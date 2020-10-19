@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     webdav_password: str
 
     class Config:
-        env_prefix = 'tes_'
+        env_prefix = 'text_extraction_system_'
 
 
 settings = Settings(_env_file='.env')

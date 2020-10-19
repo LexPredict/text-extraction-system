@@ -18,6 +18,7 @@ celerybeat-schedule.db
 
 # dotenv
 .env
+.test_env
 
 # virtualenv
 venv/
