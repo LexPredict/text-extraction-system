@@ -1,4 +1,4 @@
-from tes.file_storage import get_valid_fn
+from ..escape_utils import get_valid_fn
 
 
 def test_get_valid_fn1():

@@ -7,9 +7,11 @@ import requests
 from celery import Celery
 from textract import process
 
-from .config import settings
-from .file_storage import webdav_client, get_as_local_fn
-from .request_metadata import RequestMetadata, metadata_fn, results_fn
+from text_extraction_system.config import get_settings
+from text_extraction_system.file_storage import get_webdav_client
+from text_extraction_system.request_metadata import RequestMetadata, metadata_fn, results_fn
+
+settings = get_settings()
 
 celery_app = Celery(
     'celery_app',
@@ -24,11 +26,12 @@ celery_app.conf.update(task_track_started=True)
 def process_document(request_id: str) -> bool:
     print(f'Starting text extraction for request uid: {request_id}')
 
+    webdav_client = get_webdav_client()
     buf = BytesIO()
     webdav_client.download_from(buf, f'{request_id}/{metadata_fn}')
     meta: RequestMetadata = RequestMetadata.from_json(buf.getvalue())
     print(f'File name: {meta.file_name}')
-    with get_as_local_fn(f'{request_id}/{meta.file_name_in_storage}') as (fn, _remote_path):
+    with webdav_client.get_as_local_fn(f'{request_id}/{meta.file_name_in_storage}') as (fn, _remote_path):
         text: bytes = process(fn)
         print(f'Text: {text[:200]}')
 

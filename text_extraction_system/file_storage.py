@@ -1,41 +1,39 @@
 import os
-import re
 import tempfile
 from contextlib import contextmanager
 
 from webdav3.client import Client
 
-from .config import settings
-
-options = {
-    'webdav_hostname': settings.webdav_url,
-    'webdav_login': settings.webdav_username,
-    'webdav_password': settings.webdav_password
-}
-
-webdav_client = Client(options)
+from text_extraction_system.config import get_settings
 
 
-def get_valid_fn(s: str) -> str:
-    """
-    Return valid escaped filename from a string.
-    Removes path separators and "..". Shortens to max 64 characters.
-    Tries to keep the original extension.
+class WebDavClient(Client):
 
-    Based on the function with the same name from Django Framework.
-    """
-    fn, ext = os.path.splitext(str(s))
-    fn, ext = [re.sub(r'(?u)[^-_\w]', '_', str(ss).strip().replace(' ', '_'))
-               for ss in [fn, ext.strip('.')]]
-    return fn + '.' + ext if ext else fn
+    def __init__(self):
+        settings = get_settings()
+
+        super().__init__({
+            'webdav_hostname': settings.webdav_url,
+            'webdav_login': settings.webdav_username,
+            'webdav_password': settings.webdav_password
+        })
+
+    @contextmanager
+    def get_as_local_fn(self, remote_path: str):
+        _, ext = os.path.splitext(remote_path)
+        _fd, fn = tempfile.mkstemp(suffix=ext)
+        try:
+            self.download(remote_path=remote_path, local_path=fn)
+            yield fn, remote_path
+        finally:
+            os.remove(fn)
 
 
-@contextmanager
-def get_as_local_fn(remote_path: str):
-    _, ext = os.path.splitext(remote_path)
-    _fd, fn = tempfile.mkstemp(suffix=ext)
-    try:
-        webdav_client.download(remote_path=remote_path, local_path=fn)
-        yield fn, remote_path
-    finally:
-        os.remove(fn)
+_webdav_client: WebDavClient = None
+
+
+def get_webdav_client():
+    global _webdav_client
+    if not _webdav_client:
+        _webdav_client = WebDavClient()
+    return _webdav_client

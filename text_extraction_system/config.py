@@ -12,4 +12,11 @@ class Settings(BaseSettings):
         env_prefix = 'text_extraction_system_'
 
 
-settings = Settings(_env_file='.env')
+_settings: Settings = None
+
+
+def get_settings():
+    global _settings
+    if not _settings:
+        _settings = Settings(_env_file='.env')
+    return _settings

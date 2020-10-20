@@ -3,15 +3,17 @@ from uuid import uuid4
 
 from fastapi import FastAPI, File, UploadFile, Form
 
-from .file_storage import webdav_client, get_valid_fn
-from .request_metadata import RequestMetadata, metadata_fn
-from .tasks import process_document
+from text_extraction_system.commons.escape_utils import get_valid_fn
+from text_extraction_system.file_storage import get_webdav_client
+from text_extraction_system.request_metadata import RequestMetadata, metadata_fn
+from text_extraction_system.tasks import process_document
 
 app = FastAPI()
 
 
 @app.post('/api/v1/text_extraction_tasks/')
 async def post_text_extraction_task(file: UploadFile = File(...), call_back_url: str = Form(default=None)):
+    webdav_client = get_webdav_client()
     req = RequestMetadata(file_name=file.filename,
                           file_name_in_storage=get_valid_fn(file.filename),
                           request_id=str(uuid4()),
