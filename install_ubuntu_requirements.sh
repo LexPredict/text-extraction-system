@@ -1,3 +1,3 @@
 #!/bin/bash
 
-sudo apt-get install libpq-dev python3-dev
+sudo apt-get install virtualenv libpq-dev python3-dev
