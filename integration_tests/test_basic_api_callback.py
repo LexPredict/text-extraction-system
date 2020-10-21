@@ -28,6 +28,9 @@ def test_basic_api_call_back():
             assert meta.file_name_in_storage in file_names
             txt_fn = os.path.splitext(meta.file_name_in_storage)[0] + '.txt'
             assert txt_fn in file_names
+            pdf_fn = os.path.splitext(meta.file_name_in_storage)[0] + '.pdf'
+            assert pdf_fn in file_names
+
             text: str = z.read(txt_fn).decode('utf-8')
             assert 'Heading' in text and 'Heading Lev 2' in text
             log.info('Text extraction results look good. All assertions passed.')
