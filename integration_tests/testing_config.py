@@ -1,7 +1,7 @@
 from pydantic import BaseSettings
 
 
-class TestSettings(BaseSettings):
+class TestingSettings(BaseSettings):
     api_url: str
     call_back_server_bind_host: str
     call_back_server_bind_port: int
@@ -10,4 +10,4 @@ class TestSettings(BaseSettings):
         env_prefix = 'testing_'
 
 
-test_settings = TestSettings(_env_file='.test_env')
+test_settings = TestingSettings(_env_file='.test_env')
