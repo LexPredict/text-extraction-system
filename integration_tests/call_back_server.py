@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
 
+import logging
 import socket
 from cgi import parse_header, parse_multipart
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 from time import sleep, time
 from typing import Callable, Dict, List
+
+log = logging.getLogger(__name__)
 
 
 class MockServerRequestHandler(BaseHTTPRequestHandler):
@@ -14,19 +17,18 @@ class MockServerRequestHandler(BaseHTTPRequestHandler):
         self.server.request_received = True
 
         try:
-            print(self.path)
-            print(self.request)
-
-            print(self.headers)
+            log.info(f'POST request received to the test call-back server: {self.path}\n{self.request}')
             ctype, pdict = parse_header(self.headers['content-type'])
 
             if 'boundary' in pdict:
                 pdict['boundary'] = bytes(pdict['boundary'], "utf-8")
 
-            print("ctype", ctype, ctype == 'application/octet-stream')
-            print(pdict)
             if ctype == 'multipart/form-data':
                 multipart_data = parse_multipart(self.rfile, pdict)
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/plain')
+                self.end_headers()
+                self.wfile.write(b'Thanks!')
                 self.server.test_func(multipart_data)
             else:
                 self.send_response(400)
@@ -67,7 +69,7 @@ class DocumentCallbackServer(object):
 
     def start(self):
         self.mock_server_thread.start()
-        print(f'Started mock server at {self.bind_host}:{self.bind_port}')
+        log.info(f'Started test call-back server at {self.bind_host}:{self.bind_port}')
 
     def stop(self):
         self.mock_server.shutdown()
@@ -75,7 +77,7 @@ class DocumentCallbackServer(object):
     def wait_for_test_results(self, timeout_sec: int):
         if self.mock_server_thread.is_alive() \
                 and not self.mock_server.request_received:
-            print(f'Waiting {timeout_sec} seconds for call back...')
+            log.info(f'Waiting {timeout_sec} seconds for call back...')
         start_time = time()
         while self.mock_server_thread.is_alive() \
                 and not self.mock_server.request_received \
@@ -87,4 +89,4 @@ class DocumentCallbackServer(object):
         elif self.mock_server.test_problem is not None:
             raise Exception() from self.mock_server.test_problem
         else:
-            print(f'Done in {time() - start_time} seconds')
+            log.info(f'Done in {time() - start_time} seconds')

@@ -35,7 +35,7 @@ pip install -r requirements.txt
 ```
 cp ./docker/setenv_local.local_dev_example.sh ./docker/setenv_local.sh
 cp .env.local_dev_example .env
-cp .test_env.local_dev_example
+cp .test_env.local_dev_example .test_env
 ```
 Check/update the configuration files contents if needed.
 #### 6. Deploy Postgres and other required third-party software to the local Docker Swarm cluster
@@ -51,13 +51,39 @@ sudo ./deploy-to-swarm-cluster.sh
 ```
 cd text_extraction_system
 source venv/bin/activate
-pytest text_extraction_system
+pytest --log-cli-level=INFO text_extraction_system
 ```
-
+The unit tests do not (should not) require the .env/.test_env files.
 ### Starting Local Dev Server
 ```
 source venv/bin/activate
 
+# start web api
+uvicorn text_extraction_system.web_api:app --reload
+
+# start celery
+celery -A text_extraction_system.tasks worker
 ```
+The same commands can be used to start web api and celery in PyCharm.
 
+### Running Integration Tests
+The integration test require running WebAPI and Celery apps.
+They connect to the existing system playing the role of the API client and pass the full text extraction cycle.
 
+Terminal session 1:
+```
+source venv/bin/activate
+# start web api
+uvicorn text_extraction_system.web_api:app --reload
+```
+Terminal session 2:
+```
+source venv/bin/activate
+# start web api
+celery -A text_extraction_system.tasks worker
+```
+Terminal session 3:
+```
+source venv/bin/activate
+pytest --log-cli-level=INFO integration_tests/
+```
