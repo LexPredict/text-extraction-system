@@ -1,15 +1,23 @@
+import logging
 import os
 import subprocess
 import tempfile
 from contextlib import contextmanager
+from subprocess import CompletedProcess
 from typing import Generator
+
+log = logging.getLogger(__name__)
 
 
 class ConvertToPDFFailed(Exception):
     pass
 
 
-class OutputPDFDoesNotExistAfterConversion(Exception):
+class OutputPDFDoesNotExistAfterConversion(ConvertToPDFFailed):
+    pass
+
+
+class InputFileDoesNotExist(ConvertToPDFFailed):
     pass
 
 
@@ -23,26 +31,32 @@ def convert_to_pdf(src_fn: str) -> Generator[str, None, None]:
     a temporary directory and next yielded to the caller.
     After returning from the yield the output file and the output temp directory are removed.
     """
+    if not os.path.isfile(src_fn):
+        raise InputFileDoesNotExist(src_fn)
     temp_dir = tempfile.mkdtemp()
     src_fn_base = os.path.basename(src_fn)
     src_fn_base, src_ext = os.path.splitext(src_fn_base)
     out_fn = os.path.join(temp_dir, src_fn_base + '.pdf')
     try:
-        subprocess.run(['soffice',
-                        '--headless',
-                        '--invisible',
-                        '--nodefault',
-                        '--view',
-                        '--nolockcheck',
-                        '--nologo',
-                        '--norestore',
-                        '--nofirststartwizard',
-                        '--convert-to',
-                        'pdf',
-                        src_fn,
-                        '--outdir',
-                        temp_dir
-                        ])
+        completed_process: CompletedProcess = subprocess.run(['soffice',
+                                                              '--headless',
+                                                              '--invisible',
+                                                              '--nodefault',
+                                                              '--view',
+                                                              '--nolockcheck',
+                                                              '--nologo',
+                                                              '--norestore',
+                                                              '--nofirststartwizard',
+                                                              '--convert-to',
+                                                              'pdf',
+                                                              src_fn,
+                                                              '--outdir',
+                                                              temp_dir
+                                                              ], check=True, timeout=600, text=True,
+                                                             capture_output=True)
+        log.info(completed_process.stdout)
+        if completed_process.stderr:
+            log.error(completed_process.stderr)
         if not os.path.isfile(out_fn):
             raise OutputPDFDoesNotExistAfterConversion()
         yield out_fn
