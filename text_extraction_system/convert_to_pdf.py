@@ -38,22 +38,32 @@ def convert_to_pdf(src_fn: str) -> Generator[str, None, None]:
     src_fn_base, src_ext = os.path.splitext(src_fn_base)
     out_fn = os.path.join(temp_dir, src_fn_base + '.pdf')
     try:
-        completed_process: CompletedProcess = subprocess.run(['soffice',
-                                                              '--headless',
-                                                              '--invisible',
-                                                              '--nodefault',
-                                                              '--view',
-                                                              '--nolockcheck',
-                                                              '--nologo',
-                                                              '--norestore',
-                                                              '--nofirststartwizard',
-                                                              '--convert-to',
-                                                              'pdf',
-                                                              src_fn,
-                                                              '--outdir',
-                                                              temp_dir
-                                                              ], check=True, timeout=600, text=True,
-                                                             capture_output=True)
+        if src_ext.lower() in {'.tiff', '.jpg', '.jpeg', '.png'}:
+            completed_process: CompletedProcess = subprocess.run(['img2pdf',
+                                                                  src_fn,
+                                                                  '-o',
+                                                                  out_fn],
+                                                                 check=True,
+                                                                 text=True,
+                                                                 capture_output=True,
+                                                                 timeout=600)
+        else:
+            completed_process: CompletedProcess = subprocess.run(['soffice',
+                                                                  '--headless',
+                                                                  '--invisible',
+                                                                  '--nodefault',
+                                                                  '--view',
+                                                                  '--nolockcheck',
+                                                                  '--nologo',
+                                                                  '--norestore',
+                                                                  '--nofirststartwizard',
+                                                                  '--convert-to',
+                                                                  'pdf',
+                                                                  src_fn,
+                                                                  '--outdir',
+                                                                  temp_dir
+                                                                  ], check=True, timeout=600, text=True,
+                                                                 capture_output=True)
         log.info(completed_process.stdout)
         if completed_process.stderr:
             log.error(completed_process.stderr)
