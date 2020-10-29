@@ -37,6 +37,7 @@ olefile==0.46
 packaging==20.3
 pdfminer.six==20181108
 pep517==0.8.2
+pikepdf==1.19.3
 Pillow==8.0.0
 pluggy==0.13.1
 progress==1.5

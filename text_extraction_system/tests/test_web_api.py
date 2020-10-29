@@ -21,7 +21,8 @@ class StopHereException(Exception):
 
 @pytest.mark.asyncio
 async def test_webapi_calls_process_document(setup):
-    file_storage.get_webdav_client()
+    from text_extraction_system.commons.tests.commons import MockWebDavClient
+    file_storage._webdav_client = MockWebDavClient()
     with patch.object(file_storage._webdav_client, 'upload_to') as upload_to_method:
         with patch.object(file_storage._webdav_client, 'mkdir') as mkdir_method:
             with patch.object(file_storage._webdav_client, 'download_from') as download_method:
