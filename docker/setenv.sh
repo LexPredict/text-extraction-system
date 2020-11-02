@@ -7,17 +7,8 @@ export TEXT_EXTRACTION_SWARM_NETWORK=contraxsuite_contrax_net
 
 export DOCKER_COMPOSE_FILE=docker-compose-backend-develop.yml
 
-export DOCKER_RABBITMQ_IMAGE=rabbitmq:3-management
-export DOCKER_RABBITMQ_USER=user
-export DOCKER_RABBITMQ_PASSWORD=password
-export DOCKER_RABBITMQ_HOSTNAME=tes_rabbitmq
-export DOCKER_RABBITMQ_VHOST=vhost_tes
-
-export DOCKER_PG_HOSTNAME=tes_postgres
-export DOCKER_PG_IMAGE=postgres:13.0
-export DOCKER_PG_USER=tes1
-export DOCKER_PG_PASSWORD=tes1
-export DOCKER_PG_DB_NAME=tes1
+export DOCKER_REDIS_IMAGE=redis:6.0.9
+export DOCKER_REDIS_HOST_NAME=tes_redis
 
 export DOCKER_WEBDAV_HOSTNAME=tes_webdav
 export DOCKER_WEBDAV_IMAGE=bytemark/webdav:2.4

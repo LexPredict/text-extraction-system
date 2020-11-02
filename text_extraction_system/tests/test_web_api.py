@@ -22,16 +22,15 @@ class StopHereException(Exception):
 @pytest.mark.asyncio
 async def test_webapi_calls_process_document(setup):
     from text_extraction_system.commons.tests.commons import MockWebDavClient
+    from text_extraction_system.tasks import process_document
     file_storage._webdav_client = MockWebDavClient()
     with patch.object(file_storage._webdav_client, 'upload_to') as upload_to_method:
         with patch.object(file_storage._webdav_client, 'mkdir') as mkdir_method:
-            with patch.object(file_storage._webdav_client, 'download_from') as download_method:
-                download_method.side_effect = StopHereException()
+            with patch.object(process_document, 'apply_async') as apply_async_method:
                 from text_extraction_system.web_api import post_text_extraction_task
                 from fastapi import UploadFile
 
-                with pytest.raises(StopHereException):
-                    await post_text_extraction_task(UploadFile(filename='test.pdf'), 'return_url')
-
+                await post_text_extraction_task(UploadFile(filename='test.pdf'), 'return_url')
                 mkdir_method.assert_called_once()
                 upload_to_method.assert_called()
+                apply_async_method.assert_called_once()

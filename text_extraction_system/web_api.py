@@ -5,7 +5,7 @@ from fastapi import FastAPI, File, UploadFile, Form
 
 from text_extraction_system.commons.escape_utils import get_valid_fn
 from text_extraction_system.file_storage import get_webdav_client
-from text_extraction_system.request_metadata import RequestMetadata, metadata_fn
+from text_extraction_system.request_metadata import RequestMetadata, save_request_metadata
 from text_extraction_system.tasks import process_document
 
 app = FastAPI()
@@ -21,7 +21,7 @@ async def post_text_extraction_task(file: UploadFile = File(...), call_back_url:
                           call_back_url=call_back_url)
     webdav_client.mkdir(f'/{req.request_id}')
 
-    webdav_client.upload_to(req.to_json(indent=2), f'{req.request_id}/{metadata_fn}')
+    save_request_metadata(req)
     webdav_client.upload_to(file.file, f'{req.request_id}/{req.file_name_in_storage}')
-    process_document.apply_async((req.request_id,)).get()
+    process_document.apply_async((req.request_id,))
     return req

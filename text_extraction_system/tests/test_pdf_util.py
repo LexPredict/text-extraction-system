@@ -78,9 +78,9 @@ def test_split_pdf_file_names1():
     temp_dir = tempfile.mkdtemp()
     try:
         block_files = split_pdf_to_page_blocks(fn, temp_dir, 4)
-        assert block_files[0][-8:] == '_0_3.pdf'
-        assert block_files[1][-8:] == '_4_7.pdf'
-        assert block_files[2][-6:] == '_8.pdf'
+        assert os.path.basename(block_files[0]) == 'pdf_9_pages_0001_0004.pdf'
+        assert os.path.basename(block_files[1]) == 'pdf_9_pages_0005_0008.pdf'
+        assert os.path.basename(block_files[2]) == 'pdf_9_pages_0009.pdf'
     finally:
         shutil.rmtree(temp_dir)
 
@@ -90,9 +90,9 @@ def test_split_pdf_file_names2():
     temp_dir = tempfile.mkdtemp()
     try:
         block_files = split_pdf_to_page_blocks(fn, temp_dir, 3)
-        assert block_files[0][-8:] == '_0_2.pdf'
-        assert block_files[1][-8:] == '_3_5.pdf'
-        assert block_files[2][-8:] == '_6_8.pdf'
+        assert os.path.basename(block_files[0]) == 'pdf_9_pages_0001_0003.pdf'
+        assert os.path.basename(block_files[1]) == 'pdf_9_pages_0004_0006.pdf'
+        assert os.path.basename(block_files[2]) == 'pdf_9_pages_0007_0009.pdf'
     finally:
         shutil.rmtree(temp_dir)
 
@@ -102,9 +102,9 @@ def test_split_pdf_file_names3():
     temp_dir = tempfile.mkdtemp()
     try:
         block_files = split_pdf_to_page_blocks(fn, temp_dir, 1)
-        assert block_files[0][-6:] == '_0.pdf'
-        assert block_files[1][-6:] == '_1.pdf'
-        assert block_files[-1][-6:] == '_8.pdf'
+        assert os.path.basename(block_files[0]) == 'pdf_9_pages_0001.pdf'
+        assert os.path.basename(block_files[1]) == 'pdf_9_pages_0002.pdf'
+        assert os.path.basename(block_files[-1]) == 'pdf_9_pages_0009.pdf'
     finally:
         shutil.rmtree(temp_dir)
 
@@ -116,6 +116,29 @@ def test_split_pdf_file_names4():
         block_files = split_pdf_to_page_blocks(fn, temp_dir, 11)
         assert len(block_files) == 1
         assert block_files[0].endswith('pdf_9_pages.pdf')
+    finally:
+        shutil.rmtree(temp_dir)
+
+
+def test_split_pdf_file_names5():
+    fn = os.path.join(data_dir, 'pdf_9_pages.pdf')
+    temp_dir = tempfile.mkdtemp()
+    try:
+        block_files = split_pdf_to_page_blocks(fn, temp_dir, 3, page_block_base_name='qwerty.pdf')
+        assert os.path.basename(block_files[0]) == 'qwerty_0001_0003.pdf'
+        assert os.path.basename(block_files[1]) == 'qwerty_0004_0006.pdf'
+        assert os.path.basename(block_files[2]) == 'qwerty_0007_0009.pdf'
+    finally:
+        shutil.rmtree(temp_dir)
+
+
+def test_split_pdf_file_names6():
+    fn = os.path.join(data_dir, 'pdf_9_pages.pdf')
+    temp_dir = tempfile.mkdtemp()
+    try:
+        block_files = split_pdf_to_page_blocks(fn, temp_dir, 11, page_block_base_name='aaa.pdf')
+        assert len(block_files) == 1
+        assert os.path.basename(block_files[0]) == 'aaa.pdf'
     finally:
         shutil.rmtree(temp_dir)
 

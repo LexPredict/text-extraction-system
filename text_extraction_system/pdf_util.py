@@ -8,22 +8,25 @@ import pikepdf
 def build_block_fn(src_fn: str, page_start: int, page_end: int) -> str:
     fn: str = os.path.basename(src_fn)
     if page_start == page_end:
-        fn = f'{os.path.splitext(fn)[0]}_{page_start + 1}.pdf'
+        fn = f'{os.path.splitext(fn)[0]}_{(page_start + 1):04}.pdf'
     else:
-        fn = f'{os.path.splitext(fn)[0]}_{page_start + 1}_{page_end + 1}.pdf'
+        fn = f'{os.path.splitext(fn)[0]}_{(page_start + 1):04}_{(page_end + 1):04}.pdf'
     return fn
 
 
-def split_pdf_to_page_blocks(src_pdf_fn: os.PathLike,
-                             dst_dir: os.PathLike,
-                             pages_per_block: int = 1) -> List[str]:
+def split_pdf_to_page_blocks(src_pdf_fn: str,
+                             dst_dir: str,
+                             pages_per_block: int = 1,
+                             page_block_base_name: str = None,) -> List[str]:
+    if not page_block_base_name:
+        page_block_base_name = os.path.basename(src_pdf_fn)
     res: List[str] = list()
     with pikepdf.open(src_pdf_fn) as pdf:
         if len(pdf.pages) < 1:
             return res
 
         if len(pdf.pages) < pages_per_block:
-            dst_fn = os.path.join(dst_dir, os.path.basename(src_pdf_fn))
+            dst_fn = os.path.join(dst_dir, page_block_base_name)
             shutil.copy(src_pdf_fn, dst_fn)
             res.append(dst_fn)
             return res
@@ -34,7 +37,7 @@ def split_pdf_to_page_blocks(src_pdf_fn: os.PathLike,
             for n, page in enumerate(pdf.pages):
                 if n % pages_per_block == 0:
                     if out_pdf is not None:
-                        out_fn = build_block_fn(str(src_pdf_fn), page_start, n - 1)
+                        out_fn = build_block_fn(str(page_block_base_name), page_start, n - 1)
                         out_pdf.save(os.path.join(dst_dir, out_fn))
                         out_pdf.close()
                         res.append(os.path.join(dst_dir, out_fn))
@@ -45,7 +48,7 @@ def split_pdf_to_page_blocks(src_pdf_fn: os.PathLike,
                 out_pdf.pages.append(page)
 
             if out_pdf is not None and len(out_pdf.pages) > 0:
-                out_fn = build_block_fn(str(src_pdf_fn), page_start, n)
+                out_fn = build_block_fn(str(page_block_base_name), page_start, n)
                 out_pdf.save(os.path.join(dst_dir, out_fn))
                 res.append(os.path.join(dst_dir, out_fn))
         finally:
@@ -54,7 +57,7 @@ def split_pdf_to_page_blocks(src_pdf_fn: os.PathLike,
     return res
 
 
-def join_pdf_blocks(block_fns: List[os.PathLike], dst_fn: os.PathLike):
+def join_pdf_blocks(block_fns: List[str], dst_fn: str):
     if len(block_fns) == 1:
         shutil.copy(block_fns[0], dst_fn)
         return

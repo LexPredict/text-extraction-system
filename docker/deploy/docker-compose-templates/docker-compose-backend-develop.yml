@@ -26,14 +26,10 @@ services:
     ports:
       - 8091:80
 
-  ${DOCKER_RABBITMQ_HOSTNAME}:
-    image: ${DOCKER_RABBITMQ_IMAGE}
+  ${DOCKER_REDIS_HOST_NAME}:
+    image: ${DOCKER_REDIS_IMAGE}
     networks:
       ${TEXT_EXTRACTION_SWARM_NETWORK}:
-    environment:
-      - "RABBITMQ_DEFAULT_USER=${DOCKER_RABBITMQ_USER}"
-      - "RABBITMQ_DEFAULT_PASS=${DOCKER_RABBITMQ_PASSWORD}"
-      - "RABBITMQ_DEFAULT_VHOST=${DOCKER_RABBITMQ_VHOST}"
     logging:
       driver: "json-file"
       options:
@@ -44,40 +40,13 @@ services:
       placement:
         constraints: [node.role == manager]
     volumes:
-      - rabbitmq_data:/var/lib/rabbitmq
+      - redis_data:/data
     ports: #
-      - 56721:5672 #
-
-  ${DOCKER_PG_HOSTNAME}:
-    image: ${DOCKER_PG_IMAGE}
-    networks:
-      ${TEXT_EXTRACTION_SWARM_NETWORK}:
-    environment:
-      - "PGDATA=/var/lib/tes-postgres"
-      - "POSTGRES_USER=${DOCKER_PG_USER}"
-      - "POSTGRES_PASSWORD=${DOCKER_PG_PASSWORD}"
-      - "POSTGRES_DB=${DOCKER_PG_DB_NAME}"
-    tmpfs:
-      - /tmp:size=4GB
-    volumes:
-      - postgres_data_13:/var/lib/tes-postgres
-    read_only: false
-    logging:
-      driver: "json-file"
-      options:
-        max-file: 5
-        max-size: 10m
-    deploy:
-      replicas: 1
-      placement:
-        constraints: [node.role == manager]
-    ports: #
-      - 54330:5432 #
+      - 63791:6379 #
 
 volumes:
   file_storage:
-  rabbitmq_data:
-  postgres_data_13:
+  redis_data:
 
 networks:
   ${TEXT_EXTRACTION_SWARM_NETWORK}:
