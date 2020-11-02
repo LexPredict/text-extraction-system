@@ -1,11 +1,13 @@
 from dataclasses import dataclass, field
 from datetime import datetime
+from io import BytesIO
+from typing import List, Optional
 
 from dataclasses_json import dataclass_json, config
 from marshmallow import fields
 
-metadata_fn = 'metadata.json'
-results_fn = 'results.zip'
+from text_extraction_system.constants import metadata_fn
+from text_extraction_system.file_storage import get_webdav_client
 
 
 @dataclass_json
@@ -22,3 +24,16 @@ class RequestMetadata:
         )
     )
     call_back_url: str
+    page_block_file_names: Optional[List[str]] = None
+
+
+def load_request_metadata(request_id) -> RequestMetadata:
+    webdav_client = get_webdav_client()
+    buf = BytesIO()
+    webdav_client.download_from(buf, f'{request_id}/{metadata_fn}')
+    return RequestMetadata.from_json(buf.getvalue())
+
+
+def save_request_metadata(req: RequestMetadata):
+    webdav_client = get_webdav_client()
+    webdav_client.upload_to(req.to_json(indent=2), f'{req.request_id}/{metadata_fn}')

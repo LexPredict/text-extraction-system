@@ -1,20 +1,20 @@
+import logging
 import os
 from typing import List, Dict
 from zipfile import ZipFile
-
+from io import BytesIO
+import pikepdf
 import requests
 
 from text_extraction_system.request_metadata import metadata_fn, RequestMetadata
 from .call_back_server import DocumentCallbackServer
 from .testing_config import test_settings
 
-import logging
-
 log = logging.getLogger(__name__)
 
 
 def test_basic_api_call_back():
-    fn = os.path.join(os.path.dirname(__file__), 'data', 'docx_simple.pdf')
+    fn = os.path.join(os.path.dirname(__file__), 'data', 'many_pages.odt')
 
     def assert_func(multipart_data: Dict[str, List]):
         log.info('Text extraction results received...')
@@ -25,14 +25,21 @@ def test_basic_api_call_back():
             meta: RequestMetadata = RequestMetadata.from_json(z.read(metadata_fn))
             assert os.path.basename(fn) == meta.file_name
 
-            assert meta.file_name_in_storage in file_names
+            assert os.path.splitext(meta.file_name_in_storage)[0] + '.pdf' in file_names
             txt_fn = os.path.splitext(meta.file_name_in_storage)[0] + '.txt'
             assert txt_fn in file_names
             pdf_fn = os.path.splitext(meta.file_name_in_storage)[0] + '.pdf'
             assert pdf_fn in file_names
 
             text: str = z.read(txt_fn).decode('utf-8')
-            assert 'Heading' in text and 'Heading Lev 2' in text
+            for i in range(1, 22):
+                assert f'This is page {i}' in text
+
+            buf = BytesIO()
+            buf.write(z.read(os.path.splitext(meta.file_name_in_storage)[0] + '.pdf'))
+            with pikepdf.open(buf) as pdf:
+                assert len(pdf.pages) == 22
+
             log.info('Text extraction results look good. All assertions passed.')
 
     srv = DocumentCallbackServer(bind_host=test_settings.call_back_server_bind_host,

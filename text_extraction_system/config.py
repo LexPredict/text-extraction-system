@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     webdav_url: str
     webdav_username: str
     webdav_password: str
+    split_pdf_to_pages_block_size: int = 10
 
     class Config:
         env_prefix = 'text_extraction_system_'
