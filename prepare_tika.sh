@@ -30,16 +30,18 @@ echo "Downloading jai libs..."
 curl -sSL --fail "$IMAGIO_SERVER_URL/jai-imageio-core/1.4.0/jai-imageio-core-1.4.0.jar" > ./jai-imageio-core.jar || exit 1
 curl -sSL --fail "$IMAGIO_SERVER_URL/jai-imageio-jpeg2000/1.3.0/jai-imageio-jpeg2000-1.3.0.jar" > ./jai-imageio-jpeg2000.jar || exit 1
 
-sudo apt install -y maven
 if [ -d ./tika-src/ ]; then
   rm -rf ./tika-src/
 fi
 mkdir -p ./tika-src/
 pushd ./tika-src/
 git clone https://github.com/LexPredict/tika-server.git;
-pushd ./tika-server/lexpredict-tika/
+pushd ./tika-server/
+git checkout master
+pushd ./lexpredict-tika/
 mvn install -e -DskipTests;
 cp -fu ./target/lexpredict-tika-1.0.jar ../../../lexpredict-tika.jar
+popd
 popd
 popd
 if [ -d ./tika-src/ ]; then
