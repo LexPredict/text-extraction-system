@@ -12,7 +12,7 @@ def tika_extract_xhtml(src_fn: str) -> str:
     conf: Settings = get_settings()
 
     encoding_name = 'utf-8'
-    os.environ['LEXNLP_TIKA_PARSER_MODE'] = 'pdf_ocr'
+    os.environ['LEXNLP_TIKA_PARSER_MODE'] = 'pdf_only'
     # other possible values are 'coords_embedded' and ''
     os.environ['LEXNLP_TIKA_XML_DETAIL'] = 'coords_flat'
 
