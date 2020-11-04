@@ -7,7 +7,6 @@ from zipfile import ZipFile
 
 import requests
 from celery import Celery, chord
-from textract import process
 
 from text_extraction_system.config import get_settings
 from text_extraction_system.constants import results_fn, page_blocks_for_ocr, page_blocks_ocred, metadata_fn
@@ -15,6 +14,7 @@ from text_extraction_system.convert_to_pdf import convert_to_pdf
 from text_extraction_system.file_storage import get_webdav_client
 from text_extraction_system.pdf_util import split_pdf_to_page_blocks, join_pdf_blocks
 from text_extraction_system.request_metadata import RequestMetadata, save_request_metadata, load_request_metadata
+from text_extraction_system.tika import tika_extract_xhtml
 
 settings = get_settings()
 
@@ -110,7 +110,7 @@ def join_pdfs_and_extract_text(_processed_pdf_blocks: List[str], request_id: str
 
 
 def extract_text_and_finish(pdf_fn: str, req: RequestMetadata, webdav_client):
-    text: bytes = process(pdf_fn)
+    text: str = tika_extract_xhtml(pdf_fn)
     print(f'Text: {text[:200]}')
     zip_fn = tempfile.mktemp(suffix='.zip')
     try:

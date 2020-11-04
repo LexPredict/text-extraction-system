@@ -42,6 +42,7 @@ Pillow==8.0.0
 pluggy==0.13.1
 progress==1.5
 prompt-toolkit==3.0.8
+psutil==5.7.3
 py==1.9.0
 pycryptodome==3.9.8
 pydantic==1.6.1
