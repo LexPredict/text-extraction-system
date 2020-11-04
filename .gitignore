@@ -50,3 +50,5 @@ sve/
 
 tmp/
 docker/deploy/temp
+
+tika/*.jar
