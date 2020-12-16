@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from io import BytesIO
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from dataclasses_json import dataclass_json, config
 from marshmallow import fields
@@ -24,7 +24,7 @@ class RequestMetadata:
         )
     )
     call_back_url: str
-    page_block_file_names: Optional[List[str]] = None
+    pages_for_ocr: Optional[Dict[int, str]] = None
 
 
 def load_request_metadata(request_id) -> RequestMetadata:
