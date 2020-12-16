@@ -5,10 +5,59 @@ import tempfile
 import pikepdf
 import textract
 
-from text_extraction_system.pdf_util import split_pdf_to_page_blocks, join_pdf_blocks
+from text_extraction_system.pdf_util import split_pdf_to_page_blocks, join_pdf_blocks, find_pages_requiring_ocr, \
+    get_page_sequences, extract_page_images, ocr_page_to_pdf
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
+
+def test_get_page_sequence1():
+    actual = get_page_sequences([1, 2, 3, 4, 5])
+    assert actual == [[1, 5]]
+
+
+def test_get_page_sequence2():
+    actual = get_page_sequences([2, 3, 4, 7, 8])
+    assert actual == [[2, 4], [7, 8]]
+
+
+def test_get_page_sequence3():
+    actual = get_page_sequences([2, 3, 4, 8])
+    assert actual == [[2, 4], [8, 8]]
+
+
+def test_get_page_sequence4():
+    actual = get_page_sequences([8, 2, 3, 4, 8, 8])
+    assert actual == [[2, 4], [8, 8]]
+
+
+def test_pdf_requires_ocr1():
+    fn = os.path.join(data_dir, 'ocr1.pdf')
+    pages = find_pages_requiring_ocr(fn)
+    assert pages == [1, 2]
+
+
+def test_pdf_requires_ocr2():
+    fn = os.path.join(data_dir, 'pdf_complicated.pdf')
+    pages = find_pages_requiring_ocr(fn)
+    assert not pages
+
+
+def test_extract_images():
+    fn = os.path.join(data_dir, 'ocr1.pdf')
+    dirs_to_be_deleted = list()
+    pages_to_ocr = set()
+    for page, image in extract_page_images(fn, [0, 2, 3]):
+        assert os.path.getsize(image) > 5
+        assert os.path.splitext(image)[1] == '.png'
+        dirs_to_be_deleted.append(os.path.dirname(os.path.dirname(image)))
+        pages_to_ocr.add(page)
+    for d in dirs_to_be_deleted:
+        assert not os.path.exists(d)
+    assert pages_to_ocr == {0, 2, 3}
+
+def test_ocr_page():
+    pass
 
 def test_split_pdf1():
     fn = os.path.join(data_dir, 'pdf_9_pages.pdf')
