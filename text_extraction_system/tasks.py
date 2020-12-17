@@ -2,7 +2,7 @@ import logging
 import os
 import shutil
 import tempfile
-from typing import List
+from typing import List, Dict
 from zipfile import ZipFile
 
 import requests
@@ -12,8 +12,8 @@ from text_extraction_system.config import get_settings
 from text_extraction_system.constants import results_fn, pages_for_ocr, pages_ocred, metadata_fn
 from text_extraction_system.convert_to_pdf import convert_to_pdf
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
-from text_extraction_system.pdf_work import join_pdf_blocks, find_pages_requiring_ocr, \
-    extract_page_images, ocr_page_to_pdf
+from text_extraction_system.pdf_work import find_pages_requiring_ocr, \
+    extract_page_images, ocr_page_to_pdf, merge_pfd_pages
 from text_extraction_system.request_metadata import RequestMetadata, save_request_metadata, load_request_metadata
 from text_extraction_system.tika import tika_extract_xhtml
 
@@ -40,10 +40,15 @@ def process_document(request_id: str) -> bool:
     with webdav_client.get_as_local_fn(f'{request_id}/{req.file_name_in_storage}') as (fn, _remote_path):
         ext = os.path.splitext(fn)[1]
         if ext and ext.lower() == '.pdf':
+            req.pdf_name_in_storage = req.file_name_in_storage
+            save_request_metadata(req)
             process_pdf(pdf_fn=fn, req=req, webdav_client=webdav_client)
         else:
-            with convert_to_pdf(fn) as pdf_fn:
-                split_pdf_and_schedule_ocr(pdf_fn=pdf_fn, req=req)
+            with convert_to_pdf(fn) as local_converted_pdf_fn:
+                req.pdf_name_in_storage = os.path.splitext(req.file_name_in_storage)[0] + '.pdf'
+                webdav_client.upload(f'{request_id}/{req.pdf_name_in_storage}', local_converted_pdf_fn)
+                save_request_metadata(req)
+                process_pdf(local_converted_pdf_fn, req, webdav_client)
 
     return True
 
@@ -51,7 +56,7 @@ def process_document(request_id: str) -> bool:
 def process_pdf(pdf_fn: str, req: RequestMetadata, webdav_client: WebDavClient):
     pages_to_ocr = find_pages_requiring_ocr(pdf_fn)
     if pages_to_ocr:
-        split_pdf_and_schedule_ocr(pdf_fn=pdf_fn, req=req)
+        split_pdf_and_schedule_ocr(pdf_fn=pdf_fn, req=req, pages_to_ocr=pages_to_ocr)
     else:
         extract_text_from_ocred_pdf_and_finish(pdf_fn, req, webdav_client)
 
@@ -69,8 +74,9 @@ def split_pdf_and_schedule_ocr(pdf_fn: str, req: RequestMetadata, pages_to_ocr: 
         webdav_client.upload(f'{req.request_id}/{pages_for_ocr}/{basename}',
                              image_fn)
         req.pages_for_ocr[page_num] = basename
+        dst_basename = os.path.splitext(basename)[0] + '.pdf'
         task_signatures.append(ocr_image.s(f'{req.request_id}/{pages_for_ocr}/{basename}',
-                                           f'{req.request_id}/{pages_ocred}/{basename}',
+                                           f'{req.request_id}/{pages_ocred}/{dst_basename}',
                                            ocr_language))
 
     save_request_metadata(req)
@@ -97,18 +103,24 @@ def merge_ocred_pages_and_extract_text(_ocred_page_paths: List[str], request_id:
     webdav_client = get_webdav_client()
     temp_dir = tempfile.mkdtemp()
     try:
-        local_pdf_fns: List[str] = list()
-        for pdf_fn in req.page_block_file_names:
-            local_fn = os.path.join(temp_dir, pdf_fn)
-            webdav_client.download(f'{request_id}/{page_blocks_ocred}/{pdf_fn}', local_fn)
-            local_pdf_fns.append(local_fn)
+        pages_dir = os.path.join(temp_dir, 'pages')
+        os.mkdir(pages_dir)
+        repl_page_num_to_fn: Dict[int, str] = dict()
+        for page_num, image_fn in req.pages_for_ocr.values():
+            basename = os.path.splitext(image_fn)[0] + '.pdf'
+            remote_page_pdf_fn = f'{req.request_id}/{pages_ocred}/{basename}'
+            local_page_pdf_fn = os.path.join(pages_dir, basename)
+            webdav_client.download(remote_page_pdf_fn, local_page_pdf_fn)
+            repl_page_num_to_fn[page_num] = local_page_pdf_fn
 
-        joined_pdf_fn = tempfile.mktemp(suffix='.pdf')
-        try:
-            join_pdf_blocks(local_pdf_fns, joined_pdf_fn)
-            extract_text_from_ocred_pdf_and_finish(joined_pdf_fn, req, webdav_client)
-        finally:
-            os.remove(joined_pdf_fn)
+        local_orig_pdf_fn = os.path.join(temp_dir, req.pdf_name_in_storage)
+        req.ocred_pdf_name_in_storage = os.path.splitext(req.pdf_name_in_storage)[0] + '.ocr.pdf'
+
+        webdav_client.download(f'{req.request_id}/{req.pdf_name_in_storage}', local_orig_pdf_fn)
+        with merge_pfd_pages(local_orig_pdf_fn, repl_page_num_to_fn) as local_merged_pdf_fn:
+            webdav_client.upload(f'{req.request_id}/{req.ocred_pdf_name_in_storage}', local_merged_pdf_fn)
+            save_request_metadata(req)
+            extract_text_from_ocred_pdf_and_finish(local_merged_pdf_fn, req, webdav_client)
 
     finally:
         shutil.rmtree(temp_dir)

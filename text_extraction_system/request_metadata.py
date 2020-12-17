@@ -24,6 +24,8 @@ class RequestMetadata:
     file_name: str
     file_name_in_storage: str
     call_back_url: str
+    pdf_name_in_storage: str = None
+    ocred_pdf_name_in_storage: str = None
     doc_language: str = None
     pages_for_ocr: Optional[Dict[int, str]] = None
 
