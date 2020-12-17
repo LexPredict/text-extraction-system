@@ -5,8 +5,8 @@ import tempfile
 import pikepdf
 import textract
 
-from text_extraction_system.pdf_util import split_pdf_to_page_blocks, join_pdf_blocks, find_pages_requiring_ocr, \
-    get_page_sequences, extract_page_images, ocr_page_to_pdf
+from text_extraction_system.pdf_work import split_pdf_to_page_blocks, join_pdf_blocks, find_pages_requiring_ocr, \
+    get_page_sequences, extract_page_images, ocr_page_to_pdf, get_text_of_pdf
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
@@ -56,8 +56,19 @@ def test_extract_images():
         assert not os.path.exists(d)
     assert pages_to_ocr == {0, 2, 3}
 
+
 def test_ocr_page():
-    pass
+    fn = os.path.join(data_dir, 'ocr1.pdf')
+    txt = ''
+    for page, image in extract_page_images(fn, [1, 2]):
+        with ocr_page_to_pdf(image) as pdf_fn:
+            txt += '\n' + get_text_of_pdf(pdf_fn)
+    txt = txt.replace('  ', ' ')
+    assert 'each Contributor hereby grants to You' in txt
+    assert 'You may add Your own' in txt
+    assert 'Submission of Contributions' in txt
+    assert 'END OF TERMS AND CONDITIONS' in txt
+
 
 def test_split_pdf1():
     fn = os.path.join(data_dir, 'pdf_9_pages.pdf')

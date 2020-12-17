@@ -13,8 +13,6 @@ from text_extraction_system.file_storage import get_webdav_client
 @dataclass_json
 @dataclass
 class RequestMetadata:
-    file_name: str
-    file_name_in_storage: str
     request_id: str
     request_date: datetime = field(
         metadata=config(
@@ -23,7 +21,10 @@ class RequestMetadata:
             mm_field=fields.DateTime(format='iso')
         )
     )
+    file_name: str
+    file_name_in_storage: str
     call_back_url: str
+    doc_language: str = None
     pages_for_ocr: Optional[Dict[int, str]] = None
 
 
