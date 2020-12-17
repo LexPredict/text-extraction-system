@@ -1,3 +1,4 @@
+import re
 import os
 import shutil
 import tempfile
@@ -6,7 +7,7 @@ import pikepdf
 import textract
 
 from text_extraction_system.pdf_work import split_pdf_to_page_blocks, join_pdf_blocks, find_pages_requiring_ocr, \
-    get_page_sequences, extract_page_images, ocr_page_to_pdf, get_text_of_pdf
+    get_page_sequences, extract_page_images, ocr_page_to_pdf, get_text_of_pdf, merge_pfd_pages
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
@@ -245,3 +246,18 @@ def test_join_pdfs2():
 
     finally:
         shutil.rmtree(temp_dir)
+
+
+def test_merge_pdf_pages():
+    orig_pdf = os.path.join(data_dir, 'pdf_text_4_pages.pdf')
+    repl_pages = {1: os.path.join(data_dir, 'replacement_page.pdf'),
+                  3: os.path.join(data_dir, 'smile.pdf')}
+    should_be_deleted = list()
+    with merge_pfd_pages(orig_pdf, repl_pages) as pdf_fn:
+        should_be_deleted.append(pdf_fn)
+        txt = get_text_of_pdf(pdf_fn)
+    for fn in should_be_deleted:
+        assert not os.path.isfile(fn)
+        assert not os.path.isdir(os.path.dirname(fn))
+    txt = re.sub(r'\s+', ' ', txt).strip()
+    assert txt == 'This is page 1. Replacement page! This is page 3. This is an image!'

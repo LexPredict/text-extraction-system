@@ -5,7 +5,7 @@ from io import StringIO
 from logging import getLogger
 from subprocess import Popen, PIPE, TimeoutExpired
 from tempfile import mkdtemp
-from typing import List, Optional, Tuple, Generator
+from typing import List, Optional, Tuple, Generator, Dict
 
 import pdf2image
 import pikepdf
@@ -214,3 +214,24 @@ def get_text_of_pdf(pdf_fn: str) -> str:
         for page in PDFPage.create_pages(doc):
             interpreter.process_page(page)
     return output_string.getvalue()
+
+
+@contextmanager
+def merge_pfd_pages(original_pdf_fn: str, replace_page_num_to_page_pdf_fn: Dict[int, str]) \
+        -> Generator[str, None, None]:
+    temp_dir = mkdtemp()
+    try:
+        with pikepdf.open(original_pdf_fn) as pdf:  # type: pikepdf.Pdf
+            dst_pdf: pikepdf.Pdf = pikepdf.new()
+            for n, page in enumerate(pdf.pages):
+                replace_pdf_fn: str = replace_page_num_to_page_pdf_fn.get(n)
+                if not replace_pdf_fn:
+                    dst_pdf.pages.append(page)
+                else:
+                    with pikepdf.open(replace_pdf_fn) as replace_pdf:  # type: pikepdf.Pdf
+                        dst_pdf.pages.append(replace_pdf.pages[0])
+            dst_pdf_fn = os.path.join(temp_dir, os.path.basename(original_pdf_fn))
+            dst_pdf.save(dst_pdf_fn)
+            yield dst_pdf_fn
+    finally:
+        shutil.rmtree(temp_dir)
