@@ -12,8 +12,8 @@ from text_extraction_system.config import get_settings
 from text_extraction_system.constants import results_fn, pages_for_ocr, pages_ocred, metadata_fn
 from text_extraction_system.convert_to_pdf import convert_to_pdf
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
-from text_extraction_system.pdf_util import join_pdf_blocks, find_pages_requiring_ocr, \
-    extract_page_images
+from text_extraction_system.pdf_work import join_pdf_blocks, find_pages_requiring_ocr, \
+    extract_page_images, ocr_page_to_pdf
 from text_extraction_system.request_metadata import RequestMetadata, save_request_metadata, load_request_metadata
 from text_extraction_system.tika import tika_extract_xhtml
 
@@ -61,7 +61,7 @@ def split_pdf_and_schedule_ocr(pdf_fn: str, req: RequestMetadata, pages_to_ocr: 
     webdav_client = get_webdav_client()
     webdav_client.mkdir(f'{req.request_id}/{pages_for_ocr}')
     webdav_client.mkdir(f'{req.request_id}/{pages_ocred}')
-
+    ocr_language = req.doc_language or 'eng'
     req.pages_for_ocr = dict()
     task_signatures = list()
     for page_num, image_fn in extract_page_images(pdf_fn, pages_to_ocr):
@@ -70,7 +70,8 @@ def split_pdf_and_schedule_ocr(pdf_fn: str, req: RequestMetadata, pages_to_ocr: 
                              image_fn)
         req.pages_for_ocr[page_num] = basename
         task_signatures.append(ocr_image.s(f'{req.request_id}/{pages_for_ocr}/{basename}',
-                                           f'{req.request_id}/{pages_ocred}/{basename}'))
+                                           f'{req.request_id}/{pages_ocred}/{basename}',
+                                           ocr_language))
 
     save_request_metadata(req)
     log.info(f'Starting sub-tasks for OCR-ing pdf pages:\n{req.pages_for_ocr}')
@@ -78,13 +79,14 @@ def split_pdf_and_schedule_ocr(pdf_fn: str, req: RequestMetadata, pages_to_ocr: 
 
 
 @celery_app.task(acks_late=True)
-def ocr_image(page_image_webdav_path: str, page_pdf_dst_webdav_path: str):
+def ocr_image(page_image_webdav_path: str, page_pdf_dst_webdav_path: str, ocr_language: str = 'eng'):
     log.info(f'OCR-ing image: {page_image_webdav_path}...')
     webdav_client = get_webdav_client()
 
     with webdav_client.get_as_local_fn(page_image_webdav_path) \
-            as (local_pdf_fn, _remote_path):
-        webdav_client.upload(page_pdf_dst_webdav_path, local_pdf_fn)
+            as (local_image_src, _remote_path):
+        with ocr_page_to_pdf(local_image_src, language=ocr_language) as local_pdf_fn:
+            webdav_client.upload(page_pdf_dst_webdav_path, local_pdf_fn)
     return page_pdf_dst_webdav_path
 
 

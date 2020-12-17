@@ -1,6 +1,7 @@
 import os
 import shutil
 from contextlib import contextmanager
+from io import StringIO
 from logging import getLogger
 from subprocess import Popen, PIPE, TimeoutExpired
 from tempfile import mkdtemp
@@ -8,7 +9,7 @@ from typing import List, Optional, Tuple, Generator
 
 import pdf2image
 import pikepdf
-from pdfminer.converter import PDFPageAggregator
+from pdfminer.converter import PDFPageAggregator, TextConverter
 from pdfminer.layout import LAParams, LTTextBox, LTTextLine, LTImage, LTItem, LTLayoutContainer, LTPage
 from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
@@ -200,3 +201,16 @@ def join_pdf_blocks(block_fns: List[str], dst_fn: str):
             with pikepdf.open(block_fn) as block_pdf:
                 dst_pdf.pages.extend(block_pdf.pages)
         dst_pdf.save(dst_fn)
+
+
+def get_text_of_pdf(pdf_fn: str) -> str:
+    output_string = StringIO()
+    with open(pdf_fn, 'rb') as in_file:
+        parser = PDFParser(in_file)
+        doc = PDFDocument(parser)
+        rsrcmgr = PDFResourceManager()
+        device = TextConverter(rsrcmgr, output_string, laparams=LAParams())
+        interpreter = PDFPageInterpreter(rsrcmgr, device)
+        for page in PDFPage.create_pages(doc):
+            interpreter.process_page(page)
+    return output_string.getvalue()
