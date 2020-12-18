@@ -91,39 +91,6 @@ def extract_page_images(pdf_fn: str, pages: List[int]) -> Generator[Tuple[int, s
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-class OCRException(Exception):
-    pass
-
-
-@contextmanager
-def ocr_page_to_pdf(page_image_fn: str, language: str = 'eng', timeout: int = 60) -> Generator[str, None, None]:
-    page_dir = mkdtemp(prefix='ocr_page_to_pdf_')
-    try:
-        basename = os.path.basename(page_image_fn)
-        dstfn = os.path.join(page_dir, os.path.splitext(basename)[0])
-        args = ['tesseract', '-l', str(language), '-c', 'tessedit_create_pdf=1', page_image_fn, dstfn]
-        env = os.environ.copy()
-        log.info(f'Executing tesseract: {args}')
-        proc = Popen(args, env=env, stdout=PIPE, stderr=PIPE)
-        try:
-            data, err = proc.communicate(timeout=timeout)
-            yield dstfn + '.pdf'
-        except TimeoutExpired as te:
-            proc.kill()
-            outs, errs = proc.communicate()
-            raise OCRException(f'Timeout waiting for tesseract to finish:\n{args}') from te
-        if data:
-            data = data.decode('utf8', 'ignore')
-            log.info(f'{args} stdout:\n{data}')
-        if err:
-            err = err.decode('utf8', 'ignore')
-            log.info(f'{args} stderr:\n{err}')
-        if proc.returncode != 0:
-            raise OCRException(f'Tesseract returned non-zero code:\n{args}\n{err}')
-    finally:
-        shutil.rmtree(page_dir)
-
-
 def calc_covers(lt_obj: LTItem) -> Tuple[int, int]:
     text_cover = 0
     image_cover = 0
@@ -201,19 +168,6 @@ def join_pdf_blocks(block_fns: List[str], dst_fn: str):
             with pikepdf.open(block_fn) as block_pdf:
                 dst_pdf.pages.extend(block_pdf.pages)
         dst_pdf.save(dst_fn)
-
-
-def get_text_of_pdf(pdf_fn: str) -> str:
-    output_string = StringIO()
-    with open(pdf_fn, 'rb') as in_file:
-        parser = PDFParser(in_file)
-        doc = PDFDocument(parser)
-        rsrcmgr = PDFResourceManager()
-        device = TextConverter(rsrcmgr, output_string, laparams=LAParams())
-        interpreter = PDFPageInterpreter(rsrcmgr, device)
-        for page in PDFPage.create_pages(doc):
-            interpreter.process_page(page)
-    return output_string.getvalue()
 
 
 @contextmanager

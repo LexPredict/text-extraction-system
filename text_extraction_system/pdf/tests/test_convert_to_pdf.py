@@ -5,7 +5,7 @@ import pikepdf
 import pytest
 from textract import process
 
-from text_extraction_system.convert_to_pdf import convert_to_pdf, InputFileDoesNotExist
+from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf, InputFileDoesNotExist
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
