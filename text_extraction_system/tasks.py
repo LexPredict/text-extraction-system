@@ -10,12 +10,12 @@ from celery import Celery, chord
 
 from text_extraction_system.config import get_settings
 from text_extraction_system.constants import results_fn, pages_for_ocr, pages_ocred, metadata_fn
-from text_extraction_system.convert_to_pdf import convert_to_pdf
+from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
-from text_extraction_system.pdf_work import find_pages_requiring_ocr, \
+from text_extraction_system.pdf.pdf import find_pages_requiring_ocr, \
     extract_page_images, ocr_page_to_pdf, merge_pfd_pages
 from text_extraction_system.request_metadata import RequestMetadata, save_request_metadata, load_request_metadata
-from text_extraction_system.tika import tika_extract_xhtml
+from text_extraction_system.data_extract.tika import tika_extract_xhtml
 
 settings = get_settings()
 
@@ -128,6 +128,7 @@ def merge_ocred_pages_and_extract_text(_ocred_page_paths: List[str], request_id:
 
 def extract_text_from_ocred_pdf_and_finish(pdf_fn: str, req: RequestMetadata, webdav_client):
     text: str = tika_extract_xhtml(pdf_fn)
+    req.tika_xhtml_name_in_storage
     print(f'Text: {text[:200]}')
     zip_fn = tempfile.mktemp(suffix='.zip')
     try:
