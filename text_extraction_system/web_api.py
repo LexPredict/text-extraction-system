@@ -12,16 +12,19 @@ app = FastAPI()
 
 
 @app.post('/api/v1/text_extraction_tasks/')
-async def post_text_extraction_task(file: UploadFile = File(...), call_back_url: str = Form(default=None)):
+async def post_text_extraction_task(file: UploadFile = File(...),
+                                    call_back_url: str = Form(default=None),
+                                    doc_language: str = 'eng'):
     webdav_client = get_webdav_client()
-    req = RequestMetadata(file_name=file.filename,
-                          file_name_in_storage=get_valid_fn(file.filename),
+    req = RequestMetadata(original_file_name=file.filename,
+                          original_document=get_valid_fn(file.filename),
                           request_id=str(uuid4()),
                           request_date=datetime.now(),
-                          call_back_url=call_back_url)
+                          call_back_url=call_back_url,
+                          doc_language=doc_language)
     webdav_client.mkdir(f'/{req.request_id}')
 
     save_request_metadata(req)
-    webdav_client.upload_to(file.file, f'{req.request_id}/{req.file_name_in_storage}')
+    webdav_client.upload_to(file.file, f'{req.request_id}/{req.original_document}')
     process_document.apply_async((req.request_id,))
     return req

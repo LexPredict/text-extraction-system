@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import shutil
@@ -10,12 +11,14 @@ from celery import Celery, chord
 
 from text_extraction_system.config import get_settings
 from text_extraction_system.constants import results_fn, pages_for_ocr, pages_ocred, metadata_fn
-from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
+from text_extraction_system.data_extract.data_extract import tika_extract_xhtml, extract_text_pdfminer, \
+    get_tables_from_pdf_camelot
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
+from text_extraction_system.ocr.ocr import ocr_page_to_pdf
+from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
 from text_extraction_system.pdf.pdf import find_pages_requiring_ocr, \
-    extract_page_images, ocr_page_to_pdf, merge_pfd_pages
+    extract_page_images, merge_pfd_pages
 from text_extraction_system.request_metadata import RequestMetadata, save_request_metadata, load_request_metadata
-from text_extraction_system.data_extract.tika import tika_extract_xhtml
 
 settings = get_settings()
 
@@ -36,17 +39,15 @@ def process_document(request_id: str) -> bool:
 
     webdav_client: WebDavClient = get_webdav_client()
     req: RequestMetadata = load_request_metadata(request_id)
-    log.info(f'File name: {req.file_name}')
-    with webdav_client.get_as_local_fn(f'{request_id}/{req.file_name_in_storage}') as (fn, _remote_path):
+    log.info(f'File name: {req.original_file_name}')
+    with webdav_client.get_as_local_fn(f'{request_id}/{req.original_document}') as (fn, _remote_path):
         ext = os.path.splitext(fn)[1]
         if ext and ext.lower() == '.pdf':
-            req.pdf_name_in_storage = req.file_name_in_storage
-            save_request_metadata(req)
             process_pdf(pdf_fn=fn, req=req, webdav_client=webdav_client)
         else:
             with convert_to_pdf(fn) as local_converted_pdf_fn:
-                req.pdf_name_in_storage = os.path.splitext(req.file_name_in_storage)[0] + '.pdf'
-                webdav_client.upload(f'{request_id}/{req.pdf_name_in_storage}', local_converted_pdf_fn)
+                req.converted_to_pdf = os.path.splitext(req.original_document)[0] + '.converted.pdf'
+                webdav_client.upload(f'{request_id}/{req.converted_to_pdf}', local_converted_pdf_fn)
                 save_request_metadata(req)
                 process_pdf(local_converted_pdf_fn, req, webdav_client)
 
@@ -106,19 +107,20 @@ def merge_ocred_pages_and_extract_text(_ocred_page_paths: List[str], request_id:
         pages_dir = os.path.join(temp_dir, 'pages')
         os.mkdir(pages_dir)
         repl_page_num_to_fn: Dict[int, str] = dict()
-        for page_num, image_fn in req.pages_for_ocr.values():
+        for page_num, image_fn in req.pages_for_ocr.items():
             basename = os.path.splitext(image_fn)[0] + '.pdf'
             remote_page_pdf_fn = f'{req.request_id}/{pages_ocred}/{basename}'
             local_page_pdf_fn = os.path.join(pages_dir, basename)
             webdav_client.download(remote_page_pdf_fn, local_page_pdf_fn)
             repl_page_num_to_fn[page_num] = local_page_pdf_fn
 
-        local_orig_pdf_fn = os.path.join(temp_dir, req.pdf_name_in_storage)
-        req.ocred_pdf_name_in_storage = os.path.splitext(req.pdf_name_in_storage)[0] + '.ocr.pdf'
+        original_pdf_in_storage = req.converted_to_pdf or req.original_document
+        local_orig_pdf_fn = os.path.join(temp_dir, original_pdf_in_storage)
+        req.ocred_pdf = os.path.splitext(original_pdf_in_storage)[0] + '.ocred.pdf'
 
-        webdav_client.download(f'{req.request_id}/{req.pdf_name_in_storage}', local_orig_pdf_fn)
+        webdav_client.download(f'{req.request_id}/{original_pdf_in_storage}', local_orig_pdf_fn)
         with merge_pfd_pages(local_orig_pdf_fn, repl_page_num_to_fn) as local_merged_pdf_fn:
-            webdav_client.upload(f'{req.request_id}/{req.ocred_pdf_name_in_storage}', local_merged_pdf_fn)
+            webdav_client.upload(f'{req.request_id}/{req.ocred_pdf}', local_merged_pdf_fn)
             save_request_metadata(req)
             extract_text_from_ocred_pdf_and_finish(local_merged_pdf_fn, req, webdav_client)
 
@@ -126,22 +128,54 @@ def merge_ocred_pages_and_extract_text(_ocred_page_paths: List[str], request_id:
         shutil.rmtree(temp_dir)
 
 
-def extract_text_from_ocred_pdf_and_finish(pdf_fn: str, req: RequestMetadata, webdav_client):
-    text: str = tika_extract_xhtml(pdf_fn)
-    req.tika_xhtml_name_in_storage
+def extract_text_from_ocred_pdf_and_finish(pdf_fn: str, req: RequestMetadata, webdav_client: WebDavClient):
+    req.pdf = req.ocred_pdf or req.converted_to_pdf or req.original_document
+    pdf_fn_in_storage_base = os.path.splitext(req.original_document)[0]
+
+    tika_xhtml: str = tika_extract_xhtml(pdf_fn)
+    req.tika_xhtml = pdf_fn_in_storage_base + '.tika.xhtml'
+    webdav_client.upload_to(tika_xhtml, f'{req.request_id}/{req.tika_xhtml}')
+
+    text: str = extract_text_pdfminer(pdf_fn)
+    req.plain_text = pdf_fn_in_storage_base + '.plain.txt'
+    webdav_client.upload_to(text, f'{req.request_id}/{req.plain_text}')
+
+    tables = json.dumps([t.to_dict() for t in get_tables_from_pdf_camelot(pdf_fn)], indent=2)
+    req.tables = pdf_fn_in_storage_base + '.tables.json'
+    webdav_client.upload_to(tables, f'{req.request_id}/{req.tables}')
+
+    if settings.delete_temp_files_on_request_finish:
+        if req.converted_to_pdf and req.converted_to_pdf != req.pdf:
+            webdav_client.clean(f'{req.request_id}/{req.converted_to_pdf}')
+        if req.ocred_pdf and req.ocred_pdf != req.pdf:
+            webdav_client.clean(f'{req.request_id}/{req.ocred_pdf}')
+        if req.pages_for_ocr:
+            webdav_client.clean(f'{req.request_id}/{pages_for_ocr}')
+            webdav_client.clean(f'{req.request_id}/{pages_ocred}')
+
+    req.converted_to_pdf = None
+    req.ocred_pdf = None
+
+    save_request_metadata(req)
+
+    response_meta = {k: v for k, v in req.to_dict().items() if v is not None}
+
     print(f'Text: {text[:200]}')
     zip_fn = tempfile.mktemp(suffix='.zip')
     try:
         with ZipFile(zip_fn, 'w') as zip_archive:
-            zip_archive.writestr(metadata_fn, req.to_json(indent=2))
-            text_fn = os.path.splitext(req.file_name_in_storage)[0] + '.txt'
-            zip_archive.writestr(text_fn, text)
-            zip_archive.write(pdf_fn, os.path.splitext(req.file_name_in_storage)[0] + '.pdf')
+            zip_archive.writestr(metadata_fn, json.dumps(response_meta, indent=2))
+            zip_archive.write(pdf_fn, req.pdf)
+            with webdav_client.get_as_local_fn(f'{req.request_id}/{req.original_document}') as (orig_fn, _rp):
+                zip_archive.write(orig_fn, req.original_document)
+            zip_archive.writestr(req.plain_text, text)
+            zip_archive.writestr(req.tika_xhtml, tika_xhtml)
+            zip_archive.writestr(req.tables, tables)
 
         webdav_client.upload(f'{req.request_id}/{results_fn}', zip_fn)
         if req.call_back_url:
-            log.info(f'POSTing the extraction results of {req.file_name} to {req.call_back_url}...')
+            log.info(f'POSTing the extraction results of {req.original_file_name} to {req.call_back_url}...')
             requests.post(req.call_back_url, files=dict(file=zip_fn))
-        log.info(f'Finished processing request {req.request_id} ({req.file_name}).')
+        log.info(f'Finished processing request {req.request_id} ({req.original_file_name}).')
     finally:
         os.remove(pdf_fn)
