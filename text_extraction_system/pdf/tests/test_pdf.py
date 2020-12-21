@@ -5,7 +5,7 @@ import tempfile
 
 import pikepdf
 
-from text_extraction_system.data_extract.data_extract import get_text_of_pdf_pdfminer
+from text_extraction_system.data_extract.data_extract import extract_text_pdfminer
 from text_extraction_system.pdf.pdf import split_pdf_to_page_blocks, join_pdf_blocks, find_pages_requiring_ocr, \
     get_page_sequences, extract_page_images, merge_pfd_pages
 
@@ -92,9 +92,9 @@ def test_split_pdf_text():
     temp_dir = tempfile.mkdtemp()
     try:
         block_files = split_pdf_to_page_blocks(fn, temp_dir, 4)
-        txt1 = str(get_text_of_pdf_pdfminer(block_files[0]))
-        txt2 = str(get_text_of_pdf_pdfminer(block_files[1]))
-        txt3 = str(get_text_of_pdf_pdfminer(block_files[2]))
+        txt1 = str(extract_text_pdfminer(block_files[0]))
+        txt2 = str(extract_text_pdfminer(block_files[1]))
+        txt3 = str(extract_text_pdfminer(block_files[2]))
 
         assert 'This is page 1.' in txt1
         assert 'This is page 2.' in txt1
@@ -202,7 +202,7 @@ def test_join_pdfs1():
             join_pdf_blocks(block_files, dst_fn)
             with pikepdf.open(dst_fn) as joined_pdf:
                 assert len(joined_pdf.pages) == 9
-            txt = str(get_text_of_pdf_pdfminer(dst_fn))
+            txt = str(extract_text_pdfminer(dst_fn))
             for i in range(1, 9):
                 assert f'This is page {i}.' in txt
 
@@ -224,7 +224,7 @@ def test_join_pdfs2():
             join_pdf_blocks(block_files, dst_fn)
             with pikepdf.open(dst_fn) as joined_pdf:
                 assert len(joined_pdf.pages) == 9
-            txt = str(get_text_of_pdf_pdfminer(dst_fn))
+            txt = str(extract_text_pdfminer(dst_fn))
             for i in range(1, 9):
                 assert f'This is page {i}.' in txt
 
@@ -242,7 +242,7 @@ def test_merge_pdf_pages():
     should_be_deleted = list()
     with merge_pfd_pages(orig_pdf, repl_pages) as pdf_fn:
         should_be_deleted.append(pdf_fn)
-        txt = get_text_of_pdf_pdfminer(pdf_fn)
+        txt = extract_text_pdfminer(pdf_fn)
     for fn in should_be_deleted:
         assert not os.path.isfile(fn)
         assert not os.path.isdir(os.path.dirname(fn))

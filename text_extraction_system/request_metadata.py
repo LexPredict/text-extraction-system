@@ -21,13 +21,15 @@ class RequestMetadata:
             mm_field=fields.DateTime(format='iso')
         )
     )
-    file_name: str
-    file_name_in_storage: str
+    original_file_name: str
+    original_document: str
     call_back_url: str
-    pdf_name_in_storage: str = None
-    ocred_pdf_name_in_storage: str = None
-    txt_name_in_storage: str = None
-    tables_json_name_in_storage: str = None
+    converted_to_pdf: str = None
+    ocred_pdf: str = None
+    pdf: str = None
+    tika_xhtml: str = None
+    plain_text: str = None
+    tables: str = None
     doc_language: str = None
     pages_for_ocr: Optional[Dict[int, str]] = None
 

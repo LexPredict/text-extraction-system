@@ -71,5 +71,7 @@ def convert_to_pdf(src_fn: str) -> Generator[str, None, None]:
             raise OutputPDFDoesNotExistAfterConversion()
         yield out_fn
     finally:
-        os.remove(out_fn)
-        os.rmdir(temp_dir)
+        if os.path.isfile(out_fn):
+            os.remove(out_fn)
+        if os.path.isdir(temp_dir):
+            os.rmdir(temp_dir)
