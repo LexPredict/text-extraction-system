@@ -69,6 +69,7 @@ pytoml==0.1.21
 pytz==2020.1
 redis==3.5.3
 requests==2.22.0
+requests-celery-adapters==2.0.14
 retrying==1.3.3
 six==1.12.0
 sortedcontainers==2.2.2

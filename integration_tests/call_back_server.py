@@ -2,11 +2,10 @@
 
 import logging
 import socket
-from cgi import parse_header, parse_multipart
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from threading import Thread
 from time import sleep, time
-from typing import Callable, Dict, List
+from typing import Callable, Dict, Any
 
 log = logging.getLogger(__name__)
 
@@ -18,25 +17,8 @@ class MockServerRequestHandler(BaseHTTPRequestHandler):
 
         try:
             log.info(f'POST request received to the test call-back server: {self.path}\n{self.request}')
-            ctype, pdict = parse_header(self.headers['content-type'])
-
-            if 'boundary' in pdict:
-                pdict['boundary'] = bytes(pdict['boundary'], "utf-8")
-
-            if ctype == 'multipart/form-data':
-                multipart_data = parse_multipart(self.rfile, pdict)
-                self.send_response(200)
-                self.send_header('Content-Type', 'text/plain')
-                self.end_headers()
-                self.wfile.write(b'Thanks!')
-                self.server.test_func(multipart_data)
-            else:
-                self.send_response(400)
-                self.send_header('Content-Type', 'text/plain')
-                self.end_headers()
-                self.wfile.write(b'Where is the document? '
-                                 b'It should be multipart/form-data with the document in "file" field.')
-                raise Exception(f'Wrong call back request received:\n{self.request}')
+            content_len = int(self.headers.get('content-length', 0))
+            self.server.test_func(self.rfile.read(content_len), self.headers)
         except Exception as e:
             self.server.test_problem = e
 
@@ -53,7 +35,7 @@ def get_free_port():
 
 class DocumentCallbackServer(object):
 
-    def __init__(self, bind_host: str, bind_port: int, test_func: Callable[[Dict[str, List], ], None],
+    def __init__(self, bind_host: str, bind_port: int, test_func: Callable[[Any, Dict[str, Any], ], None],
                  start: bool = True) -> None:
         super().__init__()
         self.bind_host = bind_host

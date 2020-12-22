@@ -1,13 +1,16 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from io import BytesIO
-from typing import List, Optional, Dict
+from typing import Optional, Dict, Any
 
 from dataclasses_json import dataclass_json, config
 from marshmallow import fields
 
 from text_extraction_system.constants import metadata_fn
 from text_extraction_system.file_storage import get_webdav_client
+
+STATUS_PENDING = 'PENDING'
+STATUS_DONE = 'DONE'
 
 
 @dataclass_json
@@ -23,15 +26,24 @@ class RequestMetadata:
     )
     original_file_name: str
     original_document: str
-    call_back_url: str
-    converted_to_pdf: str = None
-    ocred_pdf: str = None
-    pdf: str = None
-    tika_xhtml: str = None
-    plain_text: str = None
-    tables: str = None
-    doc_language: str = None
+    status: str = STATUS_PENDING
+    converted_to_pdf: Optional[str] = None
+    ocred_pdf: Optional[str] = None
+    pdf: Optional[str] = None
+    tika_xhtml: Optional[str] = None
+    plain_text: Optional[str] = None
+    tables: Optional[str] = None
+    doc_language: Optional[str] = None
     pages_for_ocr: Optional[Dict[int, str]] = None
+    call_back_url: Optional[str] = None
+    call_back_celery_broker: Optional[str] = None
+    call_back_celery_queue: Optional[str] = None
+    call_back_celery_task_name: Optional[str] = None
+    call_back_celery_task_id: Optional[str] = None,
+    call_back_celery_root_task_id: Optional[str] = None,
+    call_back_celery_parent_task_id: Optional[str] = None
+    call_back_additional_info: Optional[str] = None
+    call_back_celery_version: int = 4
 
 
 def load_request_metadata(request_id) -> RequestMetadata:
