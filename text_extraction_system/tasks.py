@@ -4,13 +4,12 @@ import os
 import shutil
 import tempfile
 from typing import List, Dict
-from zipfile import ZipFile
 
 import requests
 from celery import Celery, chord
 
 from text_extraction_system.config import get_settings
-from text_extraction_system.constants import results_fn, pages_for_ocr, pages_ocred, metadata_fn
+from text_extraction_system.constants import pages_for_ocr, pages_ocred
 from text_extraction_system.data_extract.data_extract import tika_extract_xhtml, extract_text_pdfminer, \
     get_tables_from_pdf_camelot
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
@@ -18,7 +17,9 @@ from text_extraction_system.ocr.ocr import ocr_page_to_pdf
 from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
 from text_extraction_system.pdf.pdf import find_pages_requiring_ocr, \
     extract_page_images, merge_pfd_pages
-from text_extraction_system.request_metadata import RequestMetadata, save_request_metadata, load_request_metadata
+from text_extraction_system.request_metadata import RequestMetadata, STATUS_DONE, save_request_metadata, \
+    load_request_metadata
+from text_extraction_system.result_delivery.celery_client import send_task
 
 settings = get_settings()
 
@@ -99,8 +100,9 @@ def ocr_image(page_image_webdav_path: str, page_pdf_dst_webdav_path: str, ocr_la
 
 @celery_app.task(acks_late=True)
 def merge_ocred_pages_and_extract_text(_ocred_page_paths: List[str], request_id: str):
-    log.info(f'Re-combining OCR-ed pdf blocks and processing the text extraction for request {request_id}...')
     req: RequestMetadata = load_request_metadata(request_id)
+    log.info(f'Re-combining OCR-ed pdf blocks and processing the text extraction for request {request_id}: '
+             f'{req.original_file_name}')
     webdav_client = get_webdav_client()
     temp_dir = tempfile.mkdtemp()
     try:
@@ -140,9 +142,11 @@ def extract_text_from_ocred_pdf_and_finish(pdf_fn: str, req: RequestMetadata, we
     req.plain_text = pdf_fn_in_storage_base + '.plain.txt'
     webdav_client.upload_to(text, f'{req.request_id}/{req.plain_text}')
 
-    tables = json.dumps([t.to_dict() for t in get_tables_from_pdf_camelot(pdf_fn)], indent=2)
-    req.tables = pdf_fn_in_storage_base + '.tables.json'
-    webdav_client.upload_to(tables, f'{req.request_id}/{req.tables}')
+    tables = get_tables_from_pdf_camelot(pdf_fn)
+    if tables:
+        tables = json.dumps([t.to_dict() for t in get_tables_from_pdf_camelot(pdf_fn)], indent=2)
+        req.tables = pdf_fn_in_storage_base + '.tables.json'
+        webdav_client.upload_to(tables, f'{req.request_id}/{req.tables}')
 
     if settings.delete_temp_files_on_request_finish:
         if req.converted_to_pdf and req.converted_to_pdf != req.pdf:
@@ -155,27 +159,28 @@ def extract_text_from_ocred_pdf_and_finish(pdf_fn: str, req: RequestMetadata, we
 
     req.converted_to_pdf = None
     req.ocred_pdf = None
+    req.status = STATUS_DONE
 
     save_request_metadata(req)
 
     response_meta = {k: v for k, v in req.to_dict().items() if v is not None}
 
-    print(f'Text: {text[:200]}')
-    zip_fn = tempfile.mktemp(suffix='.zip')
-    try:
-        with ZipFile(zip_fn, 'w') as zip_archive:
-            zip_archive.writestr(metadata_fn, json.dumps(response_meta, indent=2))
-            zip_archive.write(pdf_fn, req.pdf)
-            with webdav_client.get_as_local_fn(f'{req.request_id}/{req.original_document}') as (orig_fn, _rp):
-                zip_archive.write(orig_fn, req.original_document)
-            zip_archive.writestr(req.plain_text, text)
-            zip_archive.writestr(req.tika_xhtml, tika_xhtml)
-            zip_archive.writestr(req.tables, tables)
+    if req.call_back_url:
+        log.info(f'POSTing the extraction results of {req.original_file_name} to {req.call_back_url}...')
+        requests.post(req.call_back_url, json=response_meta)
 
-        webdav_client.upload(f'{req.request_id}/{results_fn}', zip_fn)
-        if req.call_back_url:
-            log.info(f'POSTing the extraction results of {req.original_file_name} to {req.call_back_url}...')
-            requests.post(req.call_back_url, files=dict(file=zip_fn))
-        log.info(f'Finished processing request {req.request_id} ({req.original_file_name}).')
-    finally:
-        os.remove(pdf_fn)
+    if req.call_back_celery_broker:
+        log.info(f'Sending a celery task\n'
+                 f'broker: {req.call_back_celery_broker}\n'
+                 f'queue: {req.call_back_celery_queue}\n'
+                 f'task_name: {req.call_back_celery_task_name}\n')
+        send_task(broker_url=req.call_back_celery_broker,
+                  queue=req.call_back_celery_queue,
+                  task_name=req.call_back_celery_task_name,
+                  task_kwargs=response_meta,
+                  task_id=req.call_back_celery_task_id,
+                  parent_task_id=req.call_back_celery_parent_task_id,
+                  root_task_id=req.call_back_celery_root_task_id,
+                  celery_version=req.call_back_celery_version)
+
+    log.info(f'Finished processing request {req.request_id} ({req.original_file_name}).')

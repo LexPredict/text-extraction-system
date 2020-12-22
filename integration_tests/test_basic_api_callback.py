@@ -1,13 +1,10 @@
 import logging
 import os
-from io import BytesIO
-from typing import List, Dict
-from zipfile import ZipFile
-
+from tempfile import mkstemp
 import pikepdf
 import requests
 
-from text_extraction_system.request_metadata import metadata_fn, RequestMetadata
+from text_extraction_system.request_metadata import RequestMetadata
 from .call_back_server import DocumentCallbackServer
 from .testing_config import test_settings
 
@@ -17,72 +14,78 @@ log = logging.getLogger(__name__)
 def test_basic_api_call_back():
     fn = os.path.join(os.path.dirname(__file__), 'data', 'many_pages.odt')
 
-    def assert_func(multipart_data: Dict[str, List]):
-        log.info('Text extraction results received...')
-        with ZipFile(multipart_data['file'][0].decode('ascii'), 'r') as z:
-            file_names = {zi.filename for zi in z.filelist}
-            log.info(f'Zip file contents: {file_names}')
-            assert metadata_fn in file_names
-            meta: RequestMetadata = RequestMetadata.from_json(z.read(metadata_fn))
-            assert os.path.basename(fn) == meta.original_file_name
+    def assert_func(rfile, headers):
+        log.info('Text extraction results are ready...')
+        meta: RequestMetadata = RequestMetadata.from_json(rfile)
+        assert meta.status == 'DONE'
+        assert os.path.basename(fn) == meta.original_file_name
+        assert meta.pdf == 'many_pages.converted.pdf'
+        assert meta.tables is None
+        assert meta.tika_xhtml == 'many_pages.tika.xhtml'
+        assert meta.plain_text == 'many_pages.plain.txt'
+        assert meta.call_back_additional_info == 'hello world'
 
-            assert os.path.splitext(meta.original_document)[0] + '.odt' in file_names
-            txt_fn = os.path.splitext(meta.original_document)[0] + '.plain.txt'
-            assert txt_fn in file_names
-            pdf_fn = os.path.splitext(meta.original_document)[0] + '.converted.pdf'
-            assert pdf_fn in file_names
+        text = requests \
+            .get(f'{test_settings.api_url}/api/v1/data_extraction_tasks/{meta.request_id}/{meta.plain_text}') \
+            .text
+        for i in range(1, 22):
+            assert f'This is page {i}' in text
 
-            text: str = z.read(txt_fn).decode('utf-8')
-            for i in range(1, 22):
-                assert f'This is page {i}' in text
-
-            buf = BytesIO()
-            buf.write(z.read(pdf_fn))
-            with pikepdf.open(buf) as pdf:
+        tfd, tfn = mkstemp(suffix='.pdf')
+        try:
+            with requests \
+                    .get(f'{test_settings.api_url}/api/v1/data_extraction_tasks/{meta.request_id}/{meta.pdf}') as r:
+                r.raise_for_status()
+                with open(tfn, 'wb') as tf:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        tf.write(chunk)
+            with pikepdf.open(tfn) as pdf:
                 assert len(pdf.pages) == 22
+        finally:
+            os.remove(fn)
 
-            log.info('Text extraction results look good. All assertions passed.')
+        log.info('Text extraction results look good. All assertions passed.')
 
     srv = DocumentCallbackServer(bind_host=test_settings.call_back_server_bind_host,
                                  bind_port=test_settings.call_back_server_bind_port,
                                  test_func=assert_func)
-    requests.post(test_settings.api_url + '/api/v1/text_extraction_tasks/',
-                  files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
-                  data=dict(call_back_url=f'http://{srv.bind_host}:{srv.bind_port}'))
+    resp = requests.post(test_settings.api_url + '/api/v1/data_extraction_tasks/',
+                         files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
+                         data=dict(call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
+                                   call_back_additional_info='hello world'))
+    if resp.status_code not in {200, 201}:
+        resp.raise_for_status()
     srv.wait_for_test_results(60)
 
 
 def test_basic_api_call_back2():
     fn = os.path.join(os.path.dirname(__file__), 'data', 'tables.pdf')
 
-    def assert_func(multipart_data: Dict[str, List]):
-        log.info('Text extraction results received...')
-        with ZipFile(multipart_data['file'][0].decode('ascii'), 'r') as z:
-            file_names = {zi.filename for zi in z.filelist}
-            log.info(f'Zip file contents: {file_names}')
-            assert metadata_fn in file_names
-            meta: RequestMetadata = RequestMetadata.from_json(z.read(metadata_fn))
-            assert os.path.basename(fn) == meta.original_file_name
+    def assert_func(rfile, headers):
+        log.info('Text extraction results are ready...')
+        meta: RequestMetadata = RequestMetadata.from_json(rfile)
+        assert meta.status == 'DONE'
+        assert os.path.basename(fn) == meta.original_file_name
+        assert meta.pdf == 'tables.ocred.pdf'
+        assert meta.tables == 'tables.tables.json'
+        assert meta.tika_xhtml == 'tables.tika.xhtml'
+        assert meta.plain_text == 'tables.plain.txt'
+        import json
+        buf = requests \
+            .get(f'{test_settings.api_url}/api/v1/data_extraction_tasks/{meta.request_id}/{meta.tables}') \
+            .content
+        tables = json.loads(buf)
+        assert len(tables) == 6
 
-            assert os.path.splitext(meta.original_document)[0] + '.ocred.pdf' in file_names
-            txt_fn = os.path.splitext(meta.original_document)[0] + '.plain.txt'
-            assert txt_fn in file_names
+        # Table on page 3 was originally an image. Testing tesseract with this.
+        assert tables[-1]['page'] == 3
 
-            tables_fn = os.path.splitext(meta.original_document)[0] + '.tables.json'
-            assert tables_fn in file_names
-            buf = BytesIO()
-            buf.write(z.read(tables_fn))
-            import json
-            tables = json.loads(buf.getvalue())
-            assert len(tables) == 6
-            assert tables[-1]['page'] == 3
-
-            log.info('Text extraction results look good. All assertions passed.')
+        log.info('Text extraction results look good. All assertions passed.')
 
     srv = DocumentCallbackServer(bind_host=test_settings.call_back_server_bind_host,
                                  bind_port=test_settings.call_back_server_bind_port,
                                  test_func=assert_func)
-    requests.post(test_settings.api_url + '/api/v1/text_extraction_tasks/',
+    requests.post(test_settings.api_url + '/api/v1/data_extraction_tasks/',
                   files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
                   data=dict(call_back_url=f'http://{srv.bind_host}:{srv.bind_port}'))
     srv.wait_for_test_results(60)
