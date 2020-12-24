@@ -22,19 +22,6 @@ from text_extraction_system.processes import read_output
 log = getLogger(__name__)
 
 
-def extract_text_pdfminer(pdf_fn: str) -> str:
-    output_string = StringIO()
-    with open(pdf_fn, 'rb') as in_file:
-        parser = PDFParser(in_file)
-        doc = PDFDocument(parser)
-        rsrcmgr = PDFResourceManager()
-        device = TextConverter(rsrcmgr, output_string, laparams=LAParams())
-        interpreter = PDFPageInterpreter(rsrcmgr, device)
-        for page in PDFPage.create_pages(doc):
-            interpreter.process_page(page)
-    return output_string.getvalue()
-
-
 @dataclass_json
 @dataclass
 class Rectangle:
@@ -125,29 +112,3 @@ def get_tables_from_pdf_tabula_no_page_nums(pdf_fn: str) -> List[Table]:
     ]
 
     return tables_data
-
-
-def tika_extract_xhtml(src_fn: str) -> str:
-    conf: Settings = get_settings()
-
-    encoding_name = 'utf-8'
-    os.environ['LEXNLP_TIKA_PARSER_MODE'] = 'pdf_only'
-    # other possible values are 'coords_embedded' and ''
-    os.environ['LEXNLP_TIKA_XML_DETAIL'] = 'coords_flat'
-
-    cmd = ['java',
-           '-cp',
-           f'{conf.tika_jar_path}/*',
-           '-Dsun.java2d.cmm=sun.java2d.cmm.kcms.KcmsServiceProvider',
-           'org.apache.tika.cli.TikaCLI',
-           f'--config={conf.tika_config}',
-           '-x',
-           f'-e{encoding_name}',
-           src_fn]
-
-    def err(line):
-        log.error(f'TIKA parsing {src_fn}:\n{line}')
-
-    return read_output(cmd, stderr_callback=err,
-                       encoding=encoding_name,
-                       timeout_sec=60 * 20) or ''

@@ -19,6 +19,10 @@ class MockServerRequestHandler(BaseHTTPRequestHandler):
             log.info(f'POST request received to the test call-back server: {self.path}\n{self.request}')
             content_len = int(self.headers.get('content-length', 0))
             self.server.test_func(self.rfile.read(content_len), self.headers)
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(b'Thanks!')
         except Exception as e:
             self.server.test_problem = e
 

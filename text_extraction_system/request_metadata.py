@@ -29,10 +29,11 @@ class RequestMetadata:
     status: str = STATUS_PENDING
     converted_to_pdf: Optional[str] = None
     ocred_pdf: Optional[str] = None
-    pdf: Optional[str] = None
-    tika_xhtml: Optional[str] = None
-    plain_text: Optional[str] = None
-    tables: Optional[str] = None
+    pdf_file_name: Optional[str] = None
+    tika_xhtml_file_name: Optional[str] = None
+    plain_text_file_name: Optional[str] = None
+    plain_text_structure_file_name: Optional[str] = None
+    tables_file_name: Optional[str] = None
     doc_language: Optional[str] = None
     pages_for_ocr: Optional[Dict[int, str]] = None
     call_back_url: Optional[str] = None
