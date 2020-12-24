@@ -60,3 +60,8 @@ async def get_request_file(request_id: str, file_name: str):
     webdav_client = get_webdav_client()
     resp = webdav_client.execute_request('download', f'/{request_id}/{file_name}')
     return Response(content=resp.content, status_code=resp.status_code)
+
+
+@app.delete('/api/v1/data_extraction_tasks/{request_id}')
+async def delete_request_files(request_id: str):
+    get_webdav_client().clean(f'{request_id}')

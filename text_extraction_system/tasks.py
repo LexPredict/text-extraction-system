@@ -10,8 +10,9 @@ from celery import Celery, chord
 
 from text_extraction_system.config import get_settings
 from text_extraction_system.constants import pages_for_ocr, pages_ocred
-from text_extraction_system.data_extract.data_extract import tika_extract_xhtml, extract_text_pdfminer, \
-    get_tables_from_pdf_camelot
+from text_extraction_system.data_extract.plain_text import extract_text_and_structure
+from text_extraction_system.data_extract.tables import get_tables_from_pdf_camelot
+from text_extraction_system.data_extract.tika import tika_extract_xhtml
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf
 from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
@@ -103,7 +104,9 @@ def merge_ocred_pages_and_extract_text(_ocred_page_paths: List[str], request_id:
     req: RequestMetadata = load_request_metadata(request_id)
     log.info(f'Re-combining OCR-ed pdf blocks and processing the text extraction for request {request_id}: '
              f'{req.original_file_name}')
-    webdav_client = get_webdav_client()
+    webdav_client: WebDavClient = get_webdav_client()
+    if req.status == STATUS_DONE or not webdav_client.is_dir(f'{req.request_id}/{pages_for_ocr}'):
+        return
     temp_dir = tempfile.mkdtemp()
     try:
         pages_dir = os.path.join(temp_dir, 'pages')
@@ -131,27 +134,31 @@ def merge_ocred_pages_and_extract_text(_ocred_page_paths: List[str], request_id:
 
 
 def extract_text_from_ocred_pdf_and_finish(pdf_fn: str, req: RequestMetadata, webdav_client: WebDavClient):
-    req.pdf = req.ocred_pdf or req.converted_to_pdf or req.original_document
+    req.pdf_file_name = req.ocred_pdf or req.converted_to_pdf or req.original_document
     pdf_fn_in_storage_base = os.path.splitext(req.original_document)[0]
 
     tika_xhtml: str = tika_extract_xhtml(pdf_fn)
-    req.tika_xhtml = pdf_fn_in_storage_base + '.tika.xhtml'
-    webdav_client.upload_to(tika_xhtml, f'{req.request_id}/{req.tika_xhtml}')
+    req.tika_xhtml_file_name = pdf_fn_in_storage_base + '.tika.xhtml'
+    webdav_client.upload_to(tika_xhtml, f'{req.request_id}/{req.tika_xhtml_file_name}')
 
-    text: str = extract_text_pdfminer(pdf_fn)
-    req.plain_text = pdf_fn_in_storage_base + '.plain.txt'
-    webdav_client.upload_to(text, f'{req.request_id}/{req.plain_text}')
+    text, plain_text_structure = extract_text_and_structure(pdf_fn)
+    req.plain_text_file_name = pdf_fn_in_storage_base + '.plain.txt'
+    webdav_client.upload_to(text, f'{req.request_id}/{req.plain_text_file_name}')
+
+    req.plain_text_structure_file_name = pdf_fn_in_storage_base + '.plain_struct.json'
+    plain_text_structure = json.dumps(plain_text_structure.to_dict(), indent=2)
+    webdav_client.upload_to(plain_text_structure, f'{req.request_id}/{req.plain_text_structure_file_name}')
 
     tables = get_tables_from_pdf_camelot(pdf_fn)
     if tables:
         tables = json.dumps([t.to_dict() for t in get_tables_from_pdf_camelot(pdf_fn)], indent=2)
-        req.tables = pdf_fn_in_storage_base + '.tables.json'
-        webdav_client.upload_to(tables, f'{req.request_id}/{req.tables}')
+        req.tables_file_name = pdf_fn_in_storage_base + '.tables.json'
+        webdav_client.upload_to(tables, f'{req.request_id}/{req.tables_file_name}')
 
     if settings.delete_temp_files_on_request_finish:
-        if req.converted_to_pdf and req.converted_to_pdf != req.pdf:
+        if req.converted_to_pdf and req.converted_to_pdf != req.pdf_file_name:
             webdav_client.clean(f'{req.request_id}/{req.converted_to_pdf}')
-        if req.ocred_pdf and req.ocred_pdf != req.pdf:
+        if req.ocred_pdf and req.ocred_pdf != req.pdf_file_name:
             webdav_client.clean(f'{req.request_id}/{req.ocred_pdf}')
         if req.pages_for_ocr:
             webdav_client.clean(f'{req.request_id}/{pages_for_ocr}')

@@ -7,8 +7,9 @@ from time import time
 from lxml import etree
 
 from text_extraction_system.commons.tests.commons import default_settings
-from text_extraction_system.data_extract.data_extract import tika_extract_xhtml, get_tables_from_pdf_tabula, \
-    get_tables_from_pdf_camelot, get_tables_from_pdf_tabula_no_page_nums
+from text_extraction_system.data_extract.tables import get_tables_from_pdf_tabula, get_tables_from_pdf_camelot, \
+    get_tables_from_pdf_tabula_no_page_nums
+from text_extraction_system.data_extract.tika import tika_extract_xhtml
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
