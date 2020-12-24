@@ -6,7 +6,7 @@ from typing import List, Tuple
 
 from dataclasses_json import dataclass_json
 from lexnlp.nlp.en.segments.paragraphs import get_paragraphs
-from lexnlp.nlp.en.segments.sections import get_section_spans
+from lexnlp.nlp.en.segments.sections import get_document_sections_with_titles
 from lexnlp.nlp.en.segments.sentences import pre_process_document, get_sentence_span_list
 from pdfminer import utils as pdfminer_utils
 from pdfminer.converter import TextConverter
@@ -25,23 +25,23 @@ REG_EXTRA_SPACE = re.compile(r'<[\s/]*(?:[A-Za-z]+|[Hh]\d)[\s/]*>|\x00')
 @dataclass
 class PlainTextPage:
     number: int
-    location_start: int
-    location_end: int
+    start: int
+    end: int
 
 
 @dataclass_json
 @dataclass
 class PlainTextSection:
     title: str
-    location_start: int
-    location_end: int
+    start: int
+    end: int
 
 
 @dataclass_json
 @dataclass
 class PlainTextSpan:
-    location_start: int
-    location_end: int
+    start: int
+    end: int
 
 
 @dataclass_json
@@ -63,8 +63,8 @@ def find_pages(s: str, sep: str) -> List[PlainTextPage]:
     while next_sep_pos != -1:
         cur_page_end = next_sep_pos + len(sep)
         res.append(PlainTextPage(number=cur_page_num,
-                                 location_start=cur_page_start,
-                                 location_end=cur_page_end))
+                                 start=cur_page_start,
+                                 end=cur_page_end))
         cur_page_start = cur_page_end
         cur_page_num += 1
         next_sep_pos = s.find(sep, cur_page_start)
@@ -129,11 +129,8 @@ def extract_text_and_structure(pdf_fn: str) -> Tuple[str, PlainTextStructure]:
     # Not putting it here because it should be solved on lexnlp side.
     paragraphs = [PlainTextSpan(sp[0], sp[1]) for sp in get_paragraphs(text, return_spans=True)]
 
-    sections = [PlainTextSection(title=sp['title'], location_start=sp['start'], location_end=sp['end'])
-                for sp in get_section_spans(text,
-                                            use_ml=False,
-                                            return_text=False,
-                                            skip_empty_headers=True)]
+    sections = [PlainTextSection(title=sp['title'], start=sp['start'], end=sp['end'])
+                for sp in get_document_sections_with_titles(text, sentence_list=sentence_spans)]
 
     return text, PlainTextStructure(pages=pages, sentences=sentences, paragraphs=paragraphs, sections=sections)
 
