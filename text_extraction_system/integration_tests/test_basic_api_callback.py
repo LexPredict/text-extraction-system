@@ -1,0 +1,90 @@
+import logging
+import os
+
+import pikepdf
+from pandas import DataFrame
+from text_extraction_system_api.client import TextExtractionSystemWebClient
+from text_extraction_system_api.dto import RequestStatus, PlainTextStructure, TableList, DataFrameTableList
+
+from .call_back_server import DocumentCallbackServer
+from .testing_config import test_settings
+
+log = logging.getLogger(__name__)
+
+
+def test_basic_api_call_back():
+    fn = os.path.join(os.path.dirname(__file__), 'data', 'many_pages.odt')
+    client = TextExtractionSystemWebClient(test_settings.api_url)
+
+    def assert_func(rfile, headers):
+        log.info('Text extraction results are ready...')
+        rs: RequestStatus = RequestStatus.from_json(rfile)
+        assert rs.status == 'DONE'
+        assert os.path.basename(fn) == rs.original_file_name
+        assert rs.converted_to_pdf
+        assert rs.tables_extracted is False
+        assert rs.plain_text_extracted
+        assert rs.plain_text_structure_extracted
+        assert rs.additional_info == 'hello world'
+
+        text = client.get_plain_text(rs.request_id)
+        for i in range(1, 22):
+            assert f'This is page {i}' in text
+
+        with client.get_pdf_as_local_file(rs.request_id) as tfn:
+            with pikepdf.open(tfn) as pdf:
+                assert len(pdf.pages) == 22
+
+        text_struct: PlainTextStructure = client.get_plain_text_structure(rs.request_id)
+        assert text_struct.language == 'en'
+        assert len(text_struct.pages) == 22
+        assert len(text_struct.paragraphs) > 1
+        assert len(text_struct.sentences) > 2
+
+        log.info('Text extraction results look good. All assertions passed.')
+
+    srv = DocumentCallbackServer(bind_host=test_settings.call_back_server_bind_host,
+                                 bind_port=test_settings.call_back_server_bind_port,
+                                 test_func=assert_func)
+
+    client.schedule_data_extraction(fn,
+                                    call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
+                                    call_back_additional_info='hello world')
+    srv.wait_for_test_results(60)
+
+
+def test_basic_api_call_back2():
+    fn = os.path.join(os.path.dirname(__file__), 'data', 'tables.pdf')
+    client = TextExtractionSystemWebClient(test_settings.api_url)
+
+    def assert_func(rfile, headers):
+        log.info('Text extraction results are ready...')
+        rs: RequestStatus = RequestStatus.from_json(rfile)
+        assert rs.status == 'DONE'
+        assert os.path.basename(fn) == rs.original_file_name
+        assert rs.converted_to_pdf is False
+        assert rs.searchable_pdf_created
+        assert rs.pdf_pages_ocred == [2]
+        assert rs.tables_extracted
+        assert rs.plain_text_extracted
+        assert rs.plain_text_structure_extracted
+
+        table_list_json: TableList = client.get_tables_json(rs.request_id)
+        assert len(table_list_json.tables) == 6
+
+        table_list_df: DataFrameTableList = client.get_tables_df(rs.request_id)
+
+        # Table on page 3 was originally an image. Testing tesseract with this.
+        assert table_list_df.tables[-1].page == 3
+        assert isinstance(table_list_df.tables[-1].df, DataFrame)
+
+        log.info('Text extraction results look good. All assertions passed.')
+
+    srv = DocumentCallbackServer(bind_host=test_settings.call_back_server_bind_host,
+                                 bind_port=test_settings.call_back_server_bind_port,
+                                 test_func=assert_func)
+    client.schedule_data_extraction(fn,
+                                    call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
+                                    call_back_additional_info='hello world')
+
+    srv.wait_for_test_results(60)
