@@ -1,2 +1,47 @@
 *.egg-info/
 
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+
+# IPython Notebook
+.ipynb_checkpoints
+
+# celery beat schedule file
+celerybeat-schedule
+celerybeat-schedule.db
+
+# dotenv
+.env
+.test_env
+
+# virtualenv
+venv/
+ENV/
+
+**/.idea/*
+**/.vs_code/*
+**/.vscode/*
+**/samples
+
+
+# logs, pid files
+celery_log
+*.log*
+*.log_json*
+log.txt
+*.pid
+
+.cache/
+
+.DS_Store
+
+
+tmp/
