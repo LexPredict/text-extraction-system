@@ -1,13 +1,12 @@
 import re
-from dataclasses import dataclass
 from io import StringIO
 from logging import getLogger
 from typing import List, Tuple
 
-from dataclasses_json import dataclass_json
 from lexnlp.nlp.en.segments.paragraphs import get_paragraphs
 from lexnlp.nlp.en.segments.sections import get_document_sections_with_titles
 from lexnlp.nlp.en.segments.sentences import pre_process_document, get_sentence_span_list
+from lexnlp.nlp.en.segments.titles import get_titles
 from pdfminer import utils as pdfminer_utils
 from pdfminer.converter import TextConverter
 from pdfminer.layout import LAParams
@@ -17,40 +16,12 @@ from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
 from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfparser import PDFParser
 
+from text_extraction_system.api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, PlainTextStructure, \
+    PlainTextSentence
+from text_extraction_system.data_extract.lang import get_lang_detector
+
 log = getLogger(__name__)
 REG_EXTRA_SPACE = re.compile(r'<[\s/]*(?:[A-Za-z]+|[Hh]\d)[\s/]*>|\x00')
-
-
-@dataclass_json
-@dataclass
-class PlainTextPage:
-    number: int
-    start: int
-    end: int
-
-
-@dataclass_json
-@dataclass
-class PlainTextSection:
-    title: str
-    start: int
-    end: int
-
-
-@dataclass_json
-@dataclass
-class PlainTextSpan:
-    start: int
-    end: int
-
-
-@dataclass_json
-@dataclass
-class PlainTextStructure:
-    pages: List[PlainTextPage]
-    sentences: List[PlainTextSpan]
-    paragraphs: List[PlainTextSpan]
-    sections: List[PlainTextSection]
 
 
 def find_pages(s: str, sep: str) -> List[PlainTextPage]:
@@ -123,16 +94,40 @@ def extract_text_and_structure(pdf_fn: str) -> Tuple[str, PlainTextStructure]:
     pages = find_pages(text, '\f')
 
     sentence_spans = get_sentence_span_list(text)
-    sentences = [PlainTextSpan(sp[0], sp[1]) for sp in sentence_spans]
+
+    lang = get_lang_detector()
+
+    sentences = [PlainTextSentence(start=start,
+                                   end=end,
+                                   language=lang.predict_lang(text))
+                 for start, end, text in sentence_spans]
 
     # There was a try-except in Contraxsuite catching some lexnlp exception.
     # Not putting it here because it should be solved on lexnlp side.
-    paragraphs = [PlainTextSpan(sp[0], sp[1]) for sp in get_paragraphs(text, return_spans=True)]
+    paragraphs = [PlainTextParagraph(start=start,
+                                     end=end,
+                                     language=lang.predict_lang(text))
+                  for text, start, end in get_paragraphs(text, return_spans=True)]
 
-    sections = [PlainTextSection(title=sp['title'], start=sp['start'], end=sp['end'])
-                for sp in get_document_sections_with_titles(text, sentence_list=sentence_spans)]
+    sections = [PlainTextSection(title=sect.title,
+                                 start=sect.start,
+                                 end=sect.end,
+                                 title_start=sect.title_start,
+                                 title_end=sect.title_end,
+                                 level=sect.level,
+                                 abs_level=sect.abs_level)
+                for sect in get_document_sections_with_titles(text, sentence_list=sentence_spans)]
 
-    return text, PlainTextStructure(pages=pages, sentences=sentences, paragraphs=paragraphs, sections=sections)
+    title = next(get_titles(text))
+
+    doc_lang = get_lang_detector().predict_lang(text)
+
+    return text, PlainTextStructure(title=title,
+                                    language=doc_lang,
+                                    pages=pages,
+                                    sentences=sentences,
+                                    paragraphs=paragraphs,
+                                    sections=sections)
 
 
 def extract_text_pdfminer(pdf_fn: str) -> str:

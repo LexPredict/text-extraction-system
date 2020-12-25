@@ -2,6 +2,7 @@ import os
 import tempfile
 from contextlib import contextmanager
 
+from typing import Optional
 from webdav3.client import Client
 
 from text_extraction_system.config import get_settings
@@ -29,7 +30,7 @@ class WebDavClient(Client):
             os.remove(fn)
 
 
-_webdav_client: WebDavClient = None
+_webdav_client: Optional[WebDavClient] = None
 
 
 def get_webdav_client():
