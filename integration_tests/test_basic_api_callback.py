@@ -19,14 +19,14 @@ def test_basic_api_call_back():
         meta: RequestMetadata = RequestMetadata.from_json(rfile)
         assert meta.status == 'DONE'
         assert os.path.basename(fn) == meta.original_file_name
-        assert meta.pdf_file_name == 'many_pages.converted.pdf'
-        assert meta.tables_file_name is None
-        assert meta.tika_xhtml_file_name == 'many_pages.tika.xhtml'
-        assert meta.plain_text_file_name == 'many_pages.plain.txt'
+        assert meta.pdf_file == 'many_pages.converted.pdf'
+        assert meta.tables_json_file is None
+        assert meta.tika_xhtml_file == 'many_pages.tika.xhtml'
+        assert meta.plain_text_file == 'many_pages.plain.txt'
         assert meta.call_back_additional_info == 'hello world'
 
         text = requests \
-            .get(f'{test_settings.api_url}/api/v1/data_extraction_tasks/{meta.request_id}/{meta.plain_text_file_name}') \
+            .get(f'{test_settings.api_url}/api/v1/data_extraction_tasks/{meta.request_id}/{meta.plain_text_file}') \
             .text
         for i in range(1, 22):
             assert f'This is page {i}' in text
@@ -34,7 +34,7 @@ def test_basic_api_call_back():
         tfd, tfn = mkstemp(suffix='.pdf')
         try:
             with requests \
-                    .get(f'{test_settings.api_url}/api/v1/data_extraction_tasks/{meta.request_id}/{meta.pdf_file_name}') as r:
+                    .get(f'{test_settings.api_url}/api/v1/data_extraction_tasks/{meta.request_id}/{meta.pdf_file}') as r:
                 r.raise_for_status()
                 with open(tfn, 'wb') as tf:
                     for chunk in r.iter_content(chunk_size=8192):
@@ -66,13 +66,13 @@ def test_basic_api_call_back2():
         meta: RequestMetadata = RequestMetadata.from_json(rfile)
         assert meta.status == 'DONE'
         assert os.path.basename(fn) == meta.original_file_name
-        assert meta.pdf_file_name == 'tables.ocred.pdf'
-        assert meta.tables_file_name == 'tables.tables.json'
-        assert meta.tika_xhtml_file_name == 'tables.tika.xhtml'
-        assert meta.plain_text_file_name == 'tables.plain.txt'
+        assert meta.pdf_file == 'tables.ocred.pdf'
+        assert meta.tables_json_file == 'tables.tables.json'
+        assert meta.tika_xhtml_file == 'tables.tika.xhtml'
+        assert meta.plain_text_file == 'tables.plain.txt'
         import json
         buf = requests \
-            .get(f'{test_settings.api_url}/api/v1/data_extraction_tasks/{meta.request_id}/{meta.tables_file_name}') \
+            .get(f'{test_settings.api_url}/api/v1/data_extraction_tasks/{meta.request_id}/{meta.tables_json_file}') \
             .content
         tables = json.loads(buf)
         assert len(tables) == 6

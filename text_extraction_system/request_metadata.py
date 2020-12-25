@@ -1,11 +1,12 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from io import BytesIO
-from typing import Optional, Dict, Any
+from typing import Optional, Dict
 
 from dataclasses_json import dataclass_json, config
 from marshmallow import fields
 
+from text_extraction_system.api.dto import RequestStatus
 from text_extraction_system.constants import metadata_fn
 from text_extraction_system.file_storage import get_webdav_client
 
@@ -29,11 +30,12 @@ class RequestMetadata:
     status: str = STATUS_PENDING
     converted_to_pdf: Optional[str] = None
     ocred_pdf: Optional[str] = None
-    pdf_file_name: Optional[str] = None
-    tika_xhtml_file_name: Optional[str] = None
-    plain_text_file_name: Optional[str] = None
-    plain_text_structure_file_name: Optional[str] = None
-    tables_file_name: Optional[str] = None
+    pdf_file: Optional[str] = None
+    tika_xhtml_file: Optional[str] = None
+    plain_text_file: Optional[str] = None
+    plain_text_structure_file: Optional[str] = None
+    tables_json_file: Optional[str] = None
+    tables_df_file: Optional[str] = None
     doc_language: Optional[str] = None
     pages_for_ocr: Optional[Dict[int, str]] = None
     call_back_url: Optional[str] = None
@@ -45,6 +47,18 @@ class RequestMetadata:
     call_back_celery_parent_task_id: Optional[str] = None
     call_back_additional_info: Optional[str] = None
     call_back_celery_version: int = 4
+
+    def to_request_status(self) -> RequestStatus:
+        return RequestStatus(
+            request_id=self.request_id,
+            status=self.status,
+            converted_to_pdf=self.converted_to_pdf is not None,
+            searchable_pdf_created=self.ocred_pdf is not None,
+            pdf_pages_ocred=sorted(list(self.pages_for_ocr.keys())),
+            tables_extracted=self.tables_json_file is not None,
+            plain_text_extracted=self.plain_text_file is not None,
+            plain_text_structure_extracted=self.plain_text_structure_file is not None,
+        )
 
 
 def load_request_metadata(request_id) -> RequestMetadata:

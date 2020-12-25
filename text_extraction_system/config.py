@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     split_pdf_to_pages_block_size: int = 10
     tika_jar_path: str = os.path.join(project_root, './tika')
     tika_config: str = os.path.join(project_root, './tika/tika.lexp.no.ocr.config')
+    fasttext_lang_model: str = os.path.join(project_root, './models/lid.176.bin')
     delete_temp_files_on_request_finish: bool = True
 
     class Config:

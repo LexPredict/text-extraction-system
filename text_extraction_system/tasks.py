@@ -1,18 +1,19 @@
 import json
 import logging
 import os
+import pickle
 import shutil
 import tempfile
 from typing import List, Dict
 
+import pycountry
 import requests
 from celery import Celery, chord
 
 from text_extraction_system.config import get_settings
 from text_extraction_system.constants import pages_for_ocr, pages_ocred
 from text_extraction_system.data_extract.plain_text import extract_text_and_structure
-from text_extraction_system.data_extract.tables import get_tables_from_pdf_camelot
-from text_extraction_system.data_extract.tika import tika_extract_xhtml
+from text_extraction_system.data_extract.tables import get_tables_from_pdf_camelot_dataframes
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf
 from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
@@ -70,6 +71,12 @@ def split_pdf_and_schedule_ocr(pdf_fn: str, req: RequestMetadata, pages_to_ocr: 
     webdav_client.mkdir(f'{req.request_id}/{pages_for_ocr}')
     webdav_client.mkdir(f'{req.request_id}/{pages_ocred}')
     ocr_language = req.doc_language or 'eng'
+    if len(ocr_language) == 2:
+        try:
+            ocr_language = pycountry.languages.get(alpha_2=ocr_language).alpha_3
+        except AttributeError:
+            ocr_language = 'eng'
+
     req.pages_for_ocr = dict()
     task_signatures = list()
     for page_num, image_fn in extract_page_images(pdf_fn, pages_to_ocr):
@@ -134,47 +141,46 @@ def merge_ocred_pages_and_extract_text(_ocred_page_paths: List[str], request_id:
 
 
 def extract_text_from_ocred_pdf_and_finish(pdf_fn: str, req: RequestMetadata, webdav_client: WebDavClient):
-    req.pdf_file_name = req.ocred_pdf or req.converted_to_pdf or req.original_document
+    req.pdf_file = req.ocred_pdf or req.converted_to_pdf or req.original_document
     pdf_fn_in_storage_base = os.path.splitext(req.original_document)[0]
 
-    tika_xhtml: str = tika_extract_xhtml(pdf_fn)
-    req.tika_xhtml_file_name = pdf_fn_in_storage_base + '.tika.xhtml'
-    webdav_client.upload_to(tika_xhtml, f'{req.request_id}/{req.tika_xhtml_file_name}')
+    # tika_xhtml: str = tika_extract_xhtml(pdf_fn)
+    # req.tika_xhtml_file = pdf_fn_in_storage_base + '.tika.xhtml'
+    # webdav_client.upload_to(tika_xhtml, f'{req.request_id}/{req.tika_xhtml_file}')
 
     text, plain_text_structure = extract_text_and_structure(pdf_fn)
-    req.plain_text_file_name = pdf_fn_in_storage_base + '.plain.txt'
-    webdav_client.upload_to(text, f'{req.request_id}/{req.plain_text_file_name}')
+    req.plain_text_file = pdf_fn_in_storage_base + '.plain.txt'
+    webdav_client.upload_to(text, f'{req.request_id}/{req.plain_text_file}')
 
-    req.plain_text_structure_file_name = pdf_fn_in_storage_base + '.plain_struct.json'
+    req.plain_text_structure_file = pdf_fn_in_storage_base + '.plain_struct.json'
     plain_text_structure = json.dumps(plain_text_structure.to_dict(), indent=2)
-    webdav_client.upload_to(plain_text_structure, f'{req.request_id}/{req.plain_text_structure_file_name}')
+    webdav_client.upload_to(plain_text_structure, f'{req.request_id}/{req.plain_text_structure_file}')
 
-    tables = get_tables_from_pdf_camelot(pdf_fn)
-    if tables:
-        tables = json.dumps([t.to_dict() for t in get_tables_from_pdf_camelot(pdf_fn)], indent=2)
-        req.tables_file_name = pdf_fn_in_storage_base + '.tables.json'
-        webdav_client.upload_to(tables, f'{req.request_id}/{req.tables_file_name}')
+    tables, df_tables = get_tables_from_pdf_camelot_dataframes(pdf_fn)
+    if tables or df_tables:
+        req.tables_json_file = pdf_fn_in_storage_base + '.tables.json'
+        webdav_client.upload_to(json.dumps(tables.to_dict(), indent=2),
+                                f'{req.request_id}/{req.tables_json_file}')
+
+        req.tables_df_file = pdf_fn_in_storage_base + '.tables.pickle'
+        webdav_client.upload_to(pickle.dumps(df_tables), f'{req.request_id}/{req.tables_df_file}')
 
     if settings.delete_temp_files_on_request_finish:
-        if req.converted_to_pdf and req.converted_to_pdf != req.pdf_file_name:
+        if req.converted_to_pdf and req.converted_to_pdf != req.pdf_file:
             webdav_client.clean(f'{req.request_id}/{req.converted_to_pdf}')
-        if req.ocred_pdf and req.ocred_pdf != req.pdf_file_name:
+        if req.ocred_pdf and req.ocred_pdf != req.pdf_file:
             webdav_client.clean(f'{req.request_id}/{req.ocred_pdf}')
         if req.pages_for_ocr:
             webdav_client.clean(f'{req.request_id}/{pages_for_ocr}')
             webdav_client.clean(f'{req.request_id}/{pages_ocred}')
 
-    req.converted_to_pdf = None
-    req.ocred_pdf = None
     req.status = STATUS_DONE
 
     save_request_metadata(req)
 
-    response_meta = {k: v for k, v in req.to_dict().items() if v is not None}
-
     if req.call_back_url:
         log.info(f'POSTing the extraction results of {req.original_file_name} to {req.call_back_url}...')
-        requests.post(req.call_back_url, json=response_meta)
+        requests.post(req.call_back_url, json=req.to_request_status())
 
     if req.call_back_celery_broker:
         log.info(f'Sending a celery task\n'
@@ -184,7 +190,7 @@ def extract_text_from_ocred_pdf_and_finish(pdf_fn: str, req: RequestMetadata, we
         send_task(broker_url=req.call_back_celery_broker,
                   queue=req.call_back_celery_queue,
                   task_name=req.call_back_celery_task_name,
-                  task_kwargs=response_meta,
+                  task_kwargs=req.to_request_status().to_dict(),
                   task_id=req.call_back_celery_task_id,
                   parent_task_id=req.call_back_celery_parent_task_id,
                   root_task_id=req.call_back_celery_root_task_id,

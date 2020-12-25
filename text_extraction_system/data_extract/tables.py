@@ -1,42 +1,14 @@
-import os
-from dataclasses import dataclass
-from io import StringIO
 from logging import getLogger
 from subprocess import CalledProcessError
-from typing import List
+from typing import List, Tuple
 
 import camelot
 import tabula
 from camelot.core import Table as CamelotTable, TableList as CamelotTableList
-from dataclasses_json import dataclass_json
-from pdfminer.converter import TextConverter
-from pdfminer.layout import LAParams
-from pdfminer.pdfdocument import PDFDocument
-from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
-from pdfminer.pdfpage import PDFPage
-from pdfminer.pdfparser import PDFParser
 
-from text_extraction_system.config import get_settings, Settings
-from text_extraction_system.processes import read_output
+from text_extraction_system.api.dto import Rectangle, Table, DataFrameTable, TableList, DataFrameTableList
 
 log = getLogger(__name__)
-
-
-@dataclass_json
-@dataclass
-class Rectangle:
-    left: float
-    top: float
-    width: float
-    height: float
-
-
-@dataclass_json
-@dataclass
-class Table:
-    coordinates: Rectangle
-    data: List[List[str]]
-    page: int = None
 
 
 def get_tables_from_pdf_camelot(pdf_fn: str, accuracy_threshold: float = 50) -> List[Table]:
@@ -55,6 +27,39 @@ def get_tables_from_pdf_camelot(pdf_fn: str, accuracy_threshold: float = 50) -> 
         if t.accuracy > accuracy_threshold and len(t.cells) > 0 and len(t.cells[0]) > 0
     ]
     return table_data
+
+
+def get_tables_from_pdf_camelot_dataframes(pdf_fn: str, accuracy_threshold: float = 50) -> Tuple[TableList,
+                                                                                                 DataFrameTableList]:
+    tables: CamelotTableList = camelot.read_pdf(pdf_fn, pages='all')
+    df_table_data = [
+        DataFrameTable(
+            df=t.df,
+            coordinates=Rectangle(
+                left=t.cells[0][0].x1,
+                top=t.cells[0][0].y1,
+                width=t.cells[-1][-1].x2 - t.cells[0][0].x1,
+                height=t.cells[0][0].y2 - t.cells[-1][-1].y1
+            ),
+            page=t.page
+        ) for t in tables  # type: CamelotTable
+        if t.accuracy > accuracy_threshold and len(t.cells) > 0 and len(t.cells[0]) > 0
+    ]
+
+    table_data = [
+        Table(
+            data=t.data,
+            coordinates=Rectangle(
+                left=t.cells[0][0].x1,
+                top=t.cells[0][0].y1,
+                width=t.cells[-1][-1].x2 - t.cells[0][0].x1,
+                height=t.cells[0][0].y2 - t.cells[-1][-1].y1
+            ),
+            page=t.page
+        ) for t in tables  # type: CamelotTable
+        if t.accuracy > accuracy_threshold and len(t.cells) > 0 and len(t.cells[0]) > 0
+    ]
+    return TableList(tables=table_data), DataFrameTableList(tables=df_table_data)
 
 
 def get_tables_from_pdf_tabula(pdf_fn: str) -> List[Table]:
