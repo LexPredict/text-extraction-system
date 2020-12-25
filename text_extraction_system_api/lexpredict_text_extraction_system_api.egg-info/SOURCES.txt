@@ -1,9 +1,0 @@
-setup.py
-lexpredict_text_extraction_system_api.egg-info/PKG-INFO
-lexpredict_text_extraction_system_api.egg-info/SOURCES.txt
-lexpredict_text_extraction_system_api.egg-info/dependency_links.txt
-lexpredict_text_extraction_system_api.egg-info/requires.txt
-lexpredict_text_extraction_system_api.egg-info/top_level.txt
-text_extraction_system_api/__init__.py
-text_extraction_system_api/client.py
-text_extraction_system_api/dto.py
