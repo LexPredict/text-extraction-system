@@ -1,0 +1,22 @@
+Metadata-Version: 1.2
+Name: lexpredict-text-extraction-system-api
+Version: 1.0.0
+Summary: LexPredict Text Extraction System API
+Home-page: https://contraxsuite.com
+Author: ContraxSuite, LLC
+Author-email: support@contraxsuite.com
+License: AGPL
+Description: LexPredict Text Extraction System: a tool for extracting the document text and structure ' from any document type. This package contains DTO classes and an API client implementation.
+Keywords: text extraction legal contract document analytics nlp ml machine learning natural language
+Platform: UNKNOWN
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Information Technology
+Classifier: Intended Audience :: Legal Industry
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: GNU Affero General Public License v3
+Classifier: License :: Other/Proprietary License
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Natural Language :: English
+Classifier: Topic :: Office/Business
+Classifier: Topic :: Text Processing :: Linguistic
+Requires-Python: ~=3.7
