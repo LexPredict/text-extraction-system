@@ -1,3 +1,0 @@
-testing_api_url=http://127.0.0.1:8000
-testing_call_back_server_bind_host=127.0.0.1
-testing_call_back_server_bind_port=54321
