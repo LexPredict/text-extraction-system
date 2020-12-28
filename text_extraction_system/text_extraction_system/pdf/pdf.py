@@ -189,3 +189,16 @@ def merge_pfd_pages(original_pdf_fn: str, replace_page_num_to_page_pdf_fn: Dict[
             yield dst_pdf_fn
     finally:
         shutil.rmtree(temp_dir)
+
+
+@contextmanager
+def cleanup_pdf(original_pdf_fn: str) -> Generator[str, None, None]:
+    temp_dir = mkdtemp()
+    try:
+        with pikepdf.open(original_pdf_fn) as pdf:  # type: pikepdf.Pdf
+            pdf.remove_unreferenced_resources()
+            dst_pdf_fn = os.path.join(temp_dir, os.path.basename(original_pdf_fn))
+            pdf.save(dst_pdf_fn)
+            yield dst_pdf_fn
+    finally:
+        shutil.rmtree(temp_dir)

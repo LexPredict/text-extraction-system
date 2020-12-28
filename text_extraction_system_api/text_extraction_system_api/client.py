@@ -46,7 +46,7 @@ class TextExtractionSystemWebClient:
         return resp.text
 
     def get_task_status(self, request_id: str) -> RequestStatus:
-        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}'
+        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/status.json'
         resp = requests.get(url)
         resp.raise_for_status()
         return RequestStatus.from_json(resp.content)
