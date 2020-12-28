@@ -72,4 +72,4 @@ def load_request_metadata(request_id) -> RequestMetadata:
 
 def save_request_metadata(req: RequestMetadata):
     webdav_client = get_webdav_client()
-    webdav_client.upload_to(req.to_json(indent=2), f'{req.request_id}/{metadata_fn}')
+    webdav_client.upload_to(req.to_json(indent=2).encode('utf-8'), f'{req.request_id}/{metadata_fn}')

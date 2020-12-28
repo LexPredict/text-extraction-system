@@ -53,7 +53,7 @@ async def post_text_extraction_task(file: UploadFile = File(...),
 @app.get('/api/v1/data_extraction_tasks/{request_id}/status.json', response_model=RequestStatus)
 async def get_request_status(request_id: str) -> RequestStatus:
     req = load_request_metadata(request_id)
-    return req.to_request_status()
+    return req.to_request_status().to_dict()
 
 
 def _proxy_request(webdav_client, request_id: str, fn: str):

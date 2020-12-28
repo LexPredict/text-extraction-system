@@ -18,7 +18,7 @@ from text_extraction_system.file_storage import get_webdav_client, WebDavClient
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf
 from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
 from text_extraction_system.pdf.pdf import find_pages_requiring_ocr, \
-    extract_page_images, merge_pfd_pages
+    extract_page_images, merge_pfd_pages, cleanup_pdf
 from text_extraction_system.request_metadata import RequestMetadata, STATUS_DONE, save_request_metadata, \
     load_request_metadata
 from text_extraction_system.result_delivery.celery_client import send_task
@@ -46,7 +46,12 @@ def process_document(request_id: str) -> bool:
     with webdav_client.get_as_local_fn(f'{request_id}/{req.original_document}') as (fn, _remote_path):
         ext = os.path.splitext(fn)[1]
         if ext and ext.lower() == '.pdf':
-            process_pdf(pdf_fn=fn, req=req, webdav_client=webdav_client)
+            # cleanup pdf and convert it to the format understood by other pdf libs
+            with cleanup_pdf(fn) as local_converted_pdf_fn:
+                req.converted_to_pdf = os.path.splitext(req.original_document)[0] + '.converted.pdf'
+                webdav_client.upload(f'{request_id}/{req.converted_to_pdf}', local_converted_pdf_fn)
+                save_request_metadata(req)
+                process_pdf(local_converted_pdf_fn, req, webdav_client)
         else:
             with convert_to_pdf(fn) as local_converted_pdf_fn:
                 req.converted_to_pdf = os.path.splitext(req.original_document)[0] + '.converted.pdf'
@@ -150,16 +155,16 @@ def extract_text_from_ocred_pdf_and_finish(pdf_fn: str, req: RequestMetadata, we
 
     text, plain_text_structure = extract_text_and_structure(pdf_fn)
     req.plain_text_file = pdf_fn_in_storage_base + '.plain.txt'
-    webdav_client.upload_to(text, f'{req.request_id}/{req.plain_text_file}')
+    webdav_client.upload_to(text.encode('utf-8'), f'{req.request_id}/{req.plain_text_file}')
 
     req.plain_text_structure_file = pdf_fn_in_storage_base + '.plain_struct.json'
     plain_text_structure = json.dumps(plain_text_structure.to_dict(), indent=2)
-    webdav_client.upload_to(plain_text_structure, f'{req.request_id}/{req.plain_text_structure_file}')
+    webdav_client.upload_to(plain_text_structure.encode('utf-8'), f'{req.request_id}/{req.plain_text_structure_file}')
 
     tables, df_tables = get_tables_from_pdf_camelot_dataframes(pdf_fn)
     if tables and tables.tables or df_tables and df_tables.tables:
         req.tables_json_file = pdf_fn_in_storage_base + '.tables.json'
-        webdav_client.upload_to(json.dumps(tables.to_dict(), indent=2),
+        webdav_client.upload_to(json.dumps(tables.to_dict(), indent=2).encode('utf-8'),
                                 f'{req.request_id}/{req.tables_json_file}')
 
         req.tables_df_file = pdf_fn_in_storage_base + '.tables.pickle'

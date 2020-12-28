@@ -13,13 +13,13 @@ class RequestStatus:
     request_id: str
     original_file_name: str
     status: str
-    converted_to_pdf: bool
-    searchable_pdf_created: bool
-    pdf_pages_ocred: Optional[List[int]]
-    plain_text_extracted: bool
-    plain_text_structure_extracted: bool
-    tables_extracted: bool
-    additional_info: str
+    converted_to_pdf: bool = False
+    searchable_pdf_created: bool = False
+    pdf_pages_ocred: Optional[List[int]] = None
+    plain_text_extracted: bool = False
+    plain_text_structure_extracted: bool = False
+    tables_extracted: bool = False
+    additional_info: Optional[str] = None
 
 
 @pydantic_dataclass
