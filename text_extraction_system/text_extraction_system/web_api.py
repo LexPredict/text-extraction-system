@@ -24,11 +24,13 @@ async def post_text_extraction_task(file: UploadFile = File(...),
                                     call_back_celery_parent_task_id: str = Form(default=None),
                                     call_back_celery_root_task_id: str = Form(default=None),
                                     call_back_celery_version: int = Form(default=4),
-                                    doc_language: str = Form(default='en')):
+                                    doc_language: str = Form(default='en'),
+                                    request_id: str = Form(default=None)):
     webdav_client = get_webdav_client()
+    request_id = get_valid_fn(request_id) or str(uuid4())
     req = RequestMetadata(original_file_name=file.filename,
                           original_document=get_valid_fn(file.filename),
-                          request_id=str(uuid4()),
+                          request_id=request_id,
                           request_date=datetime.now(),
                           call_back_url=call_back_url,
                           doc_language=doc_language,

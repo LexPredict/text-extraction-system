@@ -6,7 +6,7 @@ from contextlib import contextmanager
 from typing import Generator, Any, List, Optional
 
 import requests
-from text_extraction_system_api.dto import PlainTextStructure, TableList, DataFrameTableList
+from text_extraction_system_api.dto import PlainTextStructure, TableList, DataFrameTableList, RequestStatus
 
 
 class TextExtractionSystemWebClient:
@@ -26,7 +26,8 @@ class TextExtractionSystemWebClient:
                                  call_back_celery_parent_task_id: Optional[str] = None,
                                  call_back_additional_info: Optional[str] = None,
                                  doc_language: Optional[str] = None,
-                                 call_back_celery_version: int = 4) -> str:
+                                 call_back_celery_version: int = 4,
+                                 request_id: str = None) -> str:
         resp = requests.post(f'{self.base_url}/api/v1/data_extraction_tasks/',
                              files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
                              data=dict(call_back_url=call_back_url,
@@ -38,10 +39,17 @@ class TextExtractionSystemWebClient:
                                        call_back_celery_parent_task_id=call_back_celery_parent_task_id,
                                        call_back_additional_info=call_back_additional_info,
                                        call_back_celery_version=call_back_celery_version,
-                                       doc_language=doc_language))
+                                       doc_language=doc_language,
+                                       request_id=request_id))
         if resp.status_code not in {200, 201}:
             resp.raise_for_status()
         return resp.text
+
+    def get_task_status(self, request_id: str) -> RequestStatus:
+        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}'
+        resp = requests.get(url)
+        resp.raise_for_status()
+        return RequestStatus.from_json(resp.content)
 
     @contextmanager
     def get_pdf_as_local_file(self, request_id: str) -> Generator[str, None, None]:
