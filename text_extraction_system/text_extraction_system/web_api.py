@@ -3,7 +3,7 @@ from typing import AnyStr
 from uuid import uuid4
 
 from fastapi import FastAPI, File, UploadFile, Form, Response
-from text_extraction_system_api.dto import TableList, PlainTextStructure, RequestStatus
+from text_extraction_system_api.dto import TableList, PlainTextStructure, RequestStatus, VersionInfo
 
 from text_extraction_system.commons.escape_utils import get_valid_fn
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
@@ -51,7 +51,7 @@ async def post_text_extraction_task(file: UploadFile = File(...),
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/status.json', response_model=RequestStatus)
-async def get_request_status(request_id: str) -> RequestStatus:
+async def get_request_status(request_id: str):
     req = load_request_metadata(request_id)
     return req.to_request_status().to_dict()
 
@@ -97,3 +97,11 @@ async def get_searchable_pdf(request_id: str):
 @app.delete('/api/v1/data_extraction_tasks/{request_id}')
 async def delete_request_files(request_id: str):
     get_webdav_client().clean(f'{request_id}')
+
+
+@app.get('/api/v1/version.json', response_model=VersionInfo)
+async def get_request_status(request_id: str):
+    from text_extraction_system import version
+    return VersionInfo(version_number=version.VERSION_NUMBER,
+                       git_commit=version.GIT_COMMIT,
+                       build_date=version.BUILD_DATE).to_dict()

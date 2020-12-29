@@ -119,3 +119,11 @@ class DataFrameTable:
 @dataclass
 class DataFrameTableList:
     tables: List[DataFrameTable]
+
+
+@dataclass_json
+@dataclass
+class VersionInfo:
+    version_number: str
+    git_commit: str
+    build_date: str
