@@ -75,16 +75,19 @@ if [ "${DOLLAR}{ROLE}" == "unit_tests" ]; then
   su ${SHARED_USER_NAME} -c "${DOLLAR}{ACTIVATE_VENV} && ulimit -n 65535 && pytest text_extraction_system"
 elif [ "${DOLLAR}{ROLE}" == "web-api" ]; then
   startup
-  su ${SHARED_USER_NAME} -c "${DOLLAR}{ACTIVATE_VENV} && ulimit -n 65535 && uvicorn text_extraction_system.web_api:app --reload"
+  su ${SHARED_USER_NAME} -c "${DOLLAR}{ACTIVATE_VENV} && ulimit -n 65535 && uvicorn --host 0.0.0.0 --port 8000 text_extraction_system.web_api:app --reload"
 elif [ "${DOLLAR}{ROLE}" == "celery-worker" ]; then
   startup
+  mkdir -p /data/celery_worker_state/db
+  chown ${SHARED_USER_NAME}:${SHARED_USER_NAME} /data/celery_worker_state/db
   su ${SHARED_USER_NAME} -c "${DOLLAR}{ACTIVATE_VENV} && \
    ulimit -n 65535 && \
    celery -A text_extraction_system.tasks worker \
-      -l INFO --concurrency=${CPU_QUARTER_CORES} \
+      -l INFO \
+      --concurrency=${DOLLAR}{CPU_QUARTER_CORES} \
       -Ofair \
       -n celery@%h \
-      --statedb=/data/celery_worker_state/celery-worker-state-${HOSTNAME}.db"
+      --statedb=/data/celery_worker_state/db/celery-worker-state-${DOLLAR}{HOSTNAME}.db"
 elif [ "${DOLLAR}{ROLE}" == "generate-swarm-scripts" ]; then
   echo "Copying Docker Swarm deployment scripts to the mounted volume at: ${DOLLAR}{COPY_DST_DIR}..."
   if [[ ! -d /deploy_scripts_dst  ]]; then
