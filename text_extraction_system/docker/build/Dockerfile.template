@@ -5,9 +5,12 @@ ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini /tini
 RUN chmod +x /tini
 
 COPY ./temp/text_extraction_system /text_extraction_system
+COPY ./temp/text_extraction_system_api /text_extraction_system_api
 ${LEXNLP_COPY_CMD}
 COPY ./temp/requirements.txt /
+COPY ./temp/.env.local_dev_example /
 COPY ./temp/start.sh /
+COPY ./temp/deploy-docker-swarm /deploy-docker-swarm
 
 RUN ls -l /
 RUN ls -l /lexnlp
@@ -23,7 +26,7 @@ RUN apt-get -y update --fix-missing && \
 	locale-gen --purge  en_US en_US.UTF-8 && \
 	echo -e \'LANG="en_US.UTF-8"\nLANGUAGE="en_US:en"\n\' > /etc/default/locale && \
 	virtualenv -p /usr/bin/python3 /text_extraction_system/venv && chmod ug+x /text_extraction_system/venv/bin/activate && \
-	. /text_extraction_system/venv/bin/activate && python --version && pip install -r /requirements.txt && ${LEXNLP_MASTER_INSTALL_CMD} && deactivate && \
+	. /text_extraction_system/venv/bin/activate && python --version && pip install -r /requirements.txt && ${LEXNLP_MASTER_INSTALL_CMD} && pip install -c /requirements.txt -e /text_extraction_system_api && deactivate && \
     su - ${SHARED_USER_NAME} -c ". /text_extraction_system/venv/bin/activate && python -m nltk.downloader averaged_perceptron_tagger punkt stopwords words maxent_ne_chunker wordnet && deactivate" && \
     apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-ita tesseract-ocr-fra tesseract-ocr-spa tesseract-ocr-deu tesseract-ocr-rus && \
     apt-get purge -y gcc-9 g++ build-essential linux-headers* && \
