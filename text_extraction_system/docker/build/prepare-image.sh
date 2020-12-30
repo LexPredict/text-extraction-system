@@ -19,9 +19,12 @@ mkdir -p ./temp
 
 mkdir -p ./temp/text_extraction_system
 
+
 rsync --exclude='.git/' ../../text_extraction_system ./temp/text_extraction_system -a --copy-links -v
-rsync --exclude='.git/' ../../../text_extraction_system_api/text_extraction_system_api ./temp/text_extraction_system -a --copy-links -v
+rsync --exclude='.git/' ../../../text_extraction_system_api ./temp -a --copy-links -v
+
 cp ../../requirements.txt ./temp/
+cp ../../.env.local_dev_example ./temp
 
 if [[ "${LEXNLP_PROJECT_PATH}" == "" ]]; then
   echo "Will install lexnlp from its GIT repo..."
@@ -47,9 +50,20 @@ echo "VERSION_NUMBER = '${TEXT_EXTRACTION_SYSTEM_VERSION}'" > ./temp/text_extrac
 echo "GIT_COMMIT = '${TEXT_EXTRACTION_SYSTEM_GIT_COMMIT}'" >> ./temp/text_extraction_system/text_extraction_system/version.py
 echo "BUILD_DATE = '$(date --rfc-3339=seconds)'" >> ./temp/text_extraction_system/text_extraction_system/version.py
 
+# Preparing docker swarm deploy config bundled within the image
+rsync --exclude='.git/' \
+      --exclude='temp/' \
+      --exclude='setenv_local.local_dev_example.sh' \
+      --exclude='setenv_local.sh' \
+      ../deploy/ ./temp/deploy-docker-swarm -a --copy-links -v
+sed -i "/TEXT_EXTRACTION_SYSTEM_IMAGE/ c\export TEXT_EXTRACTION_SYSTEM_IMAGE=${TEXT_EXTRACTION_SYSTEM_IMAGE}" ./temp/deploy-docker-swarm/setenv.sh
+sed -i "/DOCKER_COMPOSE_FILE/ c\export DOCKER_COMPOSE_FILE=docker-compose.yml" ./temp/deploy-docker-swarm/setenv.sh
+
+
+
 envsubst < Dockerfile.template > Dockerfile
 envsubst < start.template.sh > ./temp/start.sh
 sudo docker build ${DOCKER_BUILD_FLAGS} --no-cache -t ${TEXT_EXTRACTION_SYSTEM_IMAGE} .
 
-# rm -f -r ./temp
-# rm -f -r Dockerfile
+rm -f -r ./temp
+rm -f -r Dockerfile

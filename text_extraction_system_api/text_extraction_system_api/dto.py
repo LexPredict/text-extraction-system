@@ -121,6 +121,7 @@ class DataFrameTableList:
     tables: List[DataFrameTable]
 
 
+@pydantic_dataclass
 @dataclass_json
 @dataclass
 class VersionInfo:
