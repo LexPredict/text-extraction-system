@@ -7,8 +7,8 @@ from time import time
 from lxml import etree
 
 from text_extraction_system.commons.tests.commons import default_settings
-from text_extraction_system.data_extract.tables import get_tables_from_pdf_tabula, get_tables_from_pdf_camelot, \
-    get_tables_from_pdf_tabula_no_page_nums
+from text_extraction_system.data_extract.tables import get_tables_from_pdf_tabula, \
+    get_tables_from_pdf_camelot_dataframes, get_tables_from_pdf_tabula_no_page_nums
 from text_extraction_system.data_extract.tika import tika_extract_xhtml
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
@@ -59,7 +59,7 @@ def test_table_extraction_tabula1():
 def test_table_extraction_camelot1():
     pdf_fn = os.path.join(data_dir, 'tables.pdf')
     start = time()
-    tables = get_tables_from_pdf_camelot(pdf_fn)
+    tables = get_tables_from_pdf_camelot_dataframes(pdf_fn)[0].tables
     t = time() - start
     tables_by_page = defaultdict(list)
     for tt in tables:
@@ -86,7 +86,7 @@ def test_table_extraction_camelot2():
     return
     pdf_fn = os.path.join(data_dir, 'tables2.pdf')
     start = time()
-    tables = get_tables_from_pdf_camelot(pdf_fn)
+    tables = get_tables_from_pdf_camelot_dataframes(pdf_fn)[0].tables
     t = time() - start
     assert len(tables) > 100
     assert tables[-1].page == 100

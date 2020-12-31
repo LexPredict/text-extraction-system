@@ -2,12 +2,13 @@ import os
 import re
 import shutil
 import tempfile
+import time
 
 import pikepdf
 
 from text_extraction_system.data_extract.plain_text import extract_text_pdfminer
 from text_extraction_system.pdf.pdf import split_pdf_to_page_blocks, join_pdf_blocks, find_pages_requiring_ocr, \
-    get_page_sequences, extract_page_images, merge_pfd_pages
+    get_page_sequences, extract_page_images, merge_pfd_pages, extract_all_page_images
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
@@ -248,3 +249,35 @@ def test_merge_pdf_pages():
         assert not os.path.isdir(os.path.dirname(fn))
     txt = re.sub(r'\s+', ' ', txt).strip()
     assert txt == 'This is page 1. Replacement page! This is page 3. This is an image!'
+
+
+def test_compare_image_extraction_performance():
+    # This is not a test but a small method for comparing how slower the page-to-image
+    # conversion will work if running pdf2image per page instead of running it on all pages at once.
+
+    # disabling to avoid slowing down the tests too much
+    return
+
+    pdf_fn = os.path.join(data_dir, 'tables2.pdf')
+
+    start = time.time()
+    with extract_all_page_images(pdf_fn) as image_file_names:
+        page_num = len(image_file_names)
+        print(f'Extracted {page_num} images')
+    all_pages_at_once_seconds = time.time() - start
+    page_dir = tempfile.mkdtemp()
+    page_num = 0
+    try:
+        page_pdf_fns = split_pdf_to_page_blocks(pdf_fn, page_dir)
+
+        start = time.time()
+        for page_fn in page_pdf_fns:
+            with extract_all_page_images(page_fn) as _image_file_names:
+                page_num += 1
+        all_pages_separately_seconds = time.time() - start
+    finally:
+        shutil.rmtree(page_dir)
+
+    print(f'All pages at once time: {all_pages_at_once_seconds:.3f}s\n'
+          f'All pages separately time: {all_pages_separately_seconds:.3f}s')
+    assert all_pages_separately_seconds > 2 * all_pages_at_once_seconds
