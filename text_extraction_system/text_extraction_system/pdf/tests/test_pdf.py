@@ -6,7 +6,7 @@ import time
 
 import pikepdf
 
-from text_extraction_system.data_extract.plain_text import extract_text_pdfminer
+from text_extraction_system.data_extract.data_extract import extract_text_pdfminer
 from text_extraction_system.pdf.pdf import split_pdf_to_page_blocks, join_pdf_blocks, find_pages_requiring_ocr, \
     get_page_sequences, extract_page_images, merge_pfd_pages, extract_all_page_images
 

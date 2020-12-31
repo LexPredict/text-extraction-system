@@ -4,7 +4,7 @@ from typing import Callable
 import pikepdf
 import pytest
 
-from text_extraction_system.data_extract.plain_text import extract_text_pdfminer
+from text_extraction_system.data_extract.data_extract import extract_text_pdfminer
 from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf, InputFileDoesNotExist
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
