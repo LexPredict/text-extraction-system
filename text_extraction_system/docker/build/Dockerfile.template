@@ -34,7 +34,10 @@ RUN apt-get -y update --fix-missing && \
     apt-get purge -y gcc-9 g++ build-essential linux-headers* && \
 	apt-get clean autoclean && \
     apt-get autoremove -y && \
-    rm -rf /var/lib/{apt,dpkg,cache,log}/ && \
+    rm -rf /var/lib/apt && \
+    rm -rf /var/lib/dpkg && \
+    rm -rf /var/lib/cache && \
+    rm -rf /var/lib/log && \
     rm -rf /root/.cache/pip/ && \
     rm -rf /lexpredict-contraxsuite-core/.git/ && \
     rm -rf /var/lib/apt/lists && \
