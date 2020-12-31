@@ -1,6 +1,6 @@
 import os
 
-from text_extraction_system.data_extract.plain_text import extract_text_pdfminer
+from text_extraction_system.data_extract.data_extract import extract_text_pdfminer
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf
 from text_extraction_system.pdf.pdf import extract_page_images
 

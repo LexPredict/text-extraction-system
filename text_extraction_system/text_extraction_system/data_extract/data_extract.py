@@ -1,4 +1,6 @@
 import re
+import shutil
+import tempfile
 from dataclasses import dataclass
 from io import StringIO
 from logging import getLogger
@@ -21,7 +23,7 @@ from pdfminer.pdfparser import PDFParser
 from text_extraction_system.data_extract.camelot.camelot import extract_tables
 from text_extraction_system.data_extract.lang import get_lang_detector
 from text_extraction_system.internal_dto import PDFPagePreProcessResults
-from text_extraction_system.pdf.pdf import page_requires_ocr
+from text_extraction_system.pdf.pdf import page_requires_ocr, extract_all_page_images
 from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, PlainTextStructure, \
     PlainTextSentence
 
@@ -92,9 +94,19 @@ class TextAndStructureConverter(TextConverter):
         return
 
 
+def extract_text_and_structure_from_file(pdf_fn: str) -> Tuple[str, PlainTextStructure]:
+    image_dir = tempfile.mkdtemp()
+    try:
+        with extract_all_page_images(pdf_fn) as page_images:
+            page_images = {k: v for k, v in enumerate(page_images)}
+            pre_pro: PDFPreProcessingResults = pre_extract_data(pdf_fn, page_images, test_for_ocr_required=False)
+            return extract_text_and_structure(pre_pro.ready_results)
+    finally:
+        shutil.rmtree(image_dir, ignore_errors=True)
+
+
 def extract_text_and_structure(pre_processed_pages: Dict[int, PDFPagePreProcessResults]) \
         -> Tuple[str, PlainTextStructure]:
-
     pre_processed_pages = [pre_processed_pages[k] for k in sorted(pre_processed_pages.keys())]
 
     text = ''.join([p.page_plain_text for p in pre_processed_pages])
@@ -102,7 +114,7 @@ def extract_text_and_structure(pre_processed_pages: Dict[int, PDFPagePreProcessR
     pages = list()
     page_start = 0
     for num, p in enumerate(pre_processed_pages):
-        p_res = PlainTextPage(number=num, start=page_start, end=page_start+len(p.page_plain_text))
+        p_res = PlainTextPage(number=num, start=page_start, end=page_start + len(p.page_plain_text))
         pages.append(p_res)
         page_start = p_res.end
 
