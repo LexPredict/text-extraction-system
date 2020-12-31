@@ -1,15 +1,13 @@
 import os
 import shutil
 from contextlib import contextmanager
-from io import StringIO
 from logging import getLogger
-from subprocess import Popen, PIPE, TimeoutExpired
 from tempfile import mkdtemp
 from typing import List, Optional, Tuple, Generator, Dict
 
 import pdf2image
 import pikepdf
-from pdfminer.converter import PDFPageAggregator, TextConverter
+from pdfminer.converter import PDFPageAggregator
 from pdfminer.layout import LAParams, LTTextBox, LTTextLine, LTImage, LTItem, LTLayoutContainer, LTPage
 from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
@@ -18,6 +16,9 @@ from pdfminer.pdfparser import PDFParser
 
 log = getLogger(__name__)
 
+def page_requires_ocr(page_layout: LTPage) -> bool:
+    text_cover, image_cover = calc_covers(page_layout)
+    return text_cover < 0.3 * image_cover
 
 def find_pages_requiring_ocr(pdf_fn: str) -> Optional[List[int]]:
     pages = list()
@@ -36,8 +37,7 @@ def find_pages_requiring_ocr(pdf_fn: str) -> Optional[List[int]]:
         for page in PDFPage.create_pages(document):
             interpreter.process_page(page)
             layout: LTPage = device.get_result()
-            text_cover, image_cover = calc_covers(layout)
-            if text_cover < 0.3 * image_cover:
+            if page_requires_ocr(layout):
                 pages.append(page_num)
             page_num += 1
 
@@ -87,6 +87,21 @@ def extract_page_images(pdf_fn: str, pages: List[int]) -> Generator[Tuple[int, s
                 yield page_num, image_fn
                 os.remove(image_fn)
                 page_num += 1
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+@contextmanager
+def extract_all_page_images(pdf_fn: str) -> Generator[List[str], None, None]:
+    temp_dir = mkdtemp(prefix='pdf2image_')
+
+    try:
+        yield pdf2image.convert_from_path(pdf_path=pdf_fn,
+                                          dpi=300,
+                                          output_folder=temp_dir,
+                                          thread_count=4,
+                                          paths_only=True,
+                                          fmt='png')
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
