@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sudo apt-get install virtualenv libpq-dev python3-dev img2pdf libreoffice maven
+sudo apt-get install virtualenv libpq-dev python3-dev img2pdf libreoffice maven libpoppler-dev poppler-utils
 virtualenv -p /usr/bin/python3 venv
 source venv/bin/activate
 pip install -r requirements.txt
