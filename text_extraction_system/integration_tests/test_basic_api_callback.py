@@ -47,10 +47,10 @@ def test_basic_api_call_back():
                                  bind_port=test_settings.call_back_server_bind_port,
                                  test_func=assert_func)
 
-    client.schedule_data_extraction(fn,
-                                    call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
-                                    call_back_additional_info='hello world',
-                                    log_extra={'hello': 'world', 'test': True})
+    client.schedule_data_extraction_task(fn,
+                                         call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
+                                         call_back_additional_info='hello world',
+                                         log_extra={'hello': 'world', 'test': True})
     srv.wait_for_test_results(60)
 
 
@@ -84,9 +84,9 @@ def test_basic_api_call_back_tables():
     srv = DocumentCallbackServer(bind_host=test_settings.call_back_server_bind_host,
                                  bind_port=test_settings.call_back_server_bind_port,
                                  test_func=assert_func)
-    client.schedule_data_extraction(fn,
-                                    call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
-                                    call_back_additional_info='hello world')
+    client.schedule_data_extraction_task(fn,
+                                         call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
+                                         call_back_additional_info='hello world')
 
     srv.wait_for_test_results(60)
 
@@ -109,10 +109,10 @@ def test_basic_api_call_back_ocr():
                                  bind_port=test_settings.call_back_server_bind_port,
                                  test_func=assert_func)
 
-    client.schedule_data_extraction(fn,
-                                    call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
-                                    call_back_additional_info='hello world',
-                                    log_extra={'hello': 'world', 'test': True})
+    client.schedule_data_extraction_task(fn,
+                                         call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
+                                         call_back_additional_info='hello world',
+                                         log_extra={'hello': 'world', 'test': True})
     srv.wait_for_test_results(60)
 
 
@@ -130,8 +130,37 @@ def test_basic_api_call_back_errors():
                                  bind_port=test_settings.call_back_server_bind_port,
                                  test_func=assert_func)
 
-    client.schedule_data_extraction(fn,
-                                    call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
-                                    call_back_additional_info='hello world',
-                                    log_extra={'hello': 'world', 'test': True})
+    client.schedule_data_extraction_task(fn,
+                                         call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
+                                         call_back_additional_info='hello world',
+                                         log_extra={'hello': 'world', 'test': True})
     srv.wait_for_test_results(60)
+
+
+def test_basic_api_call_back_cancel():
+    fn = os.path.join(os.path.dirname(__file__), 'data', 'ocr1.pdf')
+    client = TextExtractionSystemWebClient(test_settings.api_url)
+
+    def assert_func(rfile, headers):
+        raise Exception('Results are unexpected. We tried to cancel the task.')
+
+    srv = DocumentCallbackServer(bind_host=test_settings.call_back_server_bind_host,
+                                 bind_port=test_settings.call_back_server_bind_port,
+                                 test_func=assert_func)
+
+    request_id = client.schedule_data_extraction_task(fn,
+                                                      call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
+                                                      call_back_additional_info='hello world',
+                                                      log_extra={'hello': 'world', 'test': True})
+
+    from time import sleep
+    sleep(10)
+    del_res = client.cancel_data_extraction_task(request_id)
+    assert del_res.task_ids
+    assert del_res.successfully_revoked
+    assert not del_res.problems
+
+    try:
+        srv.wait_for_test_results(15)
+    except TimeoutError:
+        pass

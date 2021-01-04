@@ -3,10 +3,12 @@ import os
 import pickle
 import tempfile
 from contextlib import contextmanager
-from typing import Generator, Any, List, Optional, Dict
+from typing import Generator, Optional, Dict
 
 import requests
-from text_extraction_system_api.dto import PlainTextStructure, TableList, DataFrameTableList, RequestStatus
+
+from text_extraction_system_api.dto import PlainTextStructure, TableList, DataFrameTableList, RequestStatus, \
+    TaskCancelResult
 
 
 class TextExtractionSystemWebClient:
@@ -15,20 +17,20 @@ class TextExtractionSystemWebClient:
         super().__init__()
         self.base_url = base_url
 
-    def schedule_data_extraction(self,
-                                 fn: str,
-                                 call_back_url: Optional[str] = None,
-                                 call_back_celery_broker: Optional[str] = None,
-                                 call_back_celery_queue: Optional[str] = None,
-                                 call_back_celery_task_name: Optional[str] = None,
-                                 call_back_celery_task_id: Optional[str] = None,
-                                 call_back_celery_root_task_id: Optional[str] = None,
-                                 call_back_celery_parent_task_id: Optional[str] = None,
-                                 call_back_additional_info: Optional[str] = None,
-                                 doc_language: Optional[str] = None,
-                                 call_back_celery_version: int = 4,
-                                 request_id: str = None,
-                                 log_extra: Dict[str, str] = None) -> str:
+    def schedule_data_extraction_task(self,
+                                      fn: str,
+                                      call_back_url: Optional[str] = None,
+                                      call_back_celery_broker: Optional[str] = None,
+                                      call_back_celery_queue: Optional[str] = None,
+                                      call_back_celery_task_name: Optional[str] = None,
+                                      call_back_celery_task_id: Optional[str] = None,
+                                      call_back_celery_root_task_id: Optional[str] = None,
+                                      call_back_celery_parent_task_id: Optional[str] = None,
+                                      call_back_additional_info: Optional[str] = None,
+                                      doc_language: Optional[str] = None,
+                                      call_back_celery_version: int = 4,
+                                      request_id: str = None,
+                                      log_extra: Dict[str, str] = None) -> str:
         resp = requests.post(f'{self.base_url}/api/v1/data_extraction_tasks/',
                              files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
                              data=dict(call_back_url=call_back_url,
@@ -45,9 +47,9 @@ class TextExtractionSystemWebClient:
                                        log_extra_json_key_value=json.dumps(log_extra) if log_extra else None))
         if resp.status_code not in {200, 201}:
             resp.raise_for_status()
-        return resp.text
+        return json.loads(resp.content)
 
-    def get_task_status(self, request_id: str) -> RequestStatus:
+    def get_data_extraction_task_status(self, request_id: str) -> RequestStatus:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/status.json'
         resp = requests.get(url)
         resp.raise_for_status()
@@ -91,7 +93,13 @@ class TextExtractionSystemWebClient:
         resp.raise_for_status()
         return pickle.loads(resp.content)
 
-    def delete_request_files(self, request_id: str):
-        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}'
+    def delete_data_extraction_task_files(self, request_id: str):
+        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/'
         resp = requests.delete(url)
         resp.raise_for_status()
+
+    def cancel_data_extraction_task(self, request_id: str) -> TaskCancelResult:
+        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/'
+        resp = requests.delete(url)
+        resp.raise_for_status()
+        return TaskCancelResult.from_json(resp.content)

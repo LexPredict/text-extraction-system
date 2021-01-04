@@ -1,9 +1,19 @@
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from dataclasses_json import dataclass_json
 from pandas import DataFrame
 from pydantic.dataclasses import dataclass as pydantic_dataclass
+
+
+@pydantic_dataclass
+@dataclass_json
+@dataclass
+class TaskCancelResult:
+    request_id: str
+    task_ids: List[str]
+    successfully_revoked: List[str]
+    problems: Dict[str, str]
 
 
 @pydantic_dataclass
