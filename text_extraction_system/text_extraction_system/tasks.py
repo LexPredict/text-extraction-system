@@ -15,7 +15,8 @@ from celery.signals import after_setup_logger
 
 from text_extraction_system.celery_log import JSONFormatter, set_log_extra
 from text_extraction_system.config import get_settings
-from text_extraction_system.constants import pages_for_ocr, pages_ocred, pages_pre_processed, from_original_doc
+from text_extraction_system.constants import pages_for_ocr, pages_ocred, pages_pre_processed, from_original_doc, \
+    task_ids
 from text_extraction_system.data_extract.data_extract import extract_text_and_structure, pre_extract_data
 from text_extraction_system.data_extract.tables import get_table_dtos_from_camelot_output
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
@@ -25,7 +26,7 @@ from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
 from text_extraction_system.pdf.pdf import merge_pfd_pages, cleanup_pdf, extract_all_page_images
 from text_extraction_system.request_metadata import RequestCallbackInfo, RequestMetadata, STATUS_DONE, \
     save_request_metadata, \
-    load_request_metadata, STATUS_FAILURE, STATUS_PENDING
+    load_request_metadata, STATUS_FAILURE, STATUS_PENDING, STATUS_CANCELED
 from text_extraction_system.result_delivery.celery_client import send_task
 from text_extraction_system_api.dto import RequestStatus
 
@@ -54,9 +55,21 @@ def setup_loggers(*args, **kwargs):
     logger.addHandler(sh)
 
 
+def register_task_id(webdav_client: WebDavClient, request_id: str, task_id: str):
+    webdav_client.mkdir(f'{request_id}/{task_ids}/{task_id}')
+
+
+def get_request_task_ids(webdav_client: WebDavClient, request_id: str) -> List[str]:
+    return [s.strip('/') for s in webdav_client.list(f'{request_id}/{task_ids}')]
+
+
 def deliver_error(request_id: str, request_callback_info: RequestCallbackInfo):
     try:
         req = load_request_metadata(request_id)
+        if req.status == STATUS_CANCELED:
+            log.info(f'Not delivering error '
+                     f'because the request has been canceled: {req.original_file_name} (#{req.request_id})')
+            return
         req.status = STATUS_FAILURE
         save_request_metadata(req)
     except Exception as req_upd_err:
@@ -183,9 +196,13 @@ def process_pdf(pdf_fn: str,
 
             save_request_metadata(req)
             log.info(f'Starting sub-tasks for OCR-ing pdf pages:\n{req.pages_for_ocr}')
-            chord(task_signatures)(merge_ocred_pages_and_extract_data
-                                   .s(req.request_id, req.request_callback_info)
-                                   .set(link_error=[ocr_error_callback.s(req.request_id, req.request_callback_info)]))
+            c = chord(task_signatures)(merge_ocred_pages_and_extract_data
+                .s(req.request_id, req.request_callback_info)
+                .set(
+                link_error=[ocr_error_callback.s(req.request_id, req.request_callback_info)]))
+            register_task_id(webdav_client, req.request_id, c.id)
+            for ar in c.parent.children:
+                register_task_id(webdav_client, req.request_id, ar.id)
 
 
 @celery_app.task(bind=True)
@@ -240,6 +257,7 @@ def merge_ocred_pages_and_extract_data(task,
                  f'{req.original_file_name}')
         webdav_client: WebDavClient = get_webdav_client()
         if req.status != STATUS_PENDING or not webdav_client.is_dir(f'{req.request_id}/{pages_for_ocr}'):
+            log.info(f'Request is already processed/failed/canceled for file: {req.original_file_name} (#{request_id})')
             return
         temp_dir = tempfile.mkdtemp()
         try:
@@ -316,9 +334,12 @@ def extract_data_and_finish(pre_processed_pages: Dict[int, PDFPagePreProcessResu
 
     req.status = STATUS_DONE
 
-    save_request_metadata(req)
-
-    deliver_results(req.request_callback_info, req.to_request_status())
+    if load_request_metadata(req.request_id).status == STATUS_PENDING:
+        save_request_metadata(req)
+        deliver_results(req.request_callback_info, req.to_request_status())
+    else:
+        log.info(f'Canceling results delivery '
+                 f'because the request is already processed/failed/done: {req.original_file_name} (#{req.request_id})')
 
 
 def deliver_results(req: RequestCallbackInfo, req_status: RequestStatus):

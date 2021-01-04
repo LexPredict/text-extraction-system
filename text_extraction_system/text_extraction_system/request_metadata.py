@@ -13,6 +13,7 @@ from text_extraction_system_api.dto import RequestStatus
 STATUS_PENDING = 'PENDING'
 STATUS_DONE = 'DONE'
 STATUS_FAILURE = 'FAILURE'
+STATUS_CANCELED = 'CANCELED'
 
 
 @dataclass_json

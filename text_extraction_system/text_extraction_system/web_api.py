@@ -1,16 +1,19 @@
 import json
 from datetime import datetime
-from typing import AnyStr
+from typing import AnyStr, List
 from uuid import uuid4
 
 from fastapi import FastAPI, File, UploadFile, Form, Response
 
+from text_extraction_system.celery_log import HumanReadableTraceBackException
 from text_extraction_system.commons.escape_utils import get_valid_fn
+from text_extraction_system.constants import task_ids
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
 from text_extraction_system.request_metadata import RequestMetadata, RequestCallbackInfo, save_request_metadata, \
     load_request_metadata
-from text_extraction_system.tasks import process_document
-from text_extraction_system_api.dto import TableList, PlainTextStructure, RequestStatus, VersionInfo
+from text_extraction_system.request_metadata import STATUS_CANCELED
+from text_extraction_system.tasks import process_document, celery_app, register_task_id, get_request_task_ids
+from text_extraction_system_api.dto import TableList, PlainTextStructure, RequestStatus, VersionInfo, TaskCancelResult
 
 app = FastAPI()
 
@@ -54,8 +57,35 @@ async def post_text_extraction_task(file: UploadFile = File(...),
 
     save_request_metadata(req)
     webdav_client.upload_to(file.file, f'{req.request_id}/{req.original_document}')
-    process_document.apply_async((req.request_id, req.request_callback_info))
+    async_task = process_document.apply_async((req.request_id, req.request_callback_info))
+
+    webdav_client.mkdir(f'{req.request_id}/{task_ids}')
+    register_task_id(webdav_client, req.request_id, async_task.id)
+
     return req.request_id
+
+
+@app.delete('/api/v1/data_extraction_tasks/{request_id}/', response_model=TaskCancelResult)
+async def purge_text_extraction_task(request_id: str):
+    req = load_request_metadata(request_id)
+    req.status = STATUS_CANCELED
+    save_request_metadata(req)
+
+    problems = dict()
+    success = list()
+    celery_task_ids: List[str] = get_request_task_ids(get_webdav_client(), request_id)
+    for task_id in celery_task_ids:
+        try:
+            celery_app.control.revoke(task_id, terminate=True)
+            success.append(task_id)
+        except Exception as ex:
+            problems[task_id] = HumanReadableTraceBackException \
+                .from_exception(ex) \
+                .human_readable_format()
+    return TaskCancelResult(request_id=request_id,
+                            task_ids=celery_task_ids,
+                            successfully_revoked=success,
+                            problems=problems).to_dict()
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/status.json', response_model=RequestStatus)
@@ -102,7 +132,7 @@ async def get_searchable_pdf(request_id: str):
     return _proxy_request(get_webdav_client(), request_id, load_request_metadata(request_id).pdf_file)
 
 
-@app.delete('/api/v1/data_extraction_tasks/{request_id}')
+@app.delete('/api/v1/data_extraction_tasks/{request_id}/results/')
 async def delete_request_files(request_id: str):
     get_webdav_client().clean(f'{request_id}')
 
