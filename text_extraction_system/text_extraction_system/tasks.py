@@ -5,13 +5,15 @@ import os
 import pickle
 import shutil
 import tempfile
-from typing import List, Dict
+from contextlib import contextmanager
+from typing import List, Dict, Optional
 
 import pycountry
 import requests
 from celery import Celery, chord
 from celery.signals import after_setup_logger
 
+from text_extraction_system.celery_log import JSONFormatter, set_log_extra
 from text_extraction_system.config import get_settings
 from text_extraction_system.constants import pages_for_ocr, pages_ocred, pages_pre_processed, from_original_doc
 from text_extraction_system.data_extract.data_extract import extract_text_and_structure, pre_extract_data
@@ -21,62 +23,89 @@ from text_extraction_system.internal_dto import PDFPagePreProcessResults
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf
 from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
 from text_extraction_system.pdf.pdf import merge_pfd_pages, cleanup_pdf, extract_all_page_images
-from text_extraction_system.request_metadata import RequestMetadata, STATUS_DONE, save_request_metadata, \
-    load_request_metadata
+from text_extraction_system.request_metadata import RequestCallbackInfo, RequestMetadata, STATUS_DONE, \
+    save_request_metadata, \
+    load_request_metadata, STATUS_FAILURE, STATUS_PENDING
 from text_extraction_system.result_delivery.celery_client import send_task
+from text_extraction_system_api.dto import RequestStatus
 
 settings = get_settings()
 
 celery_app = Celery(
     'celery_app',
     backend=settings.celery_backend,
-    broker=settings.celery_broker
+    broker=settings.celery_broker,
 )
 
 celery_app.conf.update(task_track_started=True)
+celery_app.conf.update(task_serializer='pickle')
+celery_app.conf.update(accept_content=['pickle', 'json'])
 
 log = logging.getLogger(__name__)
 
 
 @after_setup_logger.connect
 def setup_loggers(*args, **kwargs):
-    from text_extraction_system.celery_log import JSONFormatter
-
     logger = logging.getLogger()
     formatter = JSONFormatter()
     sh = logging.StreamHandler()
     sh.setFormatter(formatter)
+    logger.handlers.clear()
     logger.addHandler(sh)
 
 
+def deliver_error(request_id: str, request_callback_info: RequestCallbackInfo):
+    try:
+        req = load_request_metadata(request_id)
+        req.status = STATUS_FAILURE
+        save_request_metadata(req)
+    except Exception as req_upd_err:
+        log.error(f'Unable to store failed status into metadata of request #{request_id}', exc_info=req_upd_err)
+    req_status = RequestStatus(request_id=request_id,
+                               original_file_name=request_callback_info.original_file_name,
+                               status=STATUS_FAILURE,
+                               additional_info=request_callback_info.call_back_additional_info)
+    deliver_results(request_callback_info, req_status)
+
+
+@contextmanager
+def handle_errors(request_id: str, request_callback_info: RequestCallbackInfo):
+    try:
+        set_log_extra(request_callback_info.log_extra)
+        yield
+    except Exception as e:
+        deliver_error(request_id, request_callback_info)
+        raise e
+
+
 @celery_app.task(acks_late=True, bind=True)
-def process_document(task, request_id: str) -> bool:
-    webdav_client: WebDavClient = get_webdav_client()
-    req: RequestMetadata = load_request_metadata(request_id)
-    setattr(task, 'log_extra', req.log_extra)
-
-    log.info(f'Starting text extraction for request uid: {request_id}\n'
-             f'File name: {req.original_file_name}')
-    with webdav_client.get_as_local_fn(f'{request_id}/{req.original_document}') as (fn, _remote_path):
-        ext = os.path.splitext(fn)[1]
-        if ext and ext.lower() == '.pdf':
-            # cleanup pdf and convert it to the format understood by other pdf libs
-            with cleanup_pdf(fn) as local_converted_pdf_fn:
-                req.converted_to_pdf = os.path.splitext(req.original_document)[0] + '.converted.pdf'
-                webdav_client.upload(f'{request_id}/{req.converted_to_pdf}', local_converted_pdf_fn)
-                save_request_metadata(req)
-                process_pdf(local_converted_pdf_fn, req, webdav_client)
-        else:
-            with convert_to_pdf(fn) as local_converted_pdf_fn:
-                req.converted_to_pdf = os.path.splitext(req.original_document)[0] + '.converted.pdf'
-                webdav_client.upload(f'{request_id}/{req.converted_to_pdf}', local_converted_pdf_fn)
-                save_request_metadata(req)
-                process_pdf(local_converted_pdf_fn, req, webdav_client)
-
-    return True
+def process_document(task, request_id: str, request_callback_info: RequestCallbackInfo) -> bool:
+    with handle_errors(request_id, request_callback_info):
+        webdav_client: WebDavClient = get_webdav_client()
+        req: RequestMetadata = load_request_metadata(request_id)
+        log.info(f'Starting text extraction for request uid: {request_id}\n'
+                 f'File name: {req.original_file_name}')
+        with webdav_client.get_as_local_fn(f'{request_id}/{req.original_document}') as (fn, _remote_path):
+            ext = os.path.splitext(fn)[1]
+            if ext and ext.lower() == '.pdf':
+                # cleanup pdf and convert it to the format understood by other pdf libs
+                with cleanup_pdf(fn) as local_converted_pdf_fn:
+                    req.converted_to_pdf = os.path.splitext(req.original_document)[0] + '.converted.pdf'
+                    webdav_client.upload(f'{request_id}/{req.converted_to_pdf}', local_converted_pdf_fn)
+                    save_request_metadata(req)
+                    process_pdf(local_converted_pdf_fn, req, webdav_client)
+            else:
+                with convert_to_pdf(fn) as local_converted_pdf_fn:
+                    req.converted_to_pdf = os.path.splitext(req.original_document)[0] + '.converted.pdf'
+                    webdav_client.upload(f'{request_id}/{req.converted_to_pdf}', local_converted_pdf_fn)
+                    save_request_metadata(req)
+                    process_pdf(local_converted_pdf_fn, req, webdav_client)
+        return True
 
 
-def process_pdf(pdf_fn: str, req: RequestMetadata, webdav_client: WebDavClient):
+def process_pdf(pdf_fn: str,
+                req: RequestMetadata,
+                webdav_client: WebDavClient):
     """
     Steps:
 
@@ -120,6 +149,9 @@ def process_pdf(pdf_fn: str, req: RequestMetadata, webdav_client: WebDavClient):
             log.info(f'PDF document {pdf_fn} needs OCR for {len(pre_process_results.pages_to_ocr)} pages. '
                      f'Scheduling OCR tasks...')
             webdav_client.mkdir(f'{req.request_id}/{pages_pre_processed}')
+            webdav_client.mkdir(f'{req.request_id}/{pages_for_ocr}')
+            webdav_client.mkdir(f'{req.request_id}/{pages_ocred}')
+
             webdav_client.upload_to(pickle.dumps(pre_process_results.ready_results),
                                     f'{req.request_id}/{pages_pre_processed}/{from_original_doc}')
 
@@ -146,11 +178,20 @@ def process_pdf(pdf_fn: str, req: RequestMetadata, webdav_client: WebDavClient):
                     f'{req.request_id}/{pages_for_ocr}/{basename}',
                     f'{req.request_id}/{pages_ocred}/{dst_basename}',
                     f'{req.request_id}/{pages_pre_processed}/{dst_preprocess_basename}',
-                    ocr_language))
+                    ocr_language,
+                    req.request_callback_info.log_extra))
 
             save_request_metadata(req)
             log.info(f'Starting sub-tasks for OCR-ing pdf pages:\n{req.pages_for_ocr}')
-            chord(task_signatures)(merge_ocred_pages_and_extract_data.s(req.request_id))
+            chord(task_signatures)(merge_ocred_pages_and_extract_data
+                                   .s(req.request_id, req.request_callback_info)
+                                   .set(link_error=[ocr_error_callback.s(req.request_id, req.request_callback_info)]))
+
+
+@celery_app.task(bind=True)
+def ocr_error_callback(task, some_id: str, request_id: str, req_callback_info: RequestCallbackInfo):
+    set_log_extra(req_callback_info.log_extra)
+    deliver_error(request_id, req_callback_info)
 
 
 @celery_app.task(acks_late=True, bind=True)
@@ -161,11 +202,17 @@ def ocr_and_preprocess(task,
                        page_image_webdav_path: str,
                        page_pdf_dst_webdav_path: str,
                        pre_process_results_dst_webdav_path: str,
-                       ocr_language: str = 'eng'):
+                       ocr_language: str = 'eng',
+                       log_extra: Dict[str, str] = None
+                       ) -> Optional[str]:
+    set_log_extra(log_extra)
     log.info(f'OCR-ing page {page_num} of {pdf_fn}: {page_image_webdav_path}...')
     webdav_client = get_webdav_client()
     req = load_request_metadata(request_id)
-    setattr(task, 'log_extra', req.log_extra)
+    if req.status != STATUS_PENDING:
+        log.info(f'Canceling OCR sub-task for file: {pdf_fn}, page {page_num}. (request #{request_id})\n'
+                 f'because the request is already in status {req.status}.')
+        return None
 
     with webdav_client.get_as_local_fn(page_image_webdav_path) \
             as (local_image_src, _remote_path):
@@ -183,47 +230,50 @@ def ocr_and_preprocess(task,
 
 
 @celery_app.task(acks_late=True, bind=True)
-def merge_ocred_pages_and_extract_data(task, _ocred_page_paths: List[str], request_id: str):
-    req: RequestMetadata = load_request_metadata(request_id)
-    setattr(task, 'log_extra', req.log_extra)
-    log.info(f'Re-combining OCR-ed pdf blocks and processing the data extraction for request {request_id}: '
-             f'{req.original_file_name}')
-    webdav_client: WebDavClient = get_webdav_client()
-    if req.status == STATUS_DONE or not webdav_client.is_dir(f'{req.request_id}/{pages_for_ocr}'):
-        return
-    temp_dir = tempfile.mkdtemp()
-    try:
-        pages_dir = os.path.join(temp_dir, 'pages')
-        os.mkdir(pages_dir)
+def merge_ocred_pages_and_extract_data(task,
+                                       _ocred_page_paths: List[str],
+                                       request_id: str,
+                                       req_callback_info: RequestCallbackInfo):
+    with handle_errors(request_id, req_callback_info):
+        req: RequestMetadata = load_request_metadata(request_id)
+        log.info(f'Re-combining OCR-ed pdf blocks and processing the data extraction for request {request_id}: '
+                 f'{req.original_file_name}')
+        webdav_client: WebDavClient = get_webdav_client()
+        if req.status != STATUS_PENDING or not webdav_client.is_dir(f'{req.request_id}/{pages_for_ocr}'):
+            return
+        temp_dir = tempfile.mkdtemp()
+        try:
+            pages_dir = os.path.join(temp_dir, 'pages')
+            os.mkdir(pages_dir)
 
-        merged_pre_process_results: Dict[int, PDFPagePreProcessResults] = webdav_client.unpickle(
-            f'{req.request_id}/{pages_pre_processed}/{from_original_doc}')
+            merged_pre_process_results: Dict[int, PDFPagePreProcessResults] = webdav_client.unpickle(
+                f'{req.request_id}/{pages_pre_processed}/{from_original_doc}')
 
-        repl_page_num_to_fn: Dict[int, str] = dict()
-        for page_num, image_fn in req.pages_for_ocr.items():
-            basename = os.path.splitext(image_fn)[0]
-            remote_page_pdf_fn = f'{req.request_id}/{pages_ocred}/{basename}.pdf'
-            local_page_pdf_fn = os.path.join(pages_dir, basename)
-            webdav_client.download(remote_page_pdf_fn, local_page_pdf_fn)
-            repl_page_num_to_fn[page_num] = local_page_pdf_fn
+            repl_page_num_to_fn: Dict[int, str] = dict()
+            for page_num, image_fn in req.pages_for_ocr.items():
+                basename = os.path.splitext(image_fn)[0]
+                remote_page_pdf_fn = f'{req.request_id}/{pages_ocred}/{basename}.pdf'
+                local_page_pdf_fn = os.path.join(pages_dir, basename)
+                webdav_client.download(remote_page_pdf_fn, local_page_pdf_fn)
+                repl_page_num_to_fn[page_num] = local_page_pdf_fn
 
-            page_pre_process_results: PDFPagePreProcessResults = \
-                webdav_client.unpickle(f'{req.request_id}/{pages_pre_processed}/{basename}.pickle')
-            merged_pre_process_results[page_num] = page_pre_process_results
+                page_pre_process_results: PDFPagePreProcessResults = \
+                    webdav_client.unpickle(f'{req.request_id}/{pages_pre_processed}/{basename}.pickle')
+                merged_pre_process_results[page_num] = page_pre_process_results
 
-        original_pdf_in_storage = req.converted_to_pdf or req.original_document
+            original_pdf_in_storage = req.converted_to_pdf or req.original_document
 
-        local_orig_pdf_fn = os.path.join(temp_dir, original_pdf_in_storage)
-        req.ocred_pdf = os.path.splitext(original_pdf_in_storage)[0] + '.ocred.pdf'
+            local_orig_pdf_fn = os.path.join(temp_dir, original_pdf_in_storage)
+            req.ocred_pdf = os.path.splitext(original_pdf_in_storage)[0] + '.ocred.pdf'
 
-        webdav_client.download(f'{req.request_id}/{original_pdf_in_storage}', local_orig_pdf_fn)
-        with merge_pfd_pages(local_orig_pdf_fn, repl_page_num_to_fn) as local_merged_pdf_fn:
-            webdav_client.upload(f'{req.request_id}/{req.ocred_pdf}', local_merged_pdf_fn)
-            save_request_metadata(req)
-            extract_data_and_finish(merged_pre_process_results, req, webdav_client)
+            webdav_client.download(f'{req.request_id}/{original_pdf_in_storage}', local_orig_pdf_fn)
+            with merge_pfd_pages(local_orig_pdf_fn, repl_page_num_to_fn) as local_merged_pdf_fn:
+                webdav_client.upload(f'{req.request_id}/{req.ocred_pdf}', local_merged_pdf_fn)
+                save_request_metadata(req)
+                extract_data_and_finish(merged_pre_process_results, req, webdav_client)
 
-    finally:
-        shutil.rmtree(temp_dir)
+        finally:
+            shutil.rmtree(temp_dir)
 
 
 def extract_data_and_finish(pre_processed_pages: Dict[int, PDFPagePreProcessResults],
@@ -268,35 +318,36 @@ def extract_data_and_finish(pre_processed_pages: Dict[int, PDFPagePreProcessResu
 
     save_request_metadata(req)
 
-    deliver_results.apply_async((req.request_id,))
+    deliver_results(req.request_callback_info, req.to_request_status())
 
 
-@celery_app.task(acks_late=True, bind=True)
-def deliver_results(task, request_id: str):
-    """
-    Deliver results to the call back destinations.
-    Extracted into a separate sub-task to avoid repeating the final text extraction in case the call-back fails.
-
-    """
-    req: RequestMetadata = load_request_metadata(request_id)
-    setattr(task, 'log_extra', req.log_extra)
-
+def deliver_results(req: RequestCallbackInfo, req_status: RequestStatus):
     if req.call_back_url:
-        log.info(f'POSTing the extraction results of {req.original_file_name} to {req.call_back_url}...')
-        requests.post(req.call_back_url, json=req.to_request_status().to_dict())
+        try:
+            log.info(f'POSTing the extraction results of {req.original_file_name} to {req.call_back_url}...')
+            requests.post(req.call_back_url, json=req_status.to_dict())
+        except Exception as err:
+            log.error(f'Unable to POST the extraction results of {req.original_file_name} to {req.call_back_url}',
+                      exc_info=err)
 
     if req.call_back_celery_broker:
-        log.info(f'Sending a celery task\n'
-                 f'broker: {req.call_back_celery_broker}\n'
-                 f'queue: {req.call_back_celery_queue}\n'
-                 f'task_name: {req.call_back_celery_task_name}\n')
-        send_task(broker_url=req.call_back_celery_broker,
-                  queue=req.call_back_celery_queue,
-                  task_name=req.call_back_celery_task_name,
-                  task_kwargs=req.to_request_status().to_dict(),
-                  task_id=req.call_back_celery_task_id,
-                  parent_task_id=req.call_back_celery_parent_task_id,
-                  root_task_id=req.call_back_celery_root_task_id,
-                  celery_version=req.call_back_celery_version)
+        try:
+            log.info(f'Sending the extraction results of {req.original_file_name} as a celery task:\n'
+                     f'broker: {req.call_back_celery_broker}\n'
+                     f'queue: {req.call_back_celery_queue}\n'
+                     f'task_name: {req.call_back_celery_task_name}\n')
+            send_task(broker_url=req.call_back_celery_broker,
+                      queue=req.call_back_celery_queue,
+                      task_name=req.call_back_celery_task_name,
+                      task_kwargs=req_status.to_dict(),
+                      task_id=req.call_back_celery_task_id,
+                      parent_task_id=req.call_back_celery_parent_task_id,
+                      root_task_id=req.call_back_celery_root_task_id,
+                      celery_version=req.call_back_celery_version)
+        except Exception as err:
+            log.info(f'Unable to send the extraction results of {req.original_file_name} as a celery task:\n'
+                     f'broker: {req.call_back_celery_broker}\n'
+                     f'queue: {req.call_back_celery_queue}\n'
+                     f'task_name: {req.call_back_celery_task_name}\n', exc_info=err)
 
     log.info(f'Finished processing request {req.request_id} ({req.original_file_name}).')
