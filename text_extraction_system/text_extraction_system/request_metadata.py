@@ -5,13 +5,31 @@ from typing import Optional, Dict
 
 from dataclasses_json import dataclass_json, config
 from marshmallow import fields
-from text_extraction_system_api.dto import RequestStatus
 
 from text_extraction_system.constants import metadata_fn
 from text_extraction_system.file_storage import get_webdav_client
+from text_extraction_system_api.dto import RequestStatus
 
 STATUS_PENDING = 'PENDING'
 STATUS_DONE = 'DONE'
+STATUS_FAILURE = 'FAILURE'
+
+
+@dataclass_json
+@dataclass
+class RequestCallbackInfo:
+    request_id: str
+    original_file_name: str
+    call_back_url: Optional[str] = None
+    call_back_celery_broker: Optional[str] = None
+    call_back_celery_queue: Optional[str] = None
+    call_back_celery_task_name: Optional[str] = None
+    call_back_celery_task_id: Optional[str] = None,
+    call_back_celery_root_task_id: Optional[str] = None,
+    call_back_celery_parent_task_id: Optional[str] = None
+    call_back_additional_info: Optional[str] = None
+    call_back_celery_version: int = 4
+    log_extra: Optional[Dict[str, str]] = None
 
 
 @dataclass_json
@@ -27,6 +45,9 @@ class RequestMetadata:
     )
     original_file_name: str
     original_document: str
+
+    request_callback_info: RequestCallbackInfo
+
     status: str = STATUS_PENDING
     converted_to_pdf: Optional[str] = None
     ocred_pdf: Optional[str] = None
@@ -38,16 +59,6 @@ class RequestMetadata:
     tables_df_file: Optional[str] = None
     doc_language: Optional[str] = None
     pages_for_ocr: Optional[Dict[int, str]] = None
-    call_back_url: Optional[str] = None
-    call_back_celery_broker: Optional[str] = None
-    call_back_celery_queue: Optional[str] = None
-    call_back_celery_task_name: Optional[str] = None
-    call_back_celery_task_id: Optional[str] = None,
-    call_back_celery_root_task_id: Optional[str] = None,
-    call_back_celery_parent_task_id: Optional[str] = None
-    call_back_additional_info: Optional[str] = None
-    call_back_celery_version: int = 4
-    log_extra: Optional[Dict[str, str]] = None
 
     def to_request_status(self) -> RequestStatus:
         return RequestStatus(
@@ -60,7 +71,7 @@ class RequestMetadata:
             tables_extracted=self.tables_json_file is not None,
             plain_text_extracted=self.plain_text_file is not None,
             plain_text_structure_extracted=self.plain_text_structure_file is not None,
-            additional_info=self.call_back_additional_info
+            additional_info=self.request_callback_info.call_back_additional_info
         )
 
 

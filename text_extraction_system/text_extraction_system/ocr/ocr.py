@@ -16,6 +16,7 @@ class OCRException(Exception):
 @contextmanager
 def ocr_page_to_pdf(page_image_fn: str, language: str = 'eng', timeout: int = 60) -> Generator[str, None, None]:
     page_dir = mkdtemp(prefix='ocr_page_to_pdf_')
+    proc = None
     try:
         basename = os.path.basename(page_image_fn)
         dstfn = os.path.join(page_dir, os.path.splitext(basename)[0])
@@ -39,4 +40,9 @@ def ocr_page_to_pdf(page_image_fn: str, language: str = 'eng', timeout: int = 60
         if proc.returncode != 0:
             raise OCRException(f'Tesseract returned non-zero code:\n{args}\n{err}')
     finally:
+        if proc is not None:
+            try:
+                proc.kill()
+            except:
+                pass
         shutil.rmtree(page_dir)

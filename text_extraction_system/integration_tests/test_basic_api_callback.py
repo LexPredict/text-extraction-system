@@ -54,7 +54,7 @@ def test_basic_api_call_back():
     srv.wait_for_test_results(60)
 
 
-def test_basic_api_call_back2():
+def test_basic_api_call_back_tables():
     fn = os.path.join(os.path.dirname(__file__), 'data', 'tables.pdf')
     client = TextExtractionSystemWebClient(test_settings.api_url)
 
@@ -88,4 +88,50 @@ def test_basic_api_call_back2():
                                     call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
                                     call_back_additional_info='hello world')
 
+    srv.wait_for_test_results(60)
+
+
+def test_basic_api_call_back_ocr():
+    fn = os.path.join(os.path.dirname(__file__), 'data', 'ocr1.pdf')
+    client = TextExtractionSystemWebClient(test_settings.api_url)
+
+    def assert_func(rfile, headers):
+        log.info('Text extraction results are ready...')
+        rs: RequestStatus = RequestStatus.from_json(rfile)
+        assert rs.status == 'DONE'
+        assert os.path.basename(fn) == rs.original_file_name
+        assert rs.converted_to_pdf
+        assert rs.pdf_pages_ocred
+        assert rs.searchable_pdf_created
+        log.info('Text extraction results look good. All assertions passed.')
+
+    srv = DocumentCallbackServer(bind_host=test_settings.call_back_server_bind_host,
+                                 bind_port=test_settings.call_back_server_bind_port,
+                                 test_func=assert_func)
+
+    client.schedule_data_extraction(fn,
+                                    call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
+                                    call_back_additional_info='hello world',
+                                    log_extra={'hello': 'world', 'test': True})
+    srv.wait_for_test_results(60)
+
+
+def test_basic_api_call_back_errors():
+    fn = os.path.join(os.path.dirname(__file__), 'data', 'not_pdf.pdf')
+    client = TextExtractionSystemWebClient(test_settings.api_url)
+
+    def assert_func(rfile, headers):
+        log.info('Text extraction results are ready...')
+        rs: RequestStatus = RequestStatus.from_json(rfile)
+        assert rs.status == 'FAILURE'
+        log.info('Text extraction results look good. All assertions passed.')
+
+    srv = DocumentCallbackServer(bind_host=test_settings.call_back_server_bind_host,
+                                 bind_port=test_settings.call_back_server_bind_port,
+                                 test_func=assert_func)
+
+    client.schedule_data_extraction(fn,
+                                    call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
+                                    call_back_additional_info='hello world',
+                                    log_extra={'hello': 'world', 'test': True})
     srv.wait_for_test_results(60)

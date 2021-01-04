@@ -1,17 +1,19 @@
+import json
 from datetime import datetime
 from typing import AnyStr
 from uuid import uuid4
-import json
 
 from fastapi import FastAPI, File, UploadFile, Form, Response
-from text_extraction_system_api.dto import TableList, PlainTextStructure, RequestStatus, VersionInfo
 
 from text_extraction_system.commons.escape_utils import get_valid_fn
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
-from text_extraction_system.request_metadata import RequestMetadata, save_request_metadata, load_request_metadata
+from text_extraction_system.request_metadata import RequestMetadata, RequestCallbackInfo, save_request_metadata, \
+    load_request_metadata
 from text_extraction_system.tasks import process_document
+from text_extraction_system_api.dto import TableList, PlainTextStructure, RequestStatus, VersionInfo
 
 app = FastAPI()
+
 
 @app.post('/api/v1/data_extraction_tasks/', response_model=str)
 async def post_text_extraction_task(file: UploadFile = File(...),
@@ -34,22 +36,25 @@ async def post_text_extraction_task(file: UploadFile = File(...),
                           original_document=get_valid_fn(file.filename),
                           request_id=request_id,
                           request_date=datetime.now(),
-                          call_back_url=call_back_url,
                           doc_language=doc_language,
-                          call_back_celery_broker=call_back_celery_broker,
-                          call_back_celery_queue=call_back_celery_queue,
-                          call_back_celery_task_name=call_back_celery_task_name,
-                          call_back_additional_info=call_back_additional_info,
-                          call_back_celery_task_id=call_back_celery_task_id,
-                          call_back_celery_parent_task_id=call_back_celery_parent_task_id,
-                          call_back_celery_root_task_id=call_back_celery_root_task_id,
-                          call_back_celery_version=call_back_celery_version,
-                          log_extra=log_extra)
+                          request_callback_info=RequestCallbackInfo(
+                              request_id=request_id,
+                              original_file_name=file.filename,
+                              call_back_url=call_back_url,
+                              call_back_celery_broker=call_back_celery_broker,
+                              call_back_celery_queue=call_back_celery_queue,
+                              call_back_celery_task_name=call_back_celery_task_name,
+                              call_back_additional_info=call_back_additional_info,
+                              call_back_celery_task_id=call_back_celery_task_id,
+                              call_back_celery_parent_task_id=call_back_celery_parent_task_id,
+                              call_back_celery_root_task_id=call_back_celery_root_task_id,
+                              call_back_celery_version=call_back_celery_version,
+                              log_extra=log_extra))
     webdav_client.mkdir(f'/{req.request_id}')
 
     save_request_metadata(req)
     webdav_client.upload_to(file.file, f'{req.request_id}/{req.original_document}')
-    process_document.apply_async((req.request_id,))
+    process_document.apply_async((req.request_id, req.request_callback_info))
     return req.request_id
 
 

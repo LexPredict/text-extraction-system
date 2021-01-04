@@ -10,6 +10,11 @@ from celery._state import get_current_task
 LOG_STACK_TRACE = 'log_stack_trace'
 
 
+def set_log_extra(log_extra: Dict[str, str] = None):
+    task = get_current_task()
+    setattr(task, 'log_extra', log_extra)
+
+
 class HumanReadableTraceBackException(TracebackException):
     _RECURSIVE_CUTOFF = 3
 
