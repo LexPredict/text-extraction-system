@@ -47,6 +47,7 @@ class RequestMetadata:
     call_back_celery_parent_task_id: Optional[str] = None
     call_back_additional_info: Optional[str] = None
     call_back_celery_version: int = 4
+    log_extra: Optional[Dict[str, str]] = None
 
     def to_request_status(self) -> RequestStatus:
         return RequestStatus(

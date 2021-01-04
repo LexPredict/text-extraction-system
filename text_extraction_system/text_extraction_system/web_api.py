@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import AnyStr
 from uuid import uuid4
+import json
 
 from fastapi import FastAPI, File, UploadFile, Form, Response
 from text_extraction_system_api.dto import TableList, PlainTextStructure, RequestStatus, VersionInfo
@@ -11,7 +12,6 @@ from text_extraction_system.request_metadata import RequestMetadata, save_reques
 from text_extraction_system.tasks import process_document
 
 app = FastAPI()
-
 
 @app.post('/api/v1/data_extraction_tasks/', response_model=str)
 async def post_text_extraction_task(file: UploadFile = File(...),
@@ -25,9 +25,11 @@ async def post_text_extraction_task(file: UploadFile = File(...),
                                     call_back_celery_root_task_id: str = Form(default=None),
                                     call_back_celery_version: int = Form(default=4),
                                     doc_language: str = Form(default='en'),
-                                    request_id: str = Form(default=None)):
+                                    request_id: str = Form(default=None),
+                                    log_extra_json_key_value: str = Form(default=None)):
     webdav_client = get_webdav_client()
-    request_id = get_valid_fn(request_id) or str(uuid4())
+    request_id = get_valid_fn(request_id) if request_id else str(uuid4())
+    log_extra = json.loads(log_extra_json_key_value) if log_extra_json_key_value else None
     req = RequestMetadata(original_file_name=file.filename,
                           original_document=get_valid_fn(file.filename),
                           request_id=request_id,
@@ -41,7 +43,8 @@ async def post_text_extraction_task(file: UploadFile = File(...),
                           call_back_celery_task_id=call_back_celery_task_id,
                           call_back_celery_parent_task_id=call_back_celery_parent_task_id,
                           call_back_celery_root_task_id=call_back_celery_root_task_id,
-                          call_back_celery_version=call_back_celery_version)
+                          call_back_celery_version=call_back_celery_version,
+                          log_extra=log_extra)
     webdav_client.mkdir(f'/{req.request_id}')
 
     save_request_metadata(req)
