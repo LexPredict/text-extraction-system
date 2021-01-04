@@ -10,6 +10,7 @@ from typing import List, Dict
 import pycountry
 import requests
 from celery import Celery, chord
+from celery.signals import after_setup_logger
 
 from text_extraction_system.config import get_settings
 from text_extraction_system.constants import pages_for_ocr, pages_ocred, pages_pre_processed, from_original_doc
@@ -37,13 +38,25 @@ celery_app.conf.update(task_track_started=True)
 log = logging.getLogger(__name__)
 
 
-@celery_app.task(acks_late=True)
-def process_document(request_id: str) -> bool:
-    log.info(f'Starting text extraction for request uid: {request_id}')
+@after_setup_logger.connect
+def setup_loggers(*args, **kwargs):
+    from text_extraction_system.celery_log import JSONFormatter
 
+    logger = logging.getLogger()
+    formatter = JSONFormatter()
+    sh = logging.StreamHandler()
+    sh.setFormatter(formatter)
+    logger.addHandler(sh)
+
+
+@celery_app.task(acks_late=True, bind=True)
+def process_document(task, request_id: str) -> bool:
     webdav_client: WebDavClient = get_webdav_client()
     req: RequestMetadata = load_request_metadata(request_id)
-    log.info(f'File name: {req.original_file_name}')
+    setattr(task, 'log_extra', req.log_extra)
+
+    log.info(f'Starting text extraction for request uid: {request_id}\n'
+             f'File name: {req.original_file_name}')
     with webdav_client.get_as_local_fn(f'{request_id}/{req.original_document}') as (fn, _remote_path):
         ext = os.path.splitext(fn)[1]
         if ext and ext.lower() == '.pdf':
@@ -127,6 +140,7 @@ def process_pdf(pdf_fn: str, req: RequestMetadata, webdav_client: WebDavClient):
                 dst_basename = os.path.splitext(basename)[0] + '.pdf'
                 dst_preprocess_basename = os.path.splitext(basename)[0] + '.pickle'
                 task_signatures.append(ocr_and_preprocess.s(
+                    req.request_id,
                     pdf_fn,
                     page_num,
                     f'{req.request_id}/{pages_for_ocr}/{basename}',
@@ -139,8 +153,10 @@ def process_pdf(pdf_fn: str, req: RequestMetadata, webdav_client: WebDavClient):
             chord(task_signatures)(merge_ocred_pages_and_extract_data.s(req.request_id))
 
 
-@celery_app.task(acks_late=True)
-def ocr_and_preprocess(pdf_fn: str,
+@celery_app.task(acks_late=True, bind=True)
+def ocr_and_preprocess(task,
+                       request_id: str,
+                       pdf_fn: str,
                        page_num: int,
                        page_image_webdav_path: str,
                        page_pdf_dst_webdav_path: str,
@@ -148,6 +164,8 @@ def ocr_and_preprocess(pdf_fn: str,
                        ocr_language: str = 'eng'):
     log.info(f'OCR-ing page {page_num} of {pdf_fn}: {page_image_webdav_path}...')
     webdav_client = get_webdav_client()
+    req = load_request_metadata(request_id)
+    setattr(task, 'log_extra', req.log_extra)
 
     with webdav_client.get_as_local_fn(page_image_webdav_path) \
             as (local_image_src, _remote_path):
@@ -164,9 +182,10 @@ def ocr_and_preprocess(pdf_fn: str,
     return page_pdf_dst_webdav_path
 
 
-@celery_app.task(acks_late=True)
-def merge_ocred_pages_and_extract_data(_ocred_page_paths: List[str], request_id: str):
+@celery_app.task(acks_late=True, bind=True)
+def merge_ocred_pages_and_extract_data(task, _ocred_page_paths: List[str], request_id: str):
     req: RequestMetadata = load_request_metadata(request_id)
+    setattr(task, 'log_extra', req.log_extra)
     log.info(f'Re-combining OCR-ed pdf blocks and processing the data extraction for request {request_id}: '
              f'{req.original_file_name}')
     webdav_client: WebDavClient = get_webdav_client()
@@ -252,14 +271,15 @@ def extract_data_and_finish(pre_processed_pages: Dict[int, PDFPagePreProcessResu
     deliver_results.apply_async((req.request_id,))
 
 
-@celery_app.task(acks_late=True)
-def deliver_results(request_id: str):
+@celery_app.task(acks_late=True, bind=True)
+def deliver_results(task, request_id: str):
     """
     Deliver results to the call back destinations.
     Extracted into a separate sub-task to avoid repeating the final text extraction in case the call-back fails.
 
     """
     req: RequestMetadata = load_request_metadata(request_id)
+    setattr(task, 'log_extra', req.log_extra)
 
     if req.call_back_url:
         log.info(f'POSTing the extraction results of {req.original_file_name} to {req.call_back_url}...')

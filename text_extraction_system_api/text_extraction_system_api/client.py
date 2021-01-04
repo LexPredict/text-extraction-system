@@ -3,7 +3,7 @@ import os
 import pickle
 import tempfile
 from contextlib import contextmanager
-from typing import Generator, Any, List, Optional
+from typing import Generator, Any, List, Optional, Dict
 
 import requests
 from text_extraction_system_api.dto import PlainTextStructure, TableList, DataFrameTableList, RequestStatus
@@ -27,7 +27,8 @@ class TextExtractionSystemWebClient:
                                  call_back_additional_info: Optional[str] = None,
                                  doc_language: Optional[str] = None,
                                  call_back_celery_version: int = 4,
-                                 request_id: str = None) -> str:
+                                 request_id: str = None,
+                                 log_extra: Dict[str, str] = None) -> str:
         resp = requests.post(f'{self.base_url}/api/v1/data_extraction_tasks/',
                              files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
                              data=dict(call_back_url=call_back_url,
@@ -40,7 +41,8 @@ class TextExtractionSystemWebClient:
                                        call_back_additional_info=call_back_additional_info,
                                        call_back_celery_version=call_back_celery_version,
                                        doc_language=doc_language,
-                                       request_id=request_id))
+                                       request_id=request_id,
+                                       log_extra_json_key_value=json.dumps(log_extra) if log_extra else None))
         if resp.status_code not in {200, 201}:
             resp.raise_for_status()
         return resp.text

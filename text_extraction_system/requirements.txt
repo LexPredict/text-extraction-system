@@ -17,6 +17,7 @@ colorama==0.4.3
 contextlib2==0.6.0
 cryptography==3.3.1
 dataclasses-json==0.5.2
+datefinder-lexpredict==0.6.2.1
 dateparser==0.7.2
 distlib==0.3.0
 distro==1.4.0
@@ -37,6 +38,7 @@ ipaddr==2.2.0
 jdcal==1.4.1
 jellyfish==0.6.1
 joblib==0.14.0
+JSON-log-formatter==0.3.0
 kombu==5.0.2
 langid==1.1.6
 lockfile==0.12.2

@@ -3,9 +3,9 @@ import os
 
 import pikepdf
 from pandas import DataFrame
+
 from text_extraction_system_api.client import TextExtractionSystemWebClient
 from text_extraction_system_api.dto import RequestStatus, PlainTextStructure, TableList, DataFrameTableList
-
 from .call_back_server import DocumentCallbackServer
 from .testing_config import test_settings
 
@@ -49,7 +49,8 @@ def test_basic_api_call_back():
 
     client.schedule_data_extraction(fn,
                                     call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
-                                    call_back_additional_info='hello world')
+                                    call_back_additional_info='hello world',
+                                    log_extra={'hello': 'world', 'test': True})
     srv.wait_for_test_results(60)
 
 
