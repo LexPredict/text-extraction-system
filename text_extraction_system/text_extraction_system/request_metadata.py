@@ -5,6 +5,7 @@ from typing import Optional, Dict
 
 from dataclasses_json import dataclass_json, config
 from marshmallow import fields
+from webdav3.exceptions import RemoteResourceNotFound, RemoteParentNotFound
 
 from text_extraction_system.constants import metadata_fn
 from text_extraction_system.file_storage import get_webdav_client
@@ -13,7 +14,6 @@ from text_extraction_system_api.dto import RequestStatus
 STATUS_PENDING = 'PENDING'
 STATUS_DONE = 'DONE'
 STATUS_FAILURE = 'FAILURE'
-STATUS_CANCELED = 'CANCELED'
 
 
 @dataclass_json
@@ -76,11 +76,14 @@ class RequestMetadata:
         )
 
 
-def load_request_metadata(request_id) -> RequestMetadata:
-    webdav_client = get_webdav_client()
-    buf = BytesIO()
-    webdav_client.download_from(buf, f'{request_id}/{metadata_fn}')
-    return RequestMetadata.from_json(buf.getvalue())
+def load_request_metadata(request_id) -> Optional[RequestMetadata]:
+    try:
+        webdav_client = get_webdav_client()
+        buf = BytesIO()
+        webdav_client.download_from(buf, f'{request_id}/{metadata_fn}')
+        return RequestMetadata.from_json(buf.getvalue())
+    except (RemoteParentNotFound, RemoteResourceNotFound):
+        return None
 
 
 def save_request_metadata(req: RequestMetadata):

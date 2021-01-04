@@ -12,6 +12,7 @@ import pycountry
 import requests
 from celery import Celery, chord
 from celery.signals import after_setup_logger
+from webdav3.exceptions import RemoteResourceNotFound, RemoteParentNotFound
 
 from text_extraction_system.celery_log import JSONFormatter, set_log_extra
 from text_extraction_system.config import get_settings
@@ -26,7 +27,7 @@ from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
 from text_extraction_system.pdf.pdf import merge_pfd_pages, cleanup_pdf, extract_all_page_images
 from text_extraction_system.request_metadata import RequestCallbackInfo, RequestMetadata, STATUS_DONE, \
     save_request_metadata, \
-    load_request_metadata, STATUS_FAILURE, STATUS_PENDING, STATUS_CANCELED
+    load_request_metadata, STATUS_FAILURE, STATUS_PENDING
 from text_extraction_system.result_delivery.celery_client import send_task
 from text_extraction_system_api.dto import RequestStatus
 
@@ -66,9 +67,11 @@ def get_request_task_ids(webdav_client: WebDavClient, request_id: str) -> List[s
 def deliver_error(request_id: str, request_callback_info: RequestCallbackInfo):
     try:
         req = load_request_metadata(request_id)
-        if req.status == STATUS_CANCELED:
+        if not req:
             log.info(f'Not delivering error '
-                     f'because the request has been canceled: {req.original_file_name} (#{req.request_id})')
+                     f'because the request files do not exist in storage: '
+                     f'{request_callback_info.original_file_name} (#{request_id})\n'
+                     f'This usually means the request is canceled.')
             return
         req.status = STATUS_FAILURE
         save_request_metadata(req)
@@ -96,6 +99,10 @@ def process_document(task, request_id: str, request_callback_info: RequestCallba
     with handle_errors(request_id, request_callback_info):
         webdav_client: WebDavClient = get_webdav_client()
         req: RequestMetadata = load_request_metadata(request_id)
+        if not req:
+            log.info(f'Request files do not exist. Probably the request was already canceled.\n'
+                     f'{request_callback_info.original_file_name} (#{request_id})')
+            return False
         log.info(f'Starting text extraction for request uid: {request_id}\n'
                  f'File name: {req.original_file_name}')
         with webdav_client.get_as_local_fn(f'{request_id}/{req.original_document}') as (fn, _remote_path):
@@ -226,6 +233,10 @@ def ocr_and_preprocess(task,
     log.info(f'OCR-ing page {page_num} of {pdf_fn}: {page_image_webdav_path}...')
     webdav_client = get_webdav_client()
     req = load_request_metadata(request_id)
+    if not req:
+        log.info(f'Request files do not exist. Probably the request was already canceled.\n'
+                 f'{pdf_fn} (#{request_id})')
+        return None
     if req.status != STATUS_PENDING:
         log.info(f'Canceling OCR sub-task for file: {pdf_fn}, page {page_num}. (request #{request_id})\n'
                  f'because the request is already in status {req.status}.')
@@ -253,6 +264,10 @@ def merge_ocred_pages_and_extract_data(task,
                                        req_callback_info: RequestCallbackInfo):
     with handle_errors(request_id, req_callback_info):
         req: RequestMetadata = load_request_metadata(request_id)
+        if not req:
+            log.info(f'Request files do not exist. Probably the request was already canceled.\n'
+                     f'{req_callback_info.original_file_name} (#{request_id})')
+            return False
         log.info(f'Re-combining OCR-ed pdf blocks and processing the data extraction for request {request_id}: '
                  f'{req.original_file_name}')
         webdav_client: WebDavClient = get_webdav_client()
@@ -334,12 +349,12 @@ def extract_data_and_finish(pre_processed_pages: Dict[int, PDFPagePreProcessResu
 
     req.status = STATUS_DONE
 
-    if load_request_metadata(req.request_id).status == STATUS_PENDING:
+    if load_request_metadata(req.request_id):
         save_request_metadata(req)
         deliver_results(req.request_callback_info, req.to_request_status())
     else:
         log.info(f'Canceling results delivery '
-                 f'because the request is already processed/failed/done: {req.original_file_name} (#{req.request_id})')
+                 f'because the request is already removed: {req.original_file_name} (#{req.request_id})')
 
 
 def deliver_results(req: RequestCallbackInfo, req_status: RequestStatus):

@@ -11,7 +11,6 @@ from text_extraction_system.constants import task_ids
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
 from text_extraction_system.request_metadata import RequestMetadata, RequestCallbackInfo, save_request_metadata, \
     load_request_metadata
-from text_extraction_system.request_metadata import STATUS_CANCELED
 from text_extraction_system.tasks import process_document, celery_app, register_task_id, get_request_task_ids
 from text_extraction_system_api.dto import TableList, PlainTextStructure, RequestStatus, VersionInfo, TaskCancelResult
 
@@ -67,10 +66,6 @@ async def post_text_extraction_task(file: UploadFile = File(...),
 
 @app.delete('/api/v1/data_extraction_tasks/{request_id}/', response_model=TaskCancelResult)
 async def purge_text_extraction_task(request_id: str):
-    req = load_request_metadata(request_id)
-    req.status = STATUS_CANCELED
-    save_request_metadata(req)
-
     problems = dict()
     success = list()
     celery_task_ids: List[str] = get_request_task_ids(get_webdav_client(), request_id)
@@ -82,6 +77,7 @@ async def purge_text_extraction_task(request_id: str):
             problems[task_id] = HumanReadableTraceBackException \
                 .from_exception(ex) \
                 .human_readable_format()
+    get_webdav_client().clean(f'{request_id}')
     return TaskCancelResult(request_id=request_id,
                             task_ids=celery_task_ids,
                             successfully_revoked=success,
