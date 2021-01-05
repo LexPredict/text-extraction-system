@@ -9,11 +9,7 @@ from webdav3.exceptions import RemoteResourceNotFound, RemoteParentNotFound
 
 from text_extraction_system.constants import metadata_fn
 from text_extraction_system.file_storage import get_webdav_client
-from text_extraction_system_api.dto import RequestStatus
-
-STATUS_PENDING = 'PENDING'
-STATUS_DONE = 'DONE'
-STATUS_FAILURE = 'FAILURE'
+from text_extraction_system_api.dto import RequestStatus, STATUS_PENDING
 
 
 @dataclass_json

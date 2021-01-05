@@ -5,6 +5,10 @@ from dataclasses_json import dataclass_json
 from pandas import DataFrame
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
+STATUS_PENDING = 'PENDING'
+STATUS_DONE = 'DONE'
+STATUS_FAILURE = 'FAILURE'
+
 
 @pydantic_dataclass
 @dataclass_json

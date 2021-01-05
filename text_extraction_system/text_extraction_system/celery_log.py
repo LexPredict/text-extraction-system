@@ -194,8 +194,4 @@ class JSONFormatter(json_log_formatter.JSONFormatter):
         if stack and LOG_STACK_TRACE not in res:
             res[LOG_STACK_TRACE] = stack
 
-        # This is used in the filebeat config to determine the index name.
-        # Needed for splitting the important Contraxsuite task logs from other logs to keep CX logs longer.
-        res['special_log_type'] = 'cx'
-
         return res

@@ -12,7 +12,6 @@ import pycountry
 import requests
 from celery import Celery, chord
 from celery.signals import after_setup_logger
-from webdav3.exceptions import RemoteResourceNotFound, RemoteParentNotFound
 
 from text_extraction_system.celery_log import JSONFormatter, set_log_extra
 from text_extraction_system.config import get_settings
@@ -25,11 +24,12 @@ from text_extraction_system.internal_dto import PDFPagePreProcessResults
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf
 from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
 from text_extraction_system.pdf.pdf import merge_pfd_pages, cleanup_pdf, extract_all_page_images
-from text_extraction_system.request_metadata import RequestCallbackInfo, RequestMetadata, STATUS_DONE, \
+from text_extraction_system.request_metadata import RequestCallbackInfo, RequestMetadata, \
     save_request_metadata, \
-    load_request_metadata, STATUS_FAILURE, STATUS_PENDING
+    load_request_metadata
 from text_extraction_system.result_delivery.celery_client import send_task
 from text_extraction_system_api.dto import RequestStatus
+from text_extraction_system_api.dto import STATUS_FAILURE, STATUS_PENDING, STATUS_DONE
 
 settings = get_settings()
 
