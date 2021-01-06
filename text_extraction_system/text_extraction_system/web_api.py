@@ -12,7 +12,7 @@ from text_extraction_system.file_storage import get_webdav_client, WebDavClient
 from text_extraction_system.request_metadata import RequestMetadata, RequestCallbackInfo, save_request_metadata, \
     load_request_metadata
 from text_extraction_system.tasks import process_document, celery_app, register_task_id, get_request_task_ids
-from text_extraction_system_api.dto import TableList, PlainTextStructure, RequestStatus, VersionInfo, TaskCancelResult
+from text_extraction_system_api.dto import TableList, PlainTextStructure, RequestStatus, SystemInfo, TaskCancelResult
 
 app = FastAPI()
 
@@ -133,9 +133,12 @@ async def delete_request_files(request_id: str):
     get_webdav_client().clean(f'{request_id}')
 
 
-@app.get('/api/v1/version.json', response_model=VersionInfo)
-async def get_request_status(request_id: str):
+@app.get('/api/v1/system_info.json', response_model=SystemInfo)
+async def get_system_info(request_id: str):
     from text_extraction_system import version
-    return VersionInfo(version_number=version.VERSION_NUMBER,
-                       git_commit=version.GIT_COMMIT,
-                       build_date=version.BUILD_DATE).to_dict()
+    return SystemInfo(version_number=version.VERSION_NUMBER,
+                      git_branch=version.GIT_BRANCH,
+                      git_commit=version.GIT_COMMIT,
+                      lexnlp_git_branch=version.LEXNLP_GIT_BRANCH,
+                      lexnlp_git_commit=version.LEXNLP_GIT_COMMIT,
+                      build_date=version.BUILD_DATE).to_dict()

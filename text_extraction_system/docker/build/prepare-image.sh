@@ -47,7 +47,13 @@ fi
 
 
 echo "VERSION_NUMBER = '${TEXT_EXTRACTION_SYSTEM_VERSION}'" > ./temp/text_extraction_system/text_extraction_system/version.py
+
+echo "GIT_BRANCH = '${TEXT_EXTRACTION_SYSTEM_GIT_BRANCH}'" >> ./temp/text_extraction_system/text_extraction_system/version.py
 echo "GIT_COMMIT = '${TEXT_EXTRACTION_SYSTEM_GIT_COMMIT}'" >> ./temp/text_extraction_system/text_extraction_system/version.py
+
+echo "LEXNLP_GIT_BRANCH = '${LEXNLP_GIT_BRANCH}'" >> ./temp/text_extraction_system/text_extraction_system/version.py
+echo "LEXNLP_GIT_COMMIT = '${LEXNLP_GIT_COMMIT}'" >> ./temp/text_extraction_system/text_extraction_system/version.py
+
 echo "BUILD_DATE = '$(date --rfc-3339=seconds)'" >> ./temp/text_extraction_system/text_extraction_system/version.py
 
 # Preparing docker swarm deploy config bundled within the image

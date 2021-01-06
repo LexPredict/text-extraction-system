@@ -138,7 +138,10 @@ class DataFrameTableList:
 @pydantic_dataclass
 @dataclass_json
 @dataclass
-class VersionInfo:
+class SystemInfo:
     version_number: str
+    git_branch: str
     git_commit: str
+    lexnlp_git_branch: str
+    lexnlp_git_commit: str
     build_date: str

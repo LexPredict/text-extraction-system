@@ -4,7 +4,12 @@ export TEXT_EXTRACTION_SYSTEM_IMAGE=lexpredict/lexpredict-text-extraction-system
 export TEXT_EXTRACTION_SYSTEM_IMAGE_FROM=ubuntu:20.04
 export DOCKER_BUILD_FLAGS=
 
+export TEXT_EXTRACTION_SYSTEM_GIT_BRANCH=unknown
 export TEXT_EXTRACTION_SYSTEM_GIT_COMMIT=unknown
+
+export LEXNLP_GIT_BRANCH=unknown
+export LEXNLP_GIT_COMMIT=unknown
+
 export TEXT_EXTRACTION_SYSTEM_VERSION=0.0.0
 
 export SHARED_USER_ID=65432

@@ -1,3 +1,6 @@
 VERSION_NUMBER = '0.0.0'
-GIT_COMMIT = 'abcdefgh'
+GIT_BRANCH = 'branch'
+GIT_COMMIT = 'commit'
+LEXNLP_GIT_BRANCH = 'branch'
+LEXNLP_GIT_COMMIT = 'commit'
 BUILD_DATE = 'yyyy-mm-dd hh:mm:ss'
