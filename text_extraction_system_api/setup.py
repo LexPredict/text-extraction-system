@@ -29,7 +29,7 @@ from any document type. This package contains DTO classes and an API client impl
     license='AGPL',
 
     # version ranges for supported Python distributions
-    python_requires='~=3.7',
+    python_requires='~=3.6',
 
     # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers=[
@@ -76,6 +76,8 @@ from any document type. This package contains DTO classes and an API client impl
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
+        'dataclasses==0.7',
+        'dataclasses-json==0.5.1',
         'pydantic==1.6.1',
     ],
     dependency_links=[
