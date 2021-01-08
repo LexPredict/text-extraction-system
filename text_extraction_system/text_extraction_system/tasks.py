@@ -249,17 +249,20 @@ def ocr_and_preprocess(task,
                  f'because the request is already in status {req.status}.')
         return None
 
-    with webdav_client.get_as_local_fn(page_image_webdav_path) \
-            as (local_image_src, _remote_path):
-        with ocr_page_to_pdf(local_image_src, language=ocr_language) as local_pdf_fn:
-            webdav_client.upload(page_pdf_dst_webdav_path, local_pdf_fn)
-            page_images_fns = {page_num: local_image_src}
-            pre_process_results = pre_extract_data(pdf_fn=local_pdf_fn,
-                                                   page_images_fns=page_images_fns,
-                                                   page_num_starts_from=page_num,
-                                                   test_for_ocr_required=False)
-            webdav_client.upload_to(pickle.dumps(pre_process_results.ready_results[page_num]),
-                                    pre_process_results_dst_webdav_path)
+    try:
+        with webdav_client.get_as_local_fn(page_image_webdav_path) \
+                as (local_image_src, _remote_path):
+            with ocr_page_to_pdf(local_image_src, language=ocr_language) as local_pdf_fn:
+                webdav_client.upload(page_pdf_dst_webdav_path, local_pdf_fn)
+                page_images_fns = {page_num: local_image_src}
+                pre_process_results = pre_extract_data(pdf_fn=local_pdf_fn,
+                                                       page_images_fns=page_images_fns,
+                                                       page_num_starts_from=page_num,
+                                                       test_for_ocr_required=False)
+                webdav_client.upload_to(pickle.dumps(pre_process_results.ready_results[page_num]),
+                                        pre_process_results_dst_webdav_path)
+    except Exception as e:
+        raise Exception(f'Excaption caught while OCR-ing and pre-processing image: {page_image_webdav_path}') from e
 
     return page_pdf_dst_webdav_path
 
