@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from io import BytesIO
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 from dataclasses_json import dataclass_json, config
 from marshmallow import fields
@@ -56,12 +56,24 @@ class RequestMetadata:
     tables_df_file: Optional[str] = None
     doc_language: Optional[str] = None
     pages_for_ocr: Optional[Dict[int, str]] = None
+    error_message: Optional[str] = None
+
+    def append_error(self, problem: str, exc: Exception):
+        error_message: List[str] = list()
+        if self.error_message:
+            error_message.append(self.error_message)
+
+        if exc:
+            from celery_log import HumanReadableTraceBackException
+            error_message.append(HumanReadableTraceBackException.from_exception(exc).human_readable_format())
+        self.error_message = '\n'.join(error_message)
 
     def to_request_status(self) -> RequestStatus:
         return RequestStatus(
             request_id=self.request_id,
             original_file_name=self.original_file_name,
             status=self.status,
+            error_message=self.error_message,
             converted_to_pdf=self.converted_to_pdf is not None,
             searchable_pdf_created=self.ocred_pdf is not None,
             pdf_pages_ocred=sorted(list(self.pages_for_ocr.keys())) if self.pages_for_ocr else None,

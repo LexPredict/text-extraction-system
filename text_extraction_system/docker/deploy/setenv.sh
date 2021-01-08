@@ -6,6 +6,9 @@ export DOLLAR=$
 export TEXT_EXTRACTION_SYSTEM_IMAGE=lexpredict/lexpredict-text-extraction-system:latest
 export TEXT_EXTRACTION_SWARM_NETWORK=contraxsuite_contrax_net
 
+export TEXT_EXTRACTION_SYSTEM_DELETE_TEMP_FILES_ON_REQUEST_FINISHED=true
+export TEXT_EXTRACTION_SYSTEM_KEEP_FAILED_FILES=true
+
 export DOCKER_COMPOSE_FILE=docker-compose-backend-develop.yml
 
 export DOCKER_REDIS_IMAGE=redis:6.0.9
