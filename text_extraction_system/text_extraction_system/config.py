@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     tika_config: str = os.path.join(project_root, './tika/tika.lexp.no.ocr.config')
     fasttext_lang_model: str = os.path.join(project_root, './models/lid.176.bin')
     delete_temp_files_on_request_finish: bool = True
+    keep_failed_files: bool = False
 
     class Config:
         env_prefix = 'text_extraction_system_'

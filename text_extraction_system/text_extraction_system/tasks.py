@@ -64,7 +64,10 @@ def get_request_task_ids(webdav_client: WebDavClient, request_id: str) -> List[s
     return [s.strip('/') for s in webdav_client.list(f'{request_id}/{task_ids}')]
 
 
-def deliver_error(request_id: str, request_callback_info: RequestCallbackInfo):
+def deliver_error(request_id: str,
+                  request_callback_info: RequestCallbackInfo,
+                  problem: Optional[str] = None,
+                  exc: Optional[Exception] = None):
     try:
         req = load_request_metadata(request_id)
         if not req:
@@ -74,6 +77,10 @@ def deliver_error(request_id: str, request_callback_info: RequestCallbackInfo):
                      f'This usually means the request is canceled.')
             return
         req.status = STATUS_FAILURE
+
+        if problem or exc:
+            req.append_error(problem, exc)
+
         save_request_metadata(req)
     except Exception as req_upd_err:
         log.error(f'Unable to store failed status into metadata of request #{request_id}', exc_info=req_upd_err)
@@ -90,7 +97,7 @@ def handle_errors(request_id: str, request_callback_info: RequestCallbackInfo):
         set_log_extra(request_callback_info.log_extra)
         yield
     except Exception as e:
-        deliver_error(request_id, request_callback_info)
+        deliver_error(request_id, request_callback_info, exc=e)
         raise e
 
 

@@ -27,6 +27,7 @@ class RequestStatus:
     request_id: str
     original_file_name: str
     status: str
+    error_message: Optional[str] = None
     converted_to_pdf: bool = False
     searchable_pdf_created: bool = False
     pdf_pages_ocred: Optional[List[int]] = None
