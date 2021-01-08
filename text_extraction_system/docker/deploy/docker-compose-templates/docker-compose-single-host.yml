@@ -40,7 +40,7 @@ services:
     volumes:
       - redis_data:/data
 
-  contrax-celery:
+  tes-celery:
     image: ${TEXT_EXTRACTION_SYSTEM_IMAGE}
     networks:
       ${TEXT_EXTRACTION_SWARM_NETWORK}:
@@ -63,7 +63,7 @@ services:
         max-file: 5
         max-size: 10m
 
-  contrax-web-api:
+  tes-web-api:
     image: ${TEXT_EXTRACTION_SYSTEM_IMAGE}
     networks:
       ${TEXT_EXTRACTION_SWARM_NETWORK}:
