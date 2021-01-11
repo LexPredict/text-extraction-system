@@ -178,7 +178,7 @@ def process_pdf(pdf_fn: str,
         pre_process_results = pre_extract_data(pdf_fn=pdf_fn,
                                                page_images_fns=page_num_to_image_fn,
                                                page_num_starts_from=0,
-                                               test_for_ocr_required=True)
+                                               ocr_enabled=req.ocr_enable)
 
         if not pre_process_results.pages_to_ocr:
             log.info(f'PDF document {pdf_fn} does not need any OCR work. Proceeding to the data extraction...')
@@ -269,7 +269,7 @@ def ocr_and_preprocess(task,
                 pre_process_results = pre_extract_data(pdf_fn=local_pdf_fn,
                                                        page_images_fns=page_images_fns,
                                                        page_num_starts_from=page_num,
-                                                       test_for_ocr_required=False)
+                                                       ocr_enabled=False)
                 webdav_client.upload_to(pickle.dumps(pre_process_results.ready_results[page_num]),
                                         pre_process_results_dst_webdav_path)
     except Exception as e:

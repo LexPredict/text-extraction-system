@@ -99,7 +99,7 @@ def extract_text_and_structure_from_file(pdf_fn: str) -> Tuple[str, PlainTextStr
     try:
         with extract_all_page_images(pdf_fn) as page_images:
             page_images = {k: v for k, v in enumerate(page_images)}
-            pre_pro: PDFPreProcessingResults = pre_extract_data(pdf_fn, page_images, test_for_ocr_required=False)
+            pre_pro: PDFPreProcessingResults = pre_extract_data(pdf_fn, page_images, ocr_enabled=False)
             return extract_text_and_structure(pre_pro.ready_results)
     finally:
         shutil.rmtree(image_dir, ignore_errors=True)
@@ -180,7 +180,7 @@ class PDFPreProcessingResults:
 def pre_extract_data(pdf_fn: str,
                      page_images_fns: Dict[int, str],
                      page_num_starts_from: int = 0,
-                     test_for_ocr_required: bool = True) \
+                     ocr_enabled: bool = True) \
         -> PDFPreProcessingResults:
     ready_results: Dict[int, PDFPagePreProcessResults] = dict()
     pages_to_ocr: Dict[int, str] = dict()
@@ -198,7 +198,7 @@ def pre_extract_data(pdf_fn: str,
             page_layout: LTPage = device.get_result()
             page_image_fn = page_images_fns[page_num]
 
-            if test_for_ocr_required and page_requires_ocr(page_layout):
+            if ocr_enabled and page_requires_ocr(page_layout):
                 pages_to_ocr[page_num] = page_image_fn
             else:
                 page_text = render_page_to_text(page_layout)

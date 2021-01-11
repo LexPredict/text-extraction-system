@@ -36,6 +36,7 @@ async def post_text_extraction_task(file: UploadFile = File(...),
                                     call_back_celery_root_task_id: str = Form(default=None),
                                     call_back_celery_version: int = Form(default=4),
                                     doc_language: str = Form(default='en'),
+                                    ocr_enable: bool = Form(default=True),
                                     request_id: str = Form(default=None),
                                     log_extra_json_key_value: str = Form(default=None)):
     webdav_client = get_webdav_client()
@@ -46,6 +47,7 @@ async def post_text_extraction_task(file: UploadFile = File(...),
                           request_id=request_id,
                           request_date=datetime.now(),
                           doc_language=doc_language,
+                          ocr_enable=ocr_enable,
                           request_callback_info=RequestCallbackInfo(
                               request_id=request_id,
                               original_file_name=file.filename,
