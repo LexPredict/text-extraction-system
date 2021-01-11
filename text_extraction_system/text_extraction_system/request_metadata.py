@@ -21,8 +21,8 @@ class RequestCallbackInfo:
     call_back_celery_broker: Optional[str] = None
     call_back_celery_queue: Optional[str] = None
     call_back_celery_task_name: Optional[str] = None
-    call_back_celery_task_id: Optional[str] = None,
-    call_back_celery_root_task_id: Optional[str] = None,
+    call_back_celery_task_id: Optional[str] = None
+    call_back_celery_root_task_id: Optional[str] = None
     call_back_celery_parent_task_id: Optional[str] = None
     call_back_additional_info: Optional[str] = None
     call_back_celery_version: int = 4
