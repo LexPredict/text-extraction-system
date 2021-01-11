@@ -24,6 +24,8 @@ log = getLogger(__name__)
 def get_table_dtos_from_camelot_output(camelot_tables: Iterable[CamelotTable],
                                        accuracy_threshold: float = 50) -> Tuple[TableList,
                                                                                 DataFrameTableList]:
+    camelot_tables = list(camelot_tables)
+
     df_table_data = [
         DataFrameTable(
             df=t.df,
