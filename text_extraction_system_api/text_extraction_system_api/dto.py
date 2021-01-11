@@ -146,3 +146,5 @@ class SystemInfo:
     lexnlp_git_branch: str
     lexnlp_git_commit: str
     build_date: str
+    python_version: str
+    pandas_version: str

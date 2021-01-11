@@ -1,3 +1,5 @@
+import pandas
+import sys
 import json
 import os
 from datetime import datetime
@@ -145,7 +147,9 @@ async def get_system_info():
                       git_commit=version.GIT_COMMIT,
                       lexnlp_git_branch=version.LEXNLP_GIT_BRANCH,
                       lexnlp_git_commit=version.LEXNLP_GIT_COMMIT,
-                      build_date=version.BUILD_DATE).to_dict()
+                      build_date=version.BUILD_DATE,
+                      python_version=sys.version,
+                      pandas_version=pandas.__version__).to_dict()
 
 
 @app.get('/api/v1/download_python_api_client')
