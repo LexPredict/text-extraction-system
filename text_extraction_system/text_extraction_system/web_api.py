@@ -1,10 +1,14 @@
 import json
+import os
 from datetime import datetime
+from io import BytesIO
 from typing import AnyStr, List
 from uuid import uuid4
+from zipfile import ZipFile
 
 from fastapi import FastAPI, File, UploadFile, Form, Response
 
+from text_extraction_system import version
 from text_extraction_system.celery_log import HumanReadableTraceBackException
 from text_extraction_system.commons.escape_utils import get_valid_fn
 from text_extraction_system.constants import task_ids
@@ -12,6 +16,7 @@ from text_extraction_system.file_storage import get_webdav_client, WebDavClient
 from text_extraction_system.request_metadata import RequestMetadata, RequestCallbackInfo, save_request_metadata, \
     load_request_metadata
 from text_extraction_system.tasks import process_document, celery_app, register_task_id, get_request_task_ids
+from text_extraction_system_api import dto
 from text_extraction_system_api.dto import TableList, PlainTextStructure, RequestStatus, SystemInfo, TaskCancelResult
 
 app = FastAPI()
@@ -134,11 +139,34 @@ async def delete_request_files(request_id: str):
 
 
 @app.get('/api/v1/system_info.json', response_model=SystemInfo)
-async def get_system_info(request_id: str):
-    from text_extraction_system import version
+async def get_system_info():
     return SystemInfo(version_number=version.VERSION_NUMBER,
                       git_branch=version.GIT_BRANCH,
                       git_commit=version.GIT_COMMIT,
                       lexnlp_git_branch=version.LEXNLP_GIT_BRANCH,
                       lexnlp_git_commit=version.LEXNLP_GIT_COMMIT,
                       build_date=version.BUILD_DATE).to_dict()
+
+
+@app.get('/api/v1/download_python_api_client')
+async def download_python_api_client_and_dtos():
+    folder_exclude = {'lexpredict_text_extraction_system_api.egg-info', '__pycache__'}
+    file_exclude = {'.gitignore'}
+
+    dir_name = os.path.dirname(os.path.dirname(os.path.abspath(dto.__file__)))
+
+    b = BytesIO()
+    fn = f'text_extraction_system_python_api_{version.VERSION_NUMBER}.zip'
+    with ZipFile(b, 'w') as zip_obj:
+        for root, dirs, files in os.walk(dir_name):
+            if os.path.basename(root) in folder_exclude:
+                continue
+            for file in files:
+                if os.path.basename(file) in file_exclude:
+                    continue
+                zip_obj.write(os.path.join(root, file),
+                              os.path.relpath(os.path.join(root, file), os.path.join(dir_name, '..')))
+
+    return Response(b.getvalue(), status_code=200, media_type='application/x-zip-compressed', headers={
+        'Content-Disposition': f'attachment; filename={fn}'
+    })
