@@ -45,6 +45,8 @@ class RequestMetadata:
 
     request_callback_info: RequestCallbackInfo
 
+    ocr_enable: bool = True
+
     status: str = STATUS_PENDING
     converted_to_pdf: Optional[str] = None
     ocred_pdf: Optional[str] = None
