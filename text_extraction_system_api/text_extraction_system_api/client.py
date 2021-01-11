@@ -28,6 +28,7 @@ class TextExtractionSystemWebClient:
                                       call_back_celery_parent_task_id: Optional[str] = None,
                                       call_back_additional_info: Optional[str] = None,
                                       doc_language: Optional[str] = None,
+                                      ocr_enable: bool = True,
                                       call_back_celery_version: int = 4,
                                       request_id: str = None,
                                       log_extra: Dict[str, str] = None) -> str:
@@ -43,6 +44,7 @@ class TextExtractionSystemWebClient:
                                        call_back_additional_info=call_back_additional_info,
                                        call_back_celery_version=call_back_celery_version,
                                        doc_language=doc_language,
+                                       ocr_enable=ocr_enable,
                                        request_id=request_id,
                                        log_extra_json_key_value=json.dumps(log_extra) if log_extra else None))
         if resp.status_code not in {200, 201}:
