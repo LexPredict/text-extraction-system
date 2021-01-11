@@ -1,3 +1,4 @@
+aiofiles==0.6.0
 amqp==5.0.1
 appdirs==1.4.3
 argcomplete==1.10.0
