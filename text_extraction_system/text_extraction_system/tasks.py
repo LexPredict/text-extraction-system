@@ -48,12 +48,23 @@ log = logging.getLogger(__name__)
 
 @after_setup_logger.connect
 def setup_loggers(*args, **kwargs):
+    conf = get_settings()
+
     logger = logging.getLogger()
-    formatter = JSONFormatter()
-    sh = logging.StreamHandler()
-    sh.setFormatter(formatter)
     logger.handlers.clear()
-    logger.addHandler(sh)
+
+    if conf.log_to_stdout:
+        formatter = JSONFormatter()
+        sh = logging.StreamHandler()
+        sh.setFormatter(formatter)
+        logger.addHandler(sh)
+
+    if conf.log_to_file:
+        formatter = JSONFormatter()
+        from logging.handlers import RotatingFileHandler
+        sh = RotatingFileHandler(filename=conf.log_to_file, encoding='utf-8', maxBytes=10 * 1024 * 1024, backupCount=5)
+        sh.setFormatter(formatter)
+        logger.addHandler(sh)
 
 
 def register_task_id(webdav_client: WebDavClient, request_id: str, task_id: str):
