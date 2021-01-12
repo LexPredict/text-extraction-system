@@ -16,7 +16,9 @@ class Settings(BaseSettings):
     fasttext_lang_model: str = os.path.join(project_root, './models/lid.176.bin')
     delete_temp_files_on_request_finish: bool = True
     keep_failed_files: bool = False
+
     log_to_stdout: bool = True
+    log_to_stdout_json: bool = True
     log_to_file: str = None
 
     class Config:

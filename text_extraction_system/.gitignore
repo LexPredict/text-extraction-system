@@ -23,6 +23,8 @@ celerybeat-schedule.db
 # virtualenv
 venv/
 ENV/
+venv36/
+venv38/
 
 **/.idea/*
 **/.vs_code/*

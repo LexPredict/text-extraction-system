@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from io import BytesIO
 from typing import Optional, Dict, List
+import dateutil.parser
 
 from dataclasses_json import dataclass_json, config
 from marshmallow import fields
@@ -36,7 +37,7 @@ class RequestMetadata:
     request_date: datetime = field(
         metadata=config(
             encoder=datetime.isoformat,
-            decoder=datetime.fromisoformat,
+            decoder=dateutil.parser.parse,
             mm_field=fields.DateTime(format='iso')
         )
     )

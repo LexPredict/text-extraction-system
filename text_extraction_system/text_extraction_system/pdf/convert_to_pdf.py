@@ -5,6 +5,8 @@ import tempfile
 from contextlib import contextmanager
 from subprocess import CompletedProcess
 from typing import Generator
+from subprocess import PIPE
+
 
 log = logging.getLogger(__name__)
 
@@ -44,8 +46,9 @@ def convert_to_pdf(src_fn: str) -> Generator[str, None, None]:
                                                                   '-o',
                                                                   out_fn],
                                                                  check=True,
-                                                                 text=True,
-                                                                 capture_output=True,
+                                                                 universal_newlines=True,
+                                                                 stderr=PIPE,
+                                                                 stdout=PIPE,
                                                                  timeout=600)
         else:
             completed_process: CompletedProcess = subprocess.run(['soffice',
@@ -62,8 +65,12 @@ def convert_to_pdf(src_fn: str) -> Generator[str, None, None]:
                                                                   src_fn,
                                                                   '--outdir',
                                                                   temp_dir
-                                                                  ], check=True, timeout=600, text=True,
-                                                                 capture_output=True)
+                                                                  ],
+                                                                 check=True,
+                                                                 timeout=600,
+                                                                 universal_newlines=True,
+                                                                 stderr=PIPE,
+                                                                 stdout=PIPE)
         log.info(completed_process.stdout)
         if completed_process.stderr:
             log.error(completed_process.stderr)

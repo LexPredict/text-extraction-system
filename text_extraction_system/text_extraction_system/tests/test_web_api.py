@@ -41,7 +41,9 @@ async def test_webapi_calls_process_document(setup):
                                                 call_back_celery_task_id=None,
                                                 call_back_celery_task_name=None,
                                                 doc_language=None,
+                                                ocr_enable=True,
+                                                log_extra_json_key_value='null'
                                                 )
-                mkdir_method.assert_called_once()
+                mkdir_method.assert_called()
                 upload_to_method.assert_called()
                 apply_async_method.assert_called_once()
