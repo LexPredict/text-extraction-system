@@ -75,7 +75,7 @@ if [ "${DOLLAR}{ROLE}" == "unit_tests" ]; then
   su ${SHARED_USER_NAME} -c "${DOLLAR}{ACTIVATE_VENV} && ulimit -n 65535 && pytest text_extraction_system"
 elif [ "${DOLLAR}{ROLE}" == "web-api" ]; then
   startup
-  su ${SHARED_USER_NAME} -c "${DOLLAR}{ACTIVATE_VENV} && ulimit -n 65535 && uvicorn --host 0.0.0.0 --port 8000 text_extraction_system.web_api:app --reload"
+  su ${SHARED_USER_NAME} -c "${DOLLAR}{ACTIVATE_VENV} && ulimit -n 65535 && uvicorn --host 0.0.0.0 --port 8000 text_extraction_system.web_api:app"
 elif [ "${DOLLAR}{ROLE}" == "celery-worker" ]; then
   startup
   mkdir -p /data/celery_worker_state/db
