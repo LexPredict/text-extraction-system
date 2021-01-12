@@ -69,6 +69,14 @@ def setup_loggers(*args, **kwargs):
         sh.setFormatter(formatter)
         logger.addHandler(sh)
 
+    # make pdfminer a bit more silent
+    from pdfminer.pdfinterp import log as pdfinterp_log
+    from pdfminer.pdfpage import log as pdfpage_log
+    from pdfminer.pdfdocument import log as pdfdocument_log
+    pdfinterp_log.setLevel(logging.WARNING)
+    pdfpage_log.setLevel(logging.WARNING)
+    pdfdocument_log.setLevel(logging.WARNING)
+
 
 def register_task_id(webdav_client: WebDavClient, request_id: str, task_id: str):
     webdav_client.mkdir(f'{request_id}/{task_ids}/{task_id}')
@@ -85,10 +93,10 @@ def deliver_error(request_id: str,
     try:
         req = load_request_metadata(request_id)
         if not req:
-            log.info(f'Not delivering error '
-                     f'because the request files do not exist in storage: '
-                     f'{request_callback_info.original_file_name} (#{request_id})\n'
-                     f'This usually means the request is canceled.')
+            log.warning(f'Not delivering error '
+                        f'because the request files do not exist in storage: '
+                        f'{request_callback_info.original_file_name} (#{request_id})\n'
+                        f'This usually means the request is canceled.')
             return
         req.status = STATUS_FAILURE
 
@@ -121,10 +129,10 @@ def process_document(task, request_id: str, request_callback_info: RequestCallba
         webdav_client: WebDavClient = get_webdav_client()
         req: RequestMetadata = load_request_metadata(request_id)
         if not req:
-            log.info(f'Request files do not exist. Probably the request was already canceled.\n'
-                     f'{request_callback_info.original_file_name} (#{request_id})')
+            log.warning(f'Canceling document processing: {request_callback_info.original_file_name} (#{request_id}):\n'
+                        f'Request files do not exist. Probably the request was already canceled.\n')
             return False
-        log.info(f'Starting text extraction for request uid: {request_id}\n'
+        log.info(f'Starting text/data extraction for request uid: {request_id}\n'
                  f'File name: {req.original_file_name}')
         with webdav_client.get_as_local_fn(f'{request_id}/{req.original_document}') as (fn, _remote_path):
             ext = os.path.splitext(fn)[1]
@@ -251,18 +259,20 @@ def ocr_and_preprocess(task,
                        log_extra: Dict[str, str] = None
                        ) -> Optional[str]:
     set_log_extra(log_extra)
-    log.info(f'OCR-ing page {page_num} of {pdf_fn}: {page_image_webdav_path}...')
     webdav_client = get_webdav_client()
     req = load_request_metadata(request_id)
     if not req:
-        log.info(f'Request files do not exist. Probably the request was already canceled.\n'
-                 f'{pdf_fn} (#{request_id})')
+        log.warning(
+            f'Not OCR-ing page {page_num} of {pdf_fn}.\n'
+            f'Request files do not exist.\n'
+            f'Probably the request was already canceled.\n'
+            f'{pdf_fn} (#{request_id})')
         return None
     if req.status != STATUS_PENDING:
         log.info(f'Canceling OCR sub-task for file: {pdf_fn}, page {page_num}. (request #{request_id})\n'
                  f'because the request is already in status {req.status}.')
         return None
-
+    log.info(f'OCR-ing page {page_num} of {pdf_fn}: {page_image_webdav_path}...')
     try:
         with webdav_client.get_as_local_fn(page_image_webdav_path) \
                 as (local_image_src, _remote_path):
@@ -276,7 +286,7 @@ def ocr_and_preprocess(task,
                 webdav_client.upload_to(pickle.dumps(pre_process_results.ready_results[page_num]),
                                         pre_process_results_dst_webdav_path)
     except Exception as e:
-        raise Exception(f'Excaption caught while OCR-ing and pre-processing image: {page_image_webdav_path}') from e
+        raise Exception(f'Exception caught while OCR-ing and pre-processing image: {page_image_webdav_path}') from e
 
     return page_pdf_dst_webdav_path
 
@@ -289,7 +299,9 @@ def merge_ocred_pages_and_extract_data(task,
     with handle_errors(request_id, req_callback_info):
         req: RequestMetadata = load_request_metadata(request_id)
         if not req:
-            log.info(f'Request files do not exist. Probably the request was already canceled.\n'
+            log.info(f'Not re-combining OCR-ed pdf blocks and not processing the data extraction '
+                     f'for request {request_id}: {req.original_file_name}'
+                     f'Request files do not exist. Probably the request was already canceled.\n'
                      f'{req_callback_info.original_file_name} (#{request_id})')
             return False
         log.info(f'Re-combining OCR-ed pdf blocks and processing the data extraction for request {request_id}: '
@@ -378,7 +390,7 @@ def extract_data_and_finish(pre_processed_pages: Dict[int, PDFPagePreProcessResu
         deliver_results(req.request_callback_info, req.to_request_status())
     else:
         log.info(f'Canceling results delivery '
-                 f'because the request is already removed: {req.original_file_name} (#{req.request_id})')
+                 f'because the request files are already removed: {req.original_file_name} (#{req.request_id})')
 
 
 def deliver_results(req: RequestCallbackInfo, req_status: RequestStatus):
@@ -405,9 +417,9 @@ def deliver_results(req: RequestCallbackInfo, req_status: RequestStatus):
                       root_task_id=req.call_back_celery_root_task_id,
                       celery_version=req.call_back_celery_version)
         except Exception as err:
-            log.info(f'Unable to send the extraction results of {req.original_file_name} as a celery task:\n'
-                     f'broker: {req.call_back_celery_broker}\n'
-                     f'queue: {req.call_back_celery_queue}\n'
-                     f'task_name: {req.call_back_celery_task_name}\n', exc_info=err)
+            log.error(f'Unable to send the extraction results of {req.original_file_name} as a celery task:\n'
+                      f'broker: {req.call_back_celery_broker}\n'
+                      f'queue: {req.call_back_celery_queue}\n'
+                      f'task_name: {req.call_back_celery_task_name}\n', exc_info=err)
 
     log.info(f'Finished processing request {req.request_id} ({req.original_file_name}).')

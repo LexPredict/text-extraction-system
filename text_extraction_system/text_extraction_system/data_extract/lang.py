@@ -1,7 +1,9 @@
 import re
 from typing import Optional
 
-import fasttext
+# we instantiate this _ class instead of using load_model
+# to avoid printing a useless warning coded in load_model
+from fasttext.FastText import _FastText
 
 from text_extraction_system.config import get_settings
 
@@ -12,7 +14,10 @@ class FastTextLangDetector:
 
     def __init__(self):
         settings = get_settings()
-        self.model = fasttext.load_model(settings.fasttext_lang_model)
+
+        # we instantiate this _ class instead of using load_model
+        # to avoid printing a useless warning coded in load_model
+        self.model = _FastText(settings.fasttext_lang_model)
 
     def predict_lang(self, text: str):
         text = TO_REMOVE.sub(' ', text)

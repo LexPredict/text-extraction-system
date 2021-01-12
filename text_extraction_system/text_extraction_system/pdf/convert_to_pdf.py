@@ -71,9 +71,13 @@ def convert_to_pdf(src_fn: str) -> Generator[str, None, None]:
                                                                  universal_newlines=True,
                                                                  stderr=PIPE,
                                                                  stdout=PIPE)
-        log.info(completed_process.stdout)
+
         if completed_process.stderr:
+            log.info(completed_process.stdout)
             log.error(completed_process.stderr)
+        else:
+            log.debug(completed_process.stdout)
+
         if not os.path.isfile(out_fn):
             raise OutputPDFDoesNotExistAfterConversion()
         yield out_fn
