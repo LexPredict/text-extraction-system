@@ -1,11 +1,11 @@
 import re
 import shutil
 import tempfile
-from dataclasses import dataclass
 from io import StringIO
 from logging import getLogger
 from typing import List, Tuple, Dict
 
+from dataclasses import dataclass
 from lexnlp.nlp.en.segments.paragraphs import get_paragraphs
 from lexnlp.nlp.en.segments.sections import get_document_sections_with_titles
 from lexnlp.nlp.en.segments.sentences import pre_process_document, get_sentence_span_list
@@ -194,6 +194,9 @@ def pre_extract_data(pdf_fn: str,
         interpreter = PDFPageInterpreter(rsrcmgr, device)
         page_num = page_num_starts_from
         for page in PDFPage.create_pages(doc):
+            if page_num % 10 == 0:
+                log.info(f'Processing page {page_num + 1}...')
+
             interpreter.process_page(page)
             page_layout: LTPage = device.get_result()
             page_image_fn = page_images_fns[page_num]

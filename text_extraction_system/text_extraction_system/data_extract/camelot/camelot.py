@@ -44,4 +44,4 @@ def extract_tables(pageno: int,
     lattice.dimensions = dim
     # putting a dummy file name to avoid Camelot arguing
     # Camelot extracts the page number from the file name.
-    return lattice.extract_tables(f'page-{pageno}.pdf')
+    return lattice.extract_tables(f'page-{pageno}.pdf', suppress_stdout=True)

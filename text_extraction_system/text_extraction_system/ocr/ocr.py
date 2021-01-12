@@ -22,7 +22,7 @@ def ocr_page_to_pdf(page_image_fn: str, language: str = 'eng', timeout: int = 60
         dstfn = os.path.join(page_dir, os.path.splitext(basename)[0])
         args = ['tesseract', '-l', str(language), '-c', 'tessedit_create_pdf=1', page_image_fn, dstfn]
         env = os.environ.copy()
-        log.info(f'Executing tesseract: {args}')
+        log.debug(f'Executing tesseract: {args}')
         proc = Popen(args, env=env, stdout=PIPE, stderr=PIPE)
         try:
             data, err = proc.communicate(timeout=timeout)
@@ -33,10 +33,12 @@ def ocr_page_to_pdf(page_image_fn: str, language: str = 'eng', timeout: int = 60
             raise OCRException(f'Timeout waiting for tesseract to finish:\n{args}') from te
         if data:
             data = data.decode('utf8', 'ignore')
-            log.info(f'{args} stdout:\n{data}')
         if err:
             err = err.decode('utf8', 'ignore')
-            log.info(f'{args} stderr:\n{err}')
+            log.info(f'{args} stdout:\n{data}')
+            log.error(f'{args} stderr:\n{err}')
+        else:
+            log.debug(f'{args} stdout:\n{data}')
         if proc.returncode != 0:
             raise OCRException(f'Tesseract returned non-zero code:\n{args}\n{err}')
     finally:
