@@ -67,7 +67,7 @@ class RequestMetadata:
             error_message.append(self.error_message)
 
         if exc:
-            from celery_log import HumanReadableTraceBackException
+            from text_extraction_system.celery_log import HumanReadableTraceBackException
             error_message.append(HumanReadableTraceBackException.from_exception(exc).human_readable_format())
         self.error_message = '\n'.join(error_message)
 
