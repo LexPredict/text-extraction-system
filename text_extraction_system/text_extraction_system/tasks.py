@@ -54,7 +54,10 @@ def setup_loggers(*args, **kwargs):
     logger.handlers.clear()
 
     if conf.log_to_stdout:
-        formatter = JSONFormatter()
+        if conf.log_to_stdout_json:
+            formatter = JSONFormatter()
+        else:
+            formatter = logging.Formatter('%(levelname)s %(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
         sh = logging.StreamHandler()
         sh.setFormatter(formatter)
         logger.addHandler(sh)
