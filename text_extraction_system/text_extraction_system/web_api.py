@@ -1,13 +1,13 @@
-import pandas
-import sys
 import json
 import os
+import sys
 from datetime import datetime
 from io import BytesIO
-from typing import AnyStr, List
+from typing import AnyStr, List, Dict
 from uuid import uuid4
 from zipfile import ZipFile
 
+import pandas
 from fastapi import FastAPI, File, UploadFile, Form, Response
 
 from text_extraction_system import version
@@ -99,9 +99,9 @@ async def get_request_status(request_id: str):
     return req.to_request_status().to_dict()
 
 
-def _proxy_request(webdav_client, request_id: str, fn: str):
+def _proxy_request(webdav_client, request_id: str, fn: str, headers: Dict[str, str] = None):
     resp: WebDavClient = webdav_client.execute_request('download', f'/{request_id}/{fn}')
-    return Response(content=resp.content, status_code=resp.status_code)
+    return Response(content=resp.content, status_code=resp.status_code, headers=headers)
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.json',
@@ -123,7 +123,10 @@ async def get_extracted_tables_as_pickled_dataframe_table_list(request_id: str):
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_plain_text.txt', response_model=AnyStr)
 async def get_extracted_plain_text(request_id: str):
-    return _proxy_request(get_webdav_client(), request_id, load_request_metadata(request_id).plain_text_file)
+    return _proxy_request(get_webdav_client(),
+                          request_id,
+                          load_request_metadata(request_id).plain_text_file,
+                          headers={'Content-Type': 'text/plain; charset=utf-8'})
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/plain_text_structure.json',

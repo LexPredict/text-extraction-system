@@ -73,9 +73,11 @@ def setup_loggers(*args, **kwargs):
     from pdfminer.pdfinterp import log as pdfinterp_log
     from pdfminer.pdfpage import log as pdfpage_log
     from pdfminer.pdfdocument import log as pdfdocument_log
+    from pdfminer.converter import log as converter_log
     pdfinterp_log.setLevel(logging.WARNING)
     pdfpage_log.setLevel(logging.WARNING)
     pdfdocument_log.setLevel(logging.WARNING)
+    converter_log.setLevel(logging.WARNING)
 
 
 def register_task_id(webdav_client: WebDavClient, request_id: str, task_id: str):
