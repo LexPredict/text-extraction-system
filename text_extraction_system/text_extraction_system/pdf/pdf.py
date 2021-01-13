@@ -93,6 +93,7 @@ def extract_page_images(pdf_fn: str, pages: List[int]) -> Generator[Tuple[int, s
 
 @contextmanager
 def extract_all_page_images(pdf_fn: str) -> Generator[List[str], None, None]:
+    log.info('Rendering PDF pages to images for further using in table detection and OCR...')
     temp_dir = mkdtemp(prefix='pdf2image_')
 
     try:
