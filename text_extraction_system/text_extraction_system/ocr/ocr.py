@@ -40,7 +40,11 @@ def ocr_page_to_pdf(page_image_fn: str, language: str = 'eng', timeout: int = 60
         else:
             log.debug(f'{args} stdout:\n{data}')
         if proc.returncode != 0:
-            raise OCRException(f'Tesseract returned non-zero code:\n{args}\n{err}')
+            raise OCRException(f'Tesseract returned non-zero code.\n'
+                               f'Command line:\n'
+                               f'{args}\n'
+                               f'Process stderr:\n'
+                               f'{err}')
     finally:
         if proc is not None:
             try:
