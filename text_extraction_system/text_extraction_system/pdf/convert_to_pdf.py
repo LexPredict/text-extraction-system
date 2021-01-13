@@ -57,7 +57,7 @@ def convert_to_pdf(src_fn: str) -> Generator[str, None, None]:
                     '--nofirststartwizard',
                     '--convert-to',
                     'pdf',
-                    src_fn + '--',
+                    src_fn,
                     '--outdir',
                     temp_dir
                     ]
