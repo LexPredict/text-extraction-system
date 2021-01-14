@@ -42,6 +42,9 @@ celery_app = Celery(
 celery_app.conf.update(task_track_started=True)
 celery_app.conf.update(task_serializer='pickle')
 celery_app.conf.update(accept_content=['pickle', 'json'])
+celery_app.conf.update(task_acks_late=True)
+celery_app.conf.update(task_reject_on_worker_lost=True)
+celery_app.conf.update(worker_prefetch_multiplier=1)
 
 log = logging.getLogger(__name__)
 
