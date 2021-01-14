@@ -7,6 +7,8 @@ from subprocess import CompletedProcess
 from subprocess import PIPE
 from typing import Generator
 
+from text_extraction_system.locking.socket_lock import get_lock
+
 log = logging.getLogger(__name__)
 
 
@@ -26,8 +28,12 @@ class InputFileDoesNotExist(ConvertToPDFFailed):
     pass
 
 
+def _run_process(args) -> CompletedProcess:
+    return subprocess.run(args, check=False, timeout=600, universal_newlines=True, stderr=PIPE, stdout=PIPE)
+
+
 @contextmanager
-def convert_to_pdf(src_fn: str) -> Generator[str, None, None]:
+def convert_to_pdf(src_fn: str, soffice_single_process_locking: bool = True) -> Generator[str, None, None]:
     """
     Converts the specified file to pdf using Libre Office CLI.
     Libre Office allows specifying the output directory and does not allow specifying the output file name.
@@ -36,6 +42,7 @@ def convert_to_pdf(src_fn: str) -> Generator[str, None, None]:
     a temporary directory and next yielded to the caller.
     After returning from the yield the output file and the output temp directory are removed.
     """
+    log.info(f'Converting to PDF: {src_fn}...')
     if not os.path.isfile(src_fn):
         raise InputFileDoesNotExist(src_fn)
     temp_dir = tempfile.mkdtemp()
@@ -45,28 +52,24 @@ def convert_to_pdf(src_fn: str) -> Generator[str, None, None]:
     try:
         if src_ext.lower() in {'.tiff', '.jpg', '.jpeg', '.png'}:
             args = ['img2pdf', src_fn, '-o', out_fn]
+            completed_process: CompletedProcess = _run_process(args)
         else:
-            args = ['soffice',
-                    '--headless',
-                    '--invisible',
-                    '--nodefault',
-                    '--view',
-                    '--nolockcheck',
-                    '--nologo',
-                    '--norestore',
-                    '--nofirststartwizard',
-                    '--convert-to',
-                    'pdf',
-                    src_fn,
-                    '--outdir',
-                    temp_dir
-                    ]
-        completed_process: CompletedProcess = subprocess.run(args,
-                                                             check=False,
-                                                             timeout=600,
-                                                             universal_newlines=True,
-                                                             stderr=PIPE,
-                                                             stdout=PIPE)
+            args = ['soffice', '--headless', '--invisible', '--nodefault', '--view', '--nolockcheck',
+                    '--nologo', '--norestore', '--nofirststartwizard', '--convert-to', 'pdf', src_fn,
+                    '--outdir', temp_dir]
+
+            # We are using "soffice" (Libre Office) to "print" any document to pdf
+            # and it seems not allowing running more than one copy of the process in some environments.
+            # The following is a workaround mostly for in-container usage.
+            # There is no guaranty that it will work on a dev machine when there is an "soffice" process
+            # started by some other app/user.
+            if soffice_single_process_locking:
+                with get_lock('soffice_single_process',
+                              wait_required_listener=
+                              lambda: log.info('Waiting for another conversion task to finish first...')):
+                    completed_process: CompletedProcess = _run_process(args)
+            else:
+                completed_process: CompletedProcess = _run_process(args)
 
         msg = f'Command line:\n' \
               f'{args}'

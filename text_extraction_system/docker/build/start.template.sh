@@ -84,7 +84,7 @@ elif [ "${DOLLAR}{ROLE}" == "celery-worker" ]; then
    ulimit -n 65535 && \
    celery -A text_extraction_system.tasks worker \
       -l INFO \
-      --concurrency=1 \
+      --concurrency=${DOLLAR}{CPU_QUARTER_CORES} \
       -Ofair \
       -n celery@%h \
       --statedb=/data/celery_worker_state/db/celery-worker-state-${DOLLAR}{HOSTNAME}.db"
