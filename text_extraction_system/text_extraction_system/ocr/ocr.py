@@ -33,16 +33,19 @@ def ocr_page_to_pdf(page_image_fn: str, language: str = 'eng', timeout: int = 60
             raise OCRException(f'Timeout waiting for tesseract to finish:\n{args}') from te
         if data:
             data = data.decode('utf8', 'ignore')
+
         if err:
             err = err.decode('utf8', 'ignore')
-            log.info(f'{args} stdout:\n{data}')
-            log.error(f'{args} stderr:\n{err}')
-        else:
-            log.debug(f'{args} stdout:\n{data}')
+        if data:
+            data = data.decode('utf8', 'ignore')
+
+        log.debug(f'{args}\nstdout:\n{data}stderr:\n{err}')
         if proc.returncode != 0:
             raise OCRException(f'Tesseract returned non-zero code.\n'
                                f'Command line:\n'
                                f'{args}\n'
+                               f'Process stdout:\n'
+                               f'{err}'
                                f'Process stderr:\n'
                                f'{err}')
     finally:
