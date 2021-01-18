@@ -1,15 +1,12 @@
 import os
-from unittest.mock import patch
 
-from text_extraction_system import config
+from text_extraction_system.commons.tests.commons import with_default_settings
 from text_extraction_system.data_extract import data_extract
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
 
-@patch.object(config,
-              attribute='_settings',
-              new=config.Settings.construct(webdav_url='', webdav_username='', webdav_password=''))
+@with_default_settings
 def test_text_structure_extraction():
     fn = os.path.join(data_dir, 'structured_text.pdf')
     text, struct = data_extract.extract_text_and_structure_from_file(fn)

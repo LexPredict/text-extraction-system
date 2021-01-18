@@ -20,8 +20,18 @@ mkdir -p ./temp
 mkdir -p ./temp/text_extraction_system
 
 
+
 rsync --exclude='.git/' ../../text_extraction_system ./temp/text_extraction_system -a --copy-links -v
 rsync --exclude='.git/' ../../../text_extraction_system_api ./temp -a --copy-links -v
+
+# Build java modules
+pushd ../../text_extraction_system_java
+mvn clean package
+mkdir -p ../java_modules
+cp target/text_extraction_system_java-1.0-jar-with-dependencies.jar ../java_modules/
+popd
+rsync --exclude='.git/' ../../java_modules ./temp -a --copy-links -v
+
 
 cp ../../requirements.txt ./temp/
 cp ../../.env.local_dev_example ./temp

@@ -4,6 +4,7 @@ from typing import Callable
 import pikepdf
 import pytest
 
+from text_extraction_system.commons.tests.commons import with_default_settings
 from text_extraction_system.data_extract.data_extract import extract_text_pdfminer
 from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf, InputFileDoesNotExist
 
@@ -23,6 +24,7 @@ def check_pdf_conversion(src_doc_fn: str, assert_pdf_by_fn_func: Callable[[str, 
     assert not os.path.exists(os.path.dirname(pdf_temp_file))
 
 
+@with_default_settings
 def test_input_does_not_exist():
     def assert_pdf(fn: str):
         pass
@@ -31,10 +33,12 @@ def test_input_does_not_exist():
         check_pdf_conversion(os.path.join(data_dir, 'wrong_file'), assert_pdf)
 
 
+@with_default_settings
 def test_basic_conversion():
     check_pdf_conversion(__file__)
 
 
+@with_default_settings
 def test_xlsx():
     def assert_pdf(fn: str):
         txt = extract_text_pdfminer(fn)
@@ -45,6 +49,7 @@ def test_xlsx():
     check_pdf_conversion(os.path.join(data_dir, 'document1.xlsx'), assert_pdf)
 
 
+@with_default_settings
 def test_docx():
     def assert_pdf(fn: str):
         txt = extract_text_pdfminer(fn)
@@ -55,6 +60,7 @@ def test_docx():
     check_pdf_conversion(os.path.join(data_dir, 'docx_test.docx'), assert_pdf)
 
 
+@with_default_settings
 def test_doc():
     def assert_pdf(fn: str):
         txt = extract_text_pdfminer(fn)
@@ -65,6 +71,7 @@ def test_doc():
     check_pdf_conversion(os.path.join(data_dir, 'doc_test.doc'), assert_pdf)
 
 
+@with_default_settings
 def test_odf():
     def assert_pdf(fn: str):
         txt = extract_text_pdfminer(fn)
@@ -75,9 +82,19 @@ def test_odf():
     check_pdf_conversion(os.path.join(data_dir, 'odt_test.odt'), assert_pdf)
 
 
+@with_default_settings
 def test_tiff():
     def assert_pdf(fn: str):
         with pikepdf.open(fn) as pdf:
             assert len(pdf.pages) == 3
 
     check_pdf_conversion(os.path.join(data_dir, 'tiff_test.tiff'), assert_pdf)
+
+
+@with_default_settings
+def test_transparent_png():
+    def assert_pdf(fn: str):
+        with pikepdf.open(fn) as pdf:
+            assert len(pdf.pages) == 1
+
+    check_pdf_conversion(os.path.join(data_dir, 'transparent.png'), assert_pdf)

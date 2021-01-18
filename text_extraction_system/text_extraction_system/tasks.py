@@ -98,9 +98,9 @@ def deliver_error(request_id: str,
     try:
         req = load_request_metadata(request_id)
         if not req:
-            log.warning(f'Not delivering error '
+            log.warning(f'{request_callback_info.original_file_name} | Not delivering error '
                         f'because the request files do not exist in storage: '
-                        f'{request_callback_info.original_file_name} (#{request_id})\n'
+                        f'(#{request_id})\n'
                         f'This usually means the request is canceled.')
             return
         req.status = STATUS_FAILURE
@@ -110,7 +110,8 @@ def deliver_error(request_id: str,
 
         save_request_metadata(req)
     except Exception as req_upd_err:
-        log.error(f'Unable to store failed status into metadata of request #{request_id}', exc_info=req_upd_err)
+        log.error(f'{request_callback_info.original_file_name} | Unable to store failed status into '
+                  f'metadata of request #{request_id}', exc_info=req_upd_err)
     req_status = RequestStatus(request_id=request_id,
                                original_file_name=request_callback_info.original_file_name,
                                status=STATUS_FAILURE,
@@ -134,11 +135,11 @@ def process_document(task, request_id: str, request_callback_info: RequestCallba
         webdav_client: WebDavClient = get_webdav_client()
         req: RequestMetadata = load_request_metadata(request_id)
         if not req:
-            log.warning(f'Canceling document processing: {request_callback_info.original_file_name} (#{request_id}):\n'
+            log.warning(f'{request_callback_info.original_file_name} | Canceling document processing (#{request_id}):\n'
                         f'Request files do not exist. Probably the request was already canceled.\n')
             return False
-        log.info(f'Starting text/data extraction for request uid: {request_id}\n'
-                 f'File name: {req.original_file_name}')
+        log.info(f'{request_callback_info.original_file_name} | Starting text/data extraction '
+                 f'for request #{request_id}\n')
         with webdav_client.get_as_local_fn(f'{request_id}/{req.original_document}') as (fn, _remote_path):
             ext = os.path.splitext(fn)[1]
             if ext and ext.lower() == '.pdf':
@@ -149,6 +150,7 @@ def process_document(task, request_id: str, request_callback_info: RequestCallba
                     save_request_metadata(req)
                     process_pdf(local_converted_pdf_fn, req, webdav_client)
             else:
+                log.info(f'{req.original_file_name} | Converting to PDF...')
                 with convert_to_pdf(fn) as local_converted_pdf_fn:
                     req.converted_to_pdf = os.path.splitext(req.original_document)[0] + '.converted.pdf'
                     webdav_client.upload(f'{request_id}/{req.converted_to_pdf}', local_converted_pdf_fn)
@@ -187,20 +189,30 @@ def process_pdf(pdf_fn: str,
         gets Dict of single page num -> PageExtractionResults(page_text, page_tables), stores them to WebDav.
     When all OCR tasks are finished we merge all dicts into one and concatenate the results.
     """
-    log.info(f'Pre-processing PDF document: {pdf_fn}')
+    log.info(f'{req.original_file_name} | Pre-processing PDF document')
 
+    log.info(f'{req.original_file_name} | Rendering PDF pages to images for further '
+             f'using in table detection and OCR...')
     with extract_all_page_images(pdf_fn) as page_image_fns:
         page_num_to_image_fn = {i: image_fn for i, image_fn in enumerate(page_image_fns)}
+        log.info(f'{req.original_file_name} | Detecting pages which require OCR and pre-processing '
+                 f' text pages...')
         pre_process_results = pre_extract_data(pdf_fn=pdf_fn,
                                                page_images_fns=page_num_to_image_fn,
                                                page_num_starts_from=0,
-                                               ocr_enabled=req.ocr_enable)
+                                               ocr_enabled=req.ocr_enable,
+                                               log_processing_page=lambda pn:
+                                               log.info(f'{req.original_file_name} | '
+                                                        f'Processing page {pn}...')
+                                               )
 
         if not pre_process_results.pages_to_ocr:
-            log.info(f'PDF document {pdf_fn} does not need any OCR work. Proceeding to the data extraction...')
+            log.info(f'{req.original_file_name} | PDF document does not need any OCR work. '
+                     f'Proceeding to the data extraction...')
             extract_data_and_finish(pre_process_results.ready_results, req, webdav_client)
         else:
-            log.info(f'PDF document {pdf_fn} needs OCR for {len(pre_process_results.pages_to_ocr)} pages. '
+            log.info(f'{req.original_file_name} | PDF document needs OCR '
+                     f'for {len(pre_process_results.pages_to_ocr)} pages.\n'
                      f'Scheduling OCR tasks...')
             webdav_client.mkdir(f'{req.request_id}/{pages_pre_processed}')
             webdav_client.mkdir(f'{req.request_id}/{pages_for_ocr}')
@@ -226,6 +238,7 @@ def process_pdf(pdf_fn: str,
                 dst_basename = os.path.splitext(basename)[0] + '.pdf'
                 dst_preprocess_basename = os.path.splitext(basename)[0] + '.pickle'
                 task_signatures.append(ocr_and_preprocess.s(
+                    req.original_file_name,
                     req.request_id,
                     pdf_fn,
                     page_num,
@@ -236,7 +249,7 @@ def process_pdf(pdf_fn: str,
                     req.request_callback_info.log_extra))
 
             save_request_metadata(req)
-            log.info(f'Starting sub-tasks for OCR-ing pdf pages:\n{req.pages_for_ocr}')
+            log.info(f'{req.original_file_name} | Starting sub-tasks for OCR-ing pdf pages:\n{req.pages_for_ocr}')
             c = chord(task_signatures)(merge_ocred_pages_and_extract_data
                 .s(req.request_id, req.request_callback_info)
                 .set(
@@ -254,6 +267,7 @@ def ocr_error_callback(task, some_id: str, request_id: str, req_callback_info: R
 
 @celery_app.task(acks_late=True, bind=True)
 def ocr_and_preprocess(task,
+                       original_file_name: str,
                        request_id: str,
                        pdf_fn: str,
                        page_num: int,
@@ -287,7 +301,10 @@ def ocr_and_preprocess(task,
                 pre_process_results = pre_extract_data(pdf_fn=local_pdf_fn,
                                                        page_images_fns=page_images_fns,
                                                        page_num_starts_from=page_num,
-                                                       ocr_enabled=False)
+                                                       ocr_enabled=False,
+                                                       log_processing_page=lambda page_num:
+                                                       log.info(f'{original_file_name} | '
+                                                                f'Processing page {page_num}...'))
                 webdav_client.upload_to(pickle.dumps(pre_process_results.ready_results[page_num]),
                                         pre_process_results_dst_webdav_path)
     except Exception as e:
@@ -304,16 +321,16 @@ def merge_ocred_pages_and_extract_data(task,
     with handle_errors(request_id, req_callback_info):
         req: RequestMetadata = load_request_metadata(request_id)
         if not req:
-            log.info(f'Not re-combining OCR-ed pdf blocks and not processing the data extraction '
-                     f'for request {request_id}: {req.original_file_name}'
-                     f'Request files do not exist. Probably the request was already canceled.\n'
-                     f'{req_callback_info.original_file_name} (#{request_id})')
+            log.info(f'{req.original_file_name} | Not re-combining OCR-ed pdf blocks and not '
+                     f'processing the data extraction '
+                     f'for request {request_id}'
+                     f'Request files do not exist. Probably the request was already canceled.')
             return False
-        log.info(f'Re-combining OCR-ed pdf blocks and processing the data extraction for request {request_id}: '
-                 f'{req.original_file_name}')
+        log.info(f'{req.original_file_name} | Re-combining OCR-ed pdf blocks and processing the '
+                 f'data extraction for request #{request_id}')
         webdav_client: WebDavClient = get_webdav_client()
         if req.status != STATUS_PENDING or not webdav_client.is_dir(f'{req.request_id}/{pages_for_ocr}'):
-            log.info(f'Request is already processed/failed/canceled for file: {req.original_file_name} (#{request_id})')
+            log.info(f'{req.original_file_name} | Request is already processed/failed/canceled (#{request_id})')
             return
         temp_dir = tempfile.mkdtemp()
         try:
@@ -394,22 +411,22 @@ def extract_data_and_finish(pre_processed_pages: Dict[int, PDFPagePreProcessResu
         save_request_metadata(req)
         deliver_results(req.request_callback_info, req.to_request_status())
     else:
-        log.info(f'Canceling results delivery '
-                 f'because the request files are already removed: {req.original_file_name} (#{req.request_id})')
+        log.info(f'{req.original_file_name} | Canceling results delivery '
+                 f'because the request files are already removed (#{req.request_id})')
 
 
 def deliver_results(req: RequestCallbackInfo, req_status: RequestStatus):
     if req.call_back_url:
         try:
-            log.info(f'POSTing the extraction results of {req.original_file_name} to {req.call_back_url}...')
+            log.info(f'{req.original_file_name} | POSTing the extraction results to {req.call_back_url}...')
             requests.post(req.call_back_url, json=req_status.to_dict())
         except Exception as err:
-            log.error(f'Unable to POST the extraction results of {req.original_file_name} to {req.call_back_url}',
+            log.error(f'{req.original_file_name} | Unable to POST the extraction results to {req.call_back_url}',
                       exc_info=err)
 
     if req.call_back_celery_broker:
         try:
-            log.info(f'Sending the extraction results of {req.original_file_name} as a celery task:\n'
+            log.info(f'{req.original_file_name} | Sending the extraction results as a celery task:\n'
                      f'broker: {req.call_back_celery_broker}\n'
                      f'queue: {req.call_back_celery_queue}\n'
                      f'task_name: {req.call_back_celery_task_name}\n')
@@ -422,9 +439,9 @@ def deliver_results(req: RequestCallbackInfo, req_status: RequestStatus):
                       root_task_id=req.call_back_celery_root_task_id,
                       celery_version=req.call_back_celery_version)
         except Exception as err:
-            log.error(f'Unable to send the extraction results of {req.original_file_name} as a celery task:\n'
+            log.error(f'{req.original_file_name} | Unable to send the extraction results as a celery task:\n'
                       f'broker: {req.call_back_celery_broker}\n'
                       f'queue: {req.call_back_celery_queue}\n'
                       f'task_name: {req.call_back_celery_task_name}\n', exc_info=err)
 
-    log.info(f'Finished processing request {req.request_id} ({req.original_file_name}).')
+    log.info(f'{req.original_file_name} | Finished processing request (#{req.request_id}).')

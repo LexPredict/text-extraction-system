@@ -7,16 +7,14 @@ from subprocess import CompletedProcess
 from subprocess import PIPE
 from typing import Generator
 
+from text_extraction_system.config import get_settings
 from text_extraction_system.locking.socket_lock import get_lock
+from text_extraction_system.processes import raise_from_process, render_process_msg
 
 log = logging.getLogger(__name__)
 
 
 class ConvertToPDFFailed(Exception):
-    pass
-
-
-class ProcessReturnedNonZeroCode(ConvertToPDFFailed):
     pass
 
 
@@ -42,7 +40,6 @@ def convert_to_pdf(src_fn: str, soffice_single_process_locking: bool = True) -> 
     a temporary directory and next yielded to the caller.
     After returning from the yield the output file and the output temp directory are removed.
     """
-    log.info(f'Converting to PDF: {src_fn}...')
     if not os.path.isfile(src_fn):
         raise InputFileDoesNotExist(src_fn)
     temp_dir = tempfile.mkdtemp()
@@ -51,7 +48,10 @@ def convert_to_pdf(src_fn: str, soffice_single_process_locking: bool = True) -> 
     out_fn = os.path.join(temp_dir, src_fn_base + '.pdf')
     try:
         if src_ext.lower() in {'.tiff', '.jpg', '.jpeg', '.png'}:
-            args = ['img2pdf', src_fn, '-o', out_fn]
+            java_modules_path = get_settings().java_modules_path
+            args = ['java', '-cp', f'{java_modules_path}/*',
+                    'com.lexpredict.MakePDFFromImages',
+                    out_fn, src_fn]
             completed_process: CompletedProcess = _run_process(args)
         else:
             args = ['soffice', '--headless', '--invisible', '--nodefault', '--view', '--nolockcheck',
@@ -71,30 +71,12 @@ def convert_to_pdf(src_fn: str, soffice_single_process_locking: bool = True) -> 
             else:
                 completed_process: CompletedProcess = _run_process(args)
 
-        msg = f'Command line:\n' \
-              f'{args}'
+        raise_from_process(log, completed_process, lambda: f'Converting {src_fn} to pdf.')
 
-        if completed_process.stdout:
-            msg += f'Process stdout:\n' \
-                   f'===========================\n' \
-                   f'{completed_process.stdout}\n' \
-                   f'===========================\n'
-        if completed_process.stderr:
-            msg += f'Process stderr:\n' \
-                   f'===========================\n' \
-                   f'{completed_process.stderr}\n' \
-                   f'===========================\n'
-
-        if completed_process.returncode != 0:
-            raise ProcessReturnedNonZeroCode(f'Unable to convert {src_fn} to pdf. '
-                                             f'Process returned non-zero code.\n'
-                                             + msg)
-        elif not os.path.isfile(out_fn):
+        if not os.path.isfile(out_fn):
             raise OutputPDFDoesNotExistAfterConversion(f'Unable to convert {src_fn} to pdf. '
-                                                       f'Output file does not exist after conversion.\n' + msg)
-        else:
-            log.debug(msg)
-
+                                                       f'Output file does not exist after conversion.\n'
+                                                       + render_process_msg(completed_process))
         yield out_fn
 
     finally:
