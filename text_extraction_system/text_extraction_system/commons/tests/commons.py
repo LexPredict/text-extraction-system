@@ -17,5 +17,17 @@ class MockWebDavClient():
 
 @contextmanager
 def default_settings() -> Generator[config.Settings, None, None]:
-    config._settings = config.Settings.construct()
+    config._settings = config.Settings.construct(webdav_url='',
+                                                 webdav_username='',
+                                                 webdav_password='',
+                                                 celery_broker='',
+                                                 celery_backend='')
     yield config._settings
+
+
+def with_default_settings(func):
+    def wrapper(*args, **kwargs):
+        with default_settings():
+            func(*args, **kwargs)
+
+    return wrapper

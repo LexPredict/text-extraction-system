@@ -1,11 +1,15 @@
 import os
+import re
 import shutil
+import subprocess
 from contextlib import contextmanager
 from logging import getLogger
+from subprocess import CompletedProcess
+from subprocess import PIPE
 from tempfile import mkdtemp
-from typing import List, Optional, Tuple, Generator, Dict
+from typing import Generator
+from typing import List, Optional, Tuple, Dict
 
-import pdf2image
 import pikepdf
 from pdfminer.converter import PDFPageAggregator
 from pdfminer.layout import LAParams, LTTextBox, LTTextLine, LTImage, LTItem, LTLayoutContainer, LTPage
@@ -14,95 +18,67 @@ from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
 from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfparser import PDFParser
 
+from text_extraction_system.config import get_settings
+from text_extraction_system.processes import raise_from_process
+
 log = getLogger(__name__)
+
 
 def page_requires_ocr(page_layout: LTPage) -> bool:
     text_cover, image_cover = calc_covers(page_layout)
     return text_cover < 0.3 * image_cover
 
-def find_pages_requiring_ocr(pdf_fn: str) -> Optional[List[int]]:
-    pages = list()
-    with open(pdf_fn, 'rb') as f:
-        parser = PDFParser(f)
-        document = PDFDocument(parser)
-        if not document.is_extractable:
-            return None
+
+def iterate_pages(pdf_fn: str) -> Generator[LTPage, None, None]:
+    with open(pdf_fn, 'rb') as pdf_f:
+        parser = PDFParser(pdf_f)
+        doc = PDFDocument(parser)
         rsrcmgr = PDFResourceManager()
-
         laparams = LAParams()
-
         device = PDFPageAggregator(rsrcmgr, laparams=laparams)
         interpreter = PDFPageInterpreter(rsrcmgr, device)
-        page_num = 0
-        for page in PDFPage.create_pages(document):
+        for page in PDFPage.create_pages(doc):
             interpreter.process_page(page)
-            layout: LTPage = device.get_result()
-            if page_requires_ocr(layout):
-                pages.append(page_num)
-            page_num += 1
-
-    return pages
+            page_layout: LTPage = device.get_result()
+            yield page_layout
 
 
-def get_page_sequences(pages: Optional[List[int]]) -> Optional[List[List[int]]]:
-    pages = sorted(set(pages))
-    if not pages:
-        return None
-    res = list()
-    cur_sequence = None
-    for page in pages:
-        if cur_sequence is None:
-            cur_sequence = [page, page]
-        elif page != cur_sequence[1] + 1:
-            res.append(cur_sequence)
-            cur_sequence = [page, page]
-        else:  # page = prev + 1
-            cur_sequence[1] = page
-
-    if cur_sequence is not None:
-        res.append(cur_sequence)
-    return res
-
-
-def extract_page_images(pdf_fn: str, pages: List[int]) -> Generator[Tuple[int, str], None, None]:
-    temp_dir = mkdtemp(prefix='pdf2image_')
-
-    try:
-        for page_seq in get_page_sequences(pages):
-            first_page = page_seq[0]
-            last_page = page_seq[1]
-            seq_dir = os.path.join(temp_dir, f'{first_page}_{last_page}')
-            os.mkdir(seq_dir)
-            image_fns = pdf2image.convert_from_path(pdf_path=pdf_fn,
-                                                    dpi=300,
-                                                    output_folder=seq_dir,
-                                                    thread_count=4,
-                                                    first_page=first_page + 1,  # pdf2image expects first page to be 1
-                                                    last_page=last_page + 1,  # and not 0
-                                                    paths_only=True,
-                                                    fmt='png')
-            page_num = first_page
-            for image_fn in image_fns:
-                assert page_num <= last_page
-                yield page_num, image_fn
-                os.remove(image_fn)
-                page_num += 1
-    finally:
-        shutil.rmtree(temp_dir, ignore_errors=True)
+PAGE_NUM_RE = re.compile(r'\d+$')
 
 
 @contextmanager
-def extract_all_page_images(pdf_fn: str) -> Generator[List[str], None, None]:
-    log.info('Rendering PDF pages to images for further using in table detection and OCR...')
-    temp_dir = mkdtemp(prefix='pdf2image_')
+def extract_all_page_images(pdf_fn: str, pdf_password: str = None) -> Generator[List[str], None, None]:
+    java_modules_path = get_settings().java_modules_path
 
+    temp_dir = mkdtemp(prefix='pdf_images_')
+    basefn = os.path.splitext(os.path.basename(pdf_fn))[0]
     try:
-        yield pdf2image.convert_from_path(pdf_path=pdf_fn,
-                                          dpi=300,
-                                          output_folder=temp_dir,
-                                          thread_count=4,
-                                          paths_only=True,
-                                          fmt='png')
+        args = ['java', '-cp', f'{java_modules_path}/*',
+                'org.apache.pdfbox.tools.PDFToImage',
+                '-format', 'png',
+                '-dpi', '300',
+                '-quality', '1',
+                '-prefix', f'{temp_dir}/{basefn}__']
+        if pdf_password:
+            args += ['-password', pdf_password]
+        args += [pdf_fn]
+
+        completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=600,
+                                                             universal_newlines=True, stderr=PIPE, stdout=PIPE)
+        raise_from_process(log, completed_process, process_title=lambda: f'Extract page images from {pdf_fn}')
+
+        # Output of PDFToImage is a set of files with the names generated as:
+        # {prefix}+{page_num_1_based}.{ext}
+        # We used "{temp_dir}/{basefn}__" as the prefix.
+        # Now we need to get the page numbers from the filenames and return the list of file names
+        # ordered by page number.
+        page_by_num: Dict[int, str] = dict()
+        for fn in os.listdir(temp_dir):
+            page_num = PAGE_NUM_RE.search(os.path.splitext(fn)[0]).group(0)
+            page_by_num[int(page_num)] = os.path.join(temp_dir, fn)
+
+        yield [page_by_num[key] for key in sorted(page_by_num.keys())]
+
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 

@@ -1,10 +1,8 @@
 import shutil
 import tempfile
 from logging import getLogger
-from subprocess import CalledProcessError
 from typing import List, Tuple, Iterable
 
-import tabula
 from camelot.core import Table as CamelotTable
 from pdfminer.converter import PDFPageAggregator
 from pdfminer.layout import LAParams
@@ -82,60 +80,3 @@ def get_tables_from_pdf_camelot_dataframes(pdf_fn: str, accuracy_threshold: floa
         return get_table_dtos_from_camelot_output(tables, accuracy_threshold)
     finally:
         shutil.rmtree(image_dir, ignore_errors=True)
-
-
-def get_tables_from_pdf_tabula(pdf_fn: str) -> List[Table]:
-    tables_data: List[Table] = list()
-
-    # Tabula does not return the page number for the tables
-    # when running with pages = 'all'.
-    # So we iterate over the pages until it raises an error.
-    p = 1
-    while True:
-        try:
-            tables = tabula.read_pdf(
-                pdf_fn,
-                output_format='json',
-                multiple_tables=True,
-                pages=p)
-            tt = [
-                Table(
-                    data=[[cell['text'] for cell in row] for row in table['data']],
-                    coordinates=Rectangle(left=table['left'],
-                                          top=table['top'],
-                                          width=table['width'],
-                                          height=table['height']),
-                    page=p
-                ) for table in tables
-            ]
-            tables_data += tt
-            p += 1
-        except CalledProcessError as err:
-            if b'Page number does not exist' in err.stderr:
-                break
-            else:
-                raise err
-
-    return tables_data
-
-
-def get_tables_from_pdf_tabula_no_page_nums(pdf_fn: str) -> List[Table]:
-    # Tabula does not return the page number for the tables
-    # when running with pages = 'all'.
-    # This is a convenience method to return tables only without the page numbers or coordinates.
-    tables = tabula.read_pdf(
-        pdf_fn,
-        output_format='json',
-        multiple_tables=True,
-        pages='all')
-    tables_data = [
-        Table(
-            data=[[cell['text'] for cell in row] for row in table['data']],
-            coordinates=Rectangle(left=table['left'],
-                                  top=table['top'],
-                                  width=table['width'],
-                                  height=table['height'])
-        ) for table in tables
-    ]
-
-    return tables_data

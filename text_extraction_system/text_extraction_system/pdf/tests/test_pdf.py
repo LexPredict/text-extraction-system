@@ -7,56 +7,37 @@ import time
 import pikepdf
 
 from text_extraction_system.data_extract.data_extract import extract_text_pdfminer
-from text_extraction_system.pdf.pdf import split_pdf_to_page_blocks, join_pdf_blocks, find_pages_requiring_ocr, \
-    get_page_sequences, extract_page_images, merge_pfd_pages, extract_all_page_images
+from text_extraction_system.pdf.pdf import split_pdf_to_page_blocks, join_pdf_blocks, \
+    merge_pfd_pages, extract_all_page_images, iterate_pages, page_requires_ocr
+from text_extraction_system.commons.tests.commons import with_default_settings
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
 
-def test_get_page_sequence1():
-    actual = get_page_sequences([1, 2, 3, 4, 5])
-    assert actual == [[1, 5]]
-
-
-def test_get_page_sequence2():
-    actual = get_page_sequences([2, 3, 4, 7, 8])
-    assert actual == [[2, 4], [7, 8]]
-
-
-def test_get_page_sequence3():
-    actual = get_page_sequences([2, 3, 4, 8])
-    assert actual == [[2, 4], [8, 8]]
-
-
-def test_get_page_sequence4():
-    actual = get_page_sequences([8, 2, 3, 4, 8, 8])
-    assert actual == [[2, 4], [8, 8]]
-
-
 def test_pdf_requires_ocr1():
     fn = os.path.join(data_dir, 'ocr1.pdf')
-    pages = find_pages_requiring_ocr(fn)
+
+    pages = [page_num for page_num, page in enumerate(iterate_pages(fn)) if page_requires_ocr(page)]
     assert pages == [1, 2]
 
 
 def test_pdf_requires_ocr2():
     fn = os.path.join(data_dir, 'pdf_complicated.pdf')
-    pages = find_pages_requiring_ocr(fn)
+    pages = [page_num for page_num, page in enumerate(iterate_pages(fn)) if page_requires_ocr(page)]
     assert not pages
 
 
+@with_default_settings
 def test_extract_images():
     fn = os.path.join(data_dir, 'ocr1.pdf')
-    dirs_to_be_deleted = list()
-    pages_to_ocr = set()
-    for page, image in extract_page_images(fn, [0, 2, 3]):
-        assert os.path.getsize(image) > 5
-        assert os.path.splitext(image)[1] == '.png'
-        dirs_to_be_deleted.append(os.path.dirname(os.path.dirname(image)))
-        pages_to_ocr.add(page)
+    dirs_to_be_deleted = set()
+    with extract_all_page_images(fn) as images:
+        for page, image in enumerate(images):
+            assert os.path.getsize(image) > 5
+            assert os.path.splitext(image)[1] == '.png'
+            dirs_to_be_deleted.add(os.path.dirname(image))
     for d in dirs_to_be_deleted:
         assert not os.path.exists(d)
-    assert pages_to_ocr == {0, 2, 3}
 
 
 def test_split_pdf1():

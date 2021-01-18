@@ -11,8 +11,7 @@ class Settings(BaseSettings):
     webdav_url: str
     webdav_username: str
     webdav_password: str
-    tika_jar_path: str = os.path.join(project_root, './tika')
-    tika_config: str = os.path.join(project_root, './tika/tika.lexp.no.ocr.config')
+    java_modules_path: str = os.path.join(project_root, './java_modules')
     fasttext_lang_model: str = os.path.join(project_root, './models/lid.176.bin')
     delete_temp_files_on_request_finish: bool = True
     keep_failed_files: bool = False
