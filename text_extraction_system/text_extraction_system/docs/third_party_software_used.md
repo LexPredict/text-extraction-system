@@ -1,31 +1,16 @@
 # Third-party Software Used in the Project
 This document is for tracking the third-party software used in the project and its licenses.
 
-## img2pdf
-https://pypi.org/project/img2pdf/
-### Description
-Lossless conversion of raster images to PDF.
-
-### Author:
-https://pypi.org/user/josch/
-
-### License:
-[GNU Lesser General Public License v3 (LGPLv3) (LGPL)](lgplv3.txt)
-
-### Usage Notes
-The GNU Lesser General Public License (LGPL) is a free-software license published by the Free Software Foundation (FSF). The license allows developers and companies to use and integrate a software component released under the LGPL into their own (even proprietary) software without being required by the terms of a strong copyleft license to release the source code of their own components. However, any developer who modifies an LGPL-covered component is required to make their modified version available under the same LGPL license. For proprietary software, code under the LGPL is usually used in the form of a shared library, so that there is a clear separation between the proprietary and LGPL components. The LGPL is primarily used for software libraries, although it is also used by some stand-alone applications.
-
-
 ## LibreOffice
 https://www.libreoffice.org/
 
 ## Description
 Free office suite. Used for converting ("printing") popular document types to PDF.
 
-### Author:
+### Developer
 [The Document Foundation](https://www.documentfoundation.org/)
 
-### License:
+### License
 [Mozilla Public License v2.0](mlpv2.txt)
 
 ### Usage Notes
@@ -41,34 +26,15 @@ In the case of Mozilla Firefox, the Mozilla-provided executable programs already
 
 If you want to add your own terms when you distribute the software, Section 3.2(b) requires that those terms must not restrict a recipient's rights under the MPL, and if you offer a warranty on the software, Section 3.5 requires you to make clear that it is offered by you alone.
 
-## pdf2image
-https://pypi.org/project/pdf2image/
+## Apache PDFBox
+https://pdfbox.apache.org/
 
 ### Description
-A python (3.5+) module that wraps pdftoppm and pdftocairo to convert PDF to a PIL Image object.
+The Apache PDFBox® library is an open source Java tool for working with PDF documents.
 
-### Author
-https://pypi.org/user/Belval/
-
-### License
-[MIT License](mit.txt)
-
-### Usage Notes
-From Wikipedia, the free encyclopedia
-
-The MIT License is a permissive free software license originating at the Massachusetts Institute of Technology (MIT)[5] in the late 1980s.[6] As a permissive license, it puts only very limited restriction on reuse and has, therefore, high license compatibility.[7][8]
-
-The MIT license is compatible with many copyleft licenses, such as the GNU General Public License (GPL); MIT licensed software can be re-licensed as GPL software, and integrated with other GPL software, but not the other way around.[9] The MIT license also permits reuse within proprietary software, provided that either all copies of the licensed software include a copy of the MIT License terms and the copyright notice, or the software is re-licensed to remove this requirement. MIT-licensed software can also be re-licensed as proprietary software,[10][8] which distinguishes it from copyleft software licenses. As of 2020, MIT was the most popular software license found in one analysis,[11] continuing from reports in 2015 that MIT was the most popular software license on GitHub, ahead of any GPL variant and other free and open-source software (FOSS) licenses.[12]
-
-## Poppler
-https://poppler.freedesktop.org/
-
-### Description
-Poppler is a PDF rendering library based on the xpdf-3.0 code base.
-
-### Author
-Derek Noonburg of Glyph and Cog, LLC. (from https://en.wikipedia.org/wiki/Poppler_(software))
+### Developer
+Apache Software Foundation
 
 ### License
-
+[Apache License 2.0](apache20.txt)
 
