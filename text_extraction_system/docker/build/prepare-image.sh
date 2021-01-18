@@ -25,6 +25,7 @@ rsync --exclude='.git/' ../../../text_extraction_system_api ./temp -a --copy-lin
 
 cp ../../requirements.txt ./temp/
 cp ../../.env.local_dev_example ./temp
+cp ../../prepare_pdfbox.sh ./temp
 
 if [[ "${LEXNLP_PROJECT_PATH}" == "" ]]; then
   echo "Will install lexnlp from its GIT repo..."

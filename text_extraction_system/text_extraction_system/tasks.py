@@ -187,20 +187,26 @@ def process_pdf(pdf_fn: str,
         gets Dict of single page num -> PageExtractionResults(page_text, page_tables), stores them to WebDav.
     When all OCR tasks are finished we merge all dicts into one and concatenate the results.
     """
-    log.info(f'Pre-processing PDF document: {pdf_fn}')
+    log.info(f'{req.original_file_name}/{pdf_fn}: Pre-processing PDF document')
 
+    log.info(f'{req.original_file_name}/{pdf_fn}: Rendering PDF pages to images for further '
+             f'using in table detection and OCR...')
     with extract_all_page_images(pdf_fn) as page_image_fns:
         page_num_to_image_fn = {i: image_fn for i, image_fn in enumerate(page_image_fns)}
+        log.info(f'{req.original_file_name}/{pdf_fn}: Detecting pages which require OCR and pre-processing '
+                 f' text pages...')
         pre_process_results = pre_extract_data(pdf_fn=pdf_fn,
                                                page_images_fns=page_num_to_image_fn,
                                                page_num_starts_from=0,
                                                ocr_enabled=req.ocr_enable)
 
         if not pre_process_results.pages_to_ocr:
-            log.info(f'PDF document {pdf_fn} does not need any OCR work. Proceeding to the data extraction...')
+            log.info(f'{req.original_file_name}/{pdf_fn}: PDF document does not need any OCR work. '
+                     f'Proceeding to the data extraction...')
             extract_data_and_finish(pre_process_results.ready_results, req, webdav_client)
         else:
-            log.info(f'PDF document {pdf_fn} needs OCR for {len(pre_process_results.pages_to_ocr)} pages. '
+            log.info(f'{req.original_file_name}/{pdf_fn}: PDF document needs OCR '
+                     f'for {len(pre_process_results.pages_to_ocr)} pages.\n'
                      f'Scheduling OCR tasks...')
             webdav_client.mkdir(f'{req.request_id}/{pages_pre_processed}')
             webdav_client.mkdir(f'{req.request_id}/{pages_for_ocr}')

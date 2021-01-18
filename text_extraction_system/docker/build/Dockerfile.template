@@ -8,6 +8,7 @@ COPY ./temp/text_extraction_system /text_extraction_system
 COPY ./temp/text_extraction_system_api /text_extraction_system_api
 ${LEXNLP_COPY_CMD}
 COPY ./temp/requirements.txt /
+COPY ./temp/prepare_pdfbox.sh /
 COPY ./temp/.env.local_dev_example /
 COPY ./temp/start.sh /
 COPY ./temp/deploy-docker-swarm /deploy-docker-swarm
