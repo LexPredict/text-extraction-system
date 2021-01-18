@@ -9,6 +9,7 @@ import pikepdf
 from text_extraction_system.data_extract.data_extract import extract_text_pdfminer
 from text_extraction_system.pdf.pdf import split_pdf_to_page_blocks, join_pdf_blocks, \
     merge_pfd_pages, extract_all_page_images, iterate_pages, page_requires_ocr
+from text_extraction_system.commons.tests.commons import with_default_settings
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
@@ -26,19 +27,17 @@ def test_pdf_requires_ocr2():
     assert not pages
 
 
+@with_default_settings
 def test_extract_images():
     fn = os.path.join(data_dir, 'ocr1.pdf')
-    dirs_to_be_deleted = list()
-    pages_to_ocr = set()
+    dirs_to_be_deleted = set()
     with extract_all_page_images(fn) as images:
         for page, image in enumerate(images):
             assert os.path.getsize(image) > 5
             assert os.path.splitext(image)[1] == '.png'
-            dirs_to_be_deleted.append(os.path.dirname(os.path.dirname(image)))
-            pages_to_ocr.add(page)
+            dirs_to_be_deleted.add(os.path.dirname(image))
     for d in dirs_to_be_deleted:
         assert not os.path.exists(d)
-    assert pages_to_ocr == {0, 2, 3}
 
 
 def test_split_pdf1():

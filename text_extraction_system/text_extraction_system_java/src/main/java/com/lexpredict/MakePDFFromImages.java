@@ -1,8 +1,8 @@
 package com.lexpredict;
 
-import org.apache.pdfbox.cos.COSName;
-import org.apache.pdfbox.pdmodel.*;
-import org.apache.pdfbox.pdmodel.graphics.PDXObject;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 
@@ -12,28 +12,26 @@ import javax.imageio.stream.ImageInputStream;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
-import java.util.List;
 
 public class MakePDFFromImages {
 
     public static void main(String[] args) throws IOException {
-        if (args.length < 3) {
+        if (args.length < 2) {
             System.out.println("Make PDF from a set of page images.");
             System.out.println("Usage: java -classpath .... "
                     + MakePDFFromImages.class.getName()
                     + " <dst_pdf_fn> <image_fn_1> <image_fn_2> ... <image_fn_n>");
+            System.out.println(Arrays.asList(args));
         }
 
-        String outPdf = args[1];
+        String outPdf = args[0];
 
 
+        PDDocument document = new PDDocument();
 
-        PDDocument document=new PDDocument();
-
-        for (int arg = 2; arg < args.length; arg++) {
+        for (int arg = 1; arg < args.length; arg++) {
             String inputImageFn = args[arg];
             File file = new File(inputImageFn);
 

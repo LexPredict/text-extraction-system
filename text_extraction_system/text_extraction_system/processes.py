@@ -28,12 +28,12 @@ def render_process_msg(completed_process: CompletedProcess) -> str:
           f'{completed_process.args}'
 
     if completed_process.stdout:
-        msg += f'Process stdout:\n' \
+        msg += f'\nProcess stdout:\n' \
                f'===========================\n' \
                f'{completed_process.stdout}\n' \
                f'===========================\n'
     if completed_process.stderr:
-        msg += f'Process stderr:\n' \
+        msg += f'\nProcess stderr:\n' \
                f'===========================\n' \
                f'{completed_process.stderr}\n' \
                f'===========================\n'

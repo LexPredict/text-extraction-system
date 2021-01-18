@@ -3,7 +3,7 @@ import shutil
 import tempfile
 from io import StringIO
 from logging import getLogger
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Callable
 
 from dataclasses import dataclass
 from lexnlp.nlp.en.segments.paragraphs import get_paragraphs
@@ -180,7 +180,8 @@ class PDFPreProcessingResults:
 def pre_extract_data(pdf_fn: str,
                      page_images_fns: Dict[int, str],
                      page_num_starts_from: int = 0,
-                     ocr_enabled: bool = True) \
+                     ocr_enabled: bool = True,
+                     log_processing_page: Callable[[int], None] = None) \
         -> PDFPreProcessingResults:
     ready_results: Dict[int, PDFPagePreProcessResults] = dict()
     pages_to_ocr: Dict[int, str] = dict()
@@ -195,7 +196,8 @@ def pre_extract_data(pdf_fn: str,
         page_num = page_num_starts_from
         for page in PDFPage.create_pages(doc):
             if page_num % 10 == 0:
-                log.info(f'Processing page {page_num + 1}...')
+                if log_processing_page:
+                    log_processing_page(page_num + 1)
 
             interpreter.process_page(page)
             page_layout: LTPage = device.get_result()

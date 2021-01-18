@@ -7,6 +7,7 @@ from subprocess import CompletedProcess
 from subprocess import PIPE
 from typing import Generator
 
+from text_extraction_system.config import get_settings
 from text_extraction_system.locking.socket_lock import get_lock
 from text_extraction_system.processes import raise_from_process, render_process_msg
 
@@ -39,7 +40,6 @@ def convert_to_pdf(src_fn: str, soffice_single_process_locking: bool = True) -> 
     a temporary directory and next yielded to the caller.
     After returning from the yield the output file and the output temp directory are removed.
     """
-    log.info(f'Converting to PDF: {src_fn}...')
     if not os.path.isfile(src_fn):
         raise InputFileDoesNotExist(src_fn)
     temp_dir = tempfile.mkdtemp()
@@ -48,7 +48,10 @@ def convert_to_pdf(src_fn: str, soffice_single_process_locking: bool = True) -> 
     out_fn = os.path.join(temp_dir, src_fn_base + '.pdf')
     try:
         if src_ext.lower() in {'.tiff', '.jpg', '.jpeg', '.png'}:
-            args = ['img2pdf', src_fn, '-o', out_fn]
+            java_modules_path = get_settings().java_modules_path
+            args = ['java', '-cp', f'{java_modules_path}/*',
+                    'com.lexpredict.MakePDFFromImages',
+                    out_fn, src_fn]
             completed_process: CompletedProcess = _run_process(args)
         else:
             args = ['soffice', '--headless', '--invisible', '--nodefault', '--view', '--nolockcheck',

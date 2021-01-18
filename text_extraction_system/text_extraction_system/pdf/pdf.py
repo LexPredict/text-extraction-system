@@ -48,12 +48,12 @@ PAGE_NUM_RE = re.compile(r'\d+$')
 
 @contextmanager
 def extract_all_page_images(pdf_fn: str, pdf_password: str = None) -> Generator[List[str], None, None]:
-    pdfbox_jars = get_settings().pdfbox_jar_path
+    java_modules_path = get_settings().java_modules_path
 
     temp_dir = mkdtemp(prefix='pdf_images_')
     basefn = os.path.splitext(os.path.basename(pdf_fn))[0]
     try:
-        args = ['java', '-cp', f'{pdfbox_jars}/*',
+        args = ['java', '-cp', f'{java_modules_path}/*',
                 'org.apache.pdfbox.tools.PDFToImage',
                 '-format', 'png',
                 '-dpi', '300',
