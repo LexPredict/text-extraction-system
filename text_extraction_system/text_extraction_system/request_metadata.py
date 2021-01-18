@@ -77,7 +77,7 @@ class RequestMetadata:
             original_file_name=self.original_file_name,
             status=self.status,
             error_message=self.error_message,
-            converted_to_pdf=self.converted_to_pdf is not None,
+            converted_cleaned_pdf=self.converted_to_pdf is not None,
             searchable_pdf_created=self.ocred_pdf is not None,
             pdf_pages_ocred=sorted(list(self.pages_for_ocr.keys())) if self.pages_for_ocr else None,
             tables_extracted=self.tables_json_file is not None,

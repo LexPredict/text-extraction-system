@@ -28,7 +28,7 @@ class RequestStatus:
     original_file_name: str
     status: str
     error_message: Optional[str] = None
-    converted_to_pdf: bool = False
+    converted_cleaned_pdf: bool = False
     searchable_pdf_created: bool = False
     pdf_pages_ocred: Optional[List[int]] = None
     plain_text_extracted: bool = False

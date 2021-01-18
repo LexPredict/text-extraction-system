@@ -1,0 +1,1 @@
+Folder for jar files of java modules used by the Text Extraction System.
