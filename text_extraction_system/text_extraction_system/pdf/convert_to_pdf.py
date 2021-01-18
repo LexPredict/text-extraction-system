@@ -8,15 +8,12 @@ from subprocess import PIPE
 from typing import Generator
 
 from text_extraction_system.locking.socket_lock import get_lock
+from text_extraction_system.processes import raise_from_process, render_process_msg
 
 log = logging.getLogger(__name__)
 
 
 class ConvertToPDFFailed(Exception):
-    pass
-
-
-class ProcessReturnedNonZeroCode(ConvertToPDFFailed):
     pass
 
 
@@ -71,30 +68,12 @@ def convert_to_pdf(src_fn: str, soffice_single_process_locking: bool = True) -> 
             else:
                 completed_process: CompletedProcess = _run_process(args)
 
-        msg = f'Command line:\n' \
-              f'{args}'
+        raise_from_process(log, completed_process, lambda: f'Converting {src_fn} to pdf.')
 
-        if completed_process.stdout:
-            msg += f'Process stdout:\n' \
-                   f'===========================\n' \
-                   f'{completed_process.stdout}\n' \
-                   f'===========================\n'
-        if completed_process.stderr:
-            msg += f'Process stderr:\n' \
-                   f'===========================\n' \
-                   f'{completed_process.stderr}\n' \
-                   f'===========================\n'
-
-        if completed_process.returncode != 0:
-            raise ProcessReturnedNonZeroCode(f'Unable to convert {src_fn} to pdf. '
-                                             f'Process returned non-zero code.\n'
-                                             + msg)
-        elif not os.path.isfile(out_fn):
+        if not os.path.isfile(out_fn):
             raise OutputPDFDoesNotExistAfterConversion(f'Unable to convert {src_fn} to pdf. '
-                                                       f'Output file does not exist after conversion.\n' + msg)
-        else:
-            log.debug(msg)
-
+                                                       f'Output file does not exist after conversion.\n'
+                                                       + render_process_msg(completed_process))
         yield out_fn
 
     finally:

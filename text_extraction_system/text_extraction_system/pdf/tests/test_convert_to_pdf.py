@@ -81,3 +81,11 @@ def test_tiff():
             assert len(pdf.pages) == 3
 
     check_pdf_conversion(os.path.join(data_dir, 'tiff_test.tiff'), assert_pdf)
+
+
+def test_transparent_png():
+    def assert_pdf(fn: str):
+        with pikepdf.open(fn) as pdf:
+            assert len(pdf.pages) == 1
+
+    check_pdf_conversion(os.path.join(data_dir, 'transparent.png'), assert_pdf)

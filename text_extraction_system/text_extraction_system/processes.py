@@ -1,14 +1,16 @@
 import asyncio
+import logging
 import os
 import signal
 import subprocess
 import sys
 import time
-import psutil
 from io import StringIO
+from subprocess import CompletedProcess
 from threading import Thread
 from typing import List, Callable, TextIO, Optional, Any
 
+import psutil
 
 READ_LEN = 100
 
@@ -19,6 +21,35 @@ class ProcessKilledByTimeout(Exception):
 
 class ProcessReturnedErrorCode(Exception):
     pass
+
+
+def render_process_msg(completed_process: CompletedProcess) -> str:
+    msg = f'Command line:\n' \
+          f'{completed_process.args}'
+
+    if completed_process.stdout:
+        msg += f'Process stdout:\n' \
+               f'===========================\n' \
+               f'{completed_process.stdout}\n' \
+               f'===========================\n'
+    if completed_process.stderr:
+        msg += f'Process stderr:\n' \
+               f'===========================\n' \
+               f'{completed_process.stderr}\n' \
+               f'===========================\n'
+    return msg
+
+
+def raise_from_process(log: logging.Logger, completed_process: CompletedProcess, process_title: Callable[[], str]):
+    if completed_process.returncode != 0:
+        raise ProcessReturnedErrorCode(f'Process returned non-zero code:\n'
+                                       f'{process_title()}\n'
+                                       f'{render_process_msg(completed_process)}')
+    else:
+        if log.isEnabledFor(logging.DEBUG):
+            log.debug(f'Successfully executed sub-process:\n'
+                      f'{process_title()}\n'
+                      f'{render_process_msg(completed_process)}')
 
 
 def io_pipe_lines(src: TextIO, dst: Callable[[str], None]):
