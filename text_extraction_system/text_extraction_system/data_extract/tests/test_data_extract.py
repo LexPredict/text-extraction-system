@@ -18,3 +18,14 @@ def test_text_structure_extraction():
 
     # should be 2 sections but its a problem of lexnlp
     assert len(struct.sections) == 3
+
+
+@with_default_settings
+def test_text_structure_extraction():
+    from text_extraction_system.commons.sysutils import increase_recursion_limit
+    # without the increasing the recursion limit pdfminer
+    # crashes on some of the structures of this document
+    increase_recursion_limit()
+    fn = os.path.join(data_dir, 'recursion1.pdf')
+    text, struct = data_extract.extract_text_and_structure_from_file(fn)
+    assert len(struct.pages) > 2
