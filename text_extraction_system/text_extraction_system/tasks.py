@@ -23,7 +23,7 @@ from text_extraction_system.file_storage import get_webdav_client, WebDavClient
 from text_extraction_system.internal_dto import PDFPagePreProcessResults
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf
 from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
-from text_extraction_system.pdf.pdf import merge_pfd_pages, cleanup_pdf, extract_all_page_images
+from text_extraction_system.pdf.pdf import merge_pfd_pages, cleanup_pdf, extract_page_images
 from text_extraction_system.request_metadata import RequestCallbackInfo, RequestMetadata, \
     save_request_metadata, \
     load_request_metadata
@@ -208,7 +208,7 @@ def process_pdf(pdf_fn: str,
 
     log.info(f'{req.original_file_name} | Rendering PDF pages to images for further '
              f'using in table detection and OCR...')
-    with extract_all_page_images(pdf_fn) as page_image_fns:
+    with extract_page_images(pdf_fn) as page_image_fns:
         page_num_to_image_fn = {i: image_fn for i, image_fn in enumerate(page_image_fns)}
         log.info(f'{req.original_file_name} | Detecting pages which require OCR and pre-processing '
                  f' text pages...')

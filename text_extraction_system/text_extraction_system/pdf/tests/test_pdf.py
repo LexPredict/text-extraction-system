@@ -8,7 +8,7 @@ import pikepdf
 
 from text_extraction_system.data_extract.data_extract import extract_text_pdfminer
 from text_extraction_system.pdf.pdf import split_pdf_to_page_blocks, join_pdf_blocks, \
-    merge_pfd_pages, extract_all_page_images, iterate_pages, page_requires_ocr
+    merge_pfd_pages, extract_page_images, iterate_pages, page_requires_ocr
 from text_extraction_system.commons.tests.commons import with_default_settings
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
@@ -31,7 +31,7 @@ def test_pdf_requires_ocr2():
 def test_extract_images():
     fn = os.path.join(data_dir, 'ocr1.pdf')
     dirs_to_be_deleted = set()
-    with extract_all_page_images(fn) as images:
+    with extract_page_images(fn) as images:
         for page, image in enumerate(images):
             assert os.path.getsize(image) > 5
             assert os.path.splitext(image)[1] == '.png'
@@ -242,7 +242,7 @@ def test_compare_image_extraction_performance():
     pdf_fn = os.path.join(data_dir, 'tables2.pdf')
 
     start = time.time()
-    with extract_all_page_images(pdf_fn) as image_file_names:
+    with extract_page_images(pdf_fn) as image_file_names:
         page_num = len(image_file_names)
         print(f'Extracted {page_num} images')
     all_pages_at_once_seconds = time.time() - start
@@ -253,7 +253,7 @@ def test_compare_image_extraction_performance():
 
         start = time.time()
         for page_fn in page_pdf_fns:
-            with extract_all_page_images(page_fn) as _image_file_names:
+            with extract_page_images(page_fn) as _image_file_names:
                 page_num += 1
         all_pages_separately_seconds = time.time() - start
     finally:

@@ -47,7 +47,10 @@ PAGE_NUM_RE = re.compile(r'\d+$')
 
 
 @contextmanager
-def extract_all_page_images(pdf_fn: str, pdf_password: str = None) -> Generator[List[str], None, None]:
+def extract_page_images(pdf_fn: str,
+                        start_page: int = None,
+                        end_page: int = None,
+                        pdf_password: str = None) -> Generator[List[str], None, None]:
     java_modules_path = get_settings().java_modules_path
 
     temp_dir = mkdtemp(prefix='pdf_images_')
@@ -61,6 +64,13 @@ def extract_all_page_images(pdf_fn: str, pdf_password: str = None) -> Generator[
                 '-prefix', f'{temp_dir}/{basefn}__']
         if pdf_password:
             args += ['-password', pdf_password]
+
+        if start_page is not None:
+            args += ['-startPage', str(start_page)]
+
+        if end_page is not None:
+            args += ['-endPage', str(end_page)]
+
         args += [pdf_fn]
 
         completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=600,
