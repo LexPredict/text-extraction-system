@@ -23,7 +23,7 @@ from pdfminer.pdfparser import PDFParser
 from text_extraction_system.data_extract.camelot.camelot import extract_tables
 from text_extraction_system.data_extract.lang import get_lang_detector
 from text_extraction_system.internal_dto import PDFPagePreProcessResults
-from text_extraction_system.pdf.pdf import page_requires_ocr, extract_all_page_images
+from text_extraction_system.pdf.pdf import page_requires_ocr, extract_page_images
 from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, PlainTextStructure, \
     PlainTextSentence
 
@@ -97,7 +97,7 @@ class TextAndStructureConverter(TextConverter):
 def extract_text_and_structure_from_file(pdf_fn: str) -> Tuple[str, PlainTextStructure]:
     image_dir = tempfile.mkdtemp()
     try:
-        with extract_all_page_images(pdf_fn) as page_images:
+        with extract_page_images(pdf_fn) as page_images:
             page_images = {k: v for k, v in enumerate(page_images)}
             pre_pro: PDFPreProcessingResults = pre_extract_data(pdf_fn, page_images, ocr_enabled=False)
             return extract_text_and_structure(pre_pro.ready_results)

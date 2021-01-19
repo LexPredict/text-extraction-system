@@ -20,7 +20,12 @@ def ocr_page_to_pdf(page_image_fn: str, language: str = 'eng', timeout: int = 60
     try:
         basename = os.path.basename(page_image_fn)
         dstfn = os.path.join(page_dir, os.path.splitext(basename)[0])
-        args = ['tesseract', '-l', str(language), '-c', 'tessedit_create_pdf=1', page_image_fn, dstfn]
+        args = ['tesseract',
+                '--psm', '1',
+                '-l', str(language),
+                '-c', 'tessedit_create_pdf=1',
+                page_image_fn,
+                dstfn]
         env = os.environ.copy()
         log.debug(f'Executing tesseract: {args}')
         proc = Popen(args, env=env, stdout=PIPE, stderr=PIPE)

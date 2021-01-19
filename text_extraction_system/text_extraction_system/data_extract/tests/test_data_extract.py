@@ -21,7 +21,7 @@ def test_text_structure_extraction():
 
 
 @with_default_settings
-def test_text_structure_extraction():
+def test_recursion1():
     from text_extraction_system.commons.sysutils import increase_recursion_limit
     # without the increasing the recursion limit pdfminer
     # crashes on some of the structures of this document
@@ -29,3 +29,14 @@ def test_text_structure_extraction():
     fn = os.path.join(data_dir, 'recursion1.pdf')
     text, struct = data_extract.extract_text_and_structure_from_file(fn)
     assert len(struct.pages) > 2
+
+
+@with_default_settings
+def test_recursion3():
+    fn = os.path.join(data_dir, 'recursion3.png')
+
+    from text_extraction_system.ocr.ocr import ocr_page_to_pdf
+
+    with ocr_page_to_pdf(fn) as pdf_fn:
+        text, struct = data_extract.extract_text_and_structure_from_file(pdf_fn)
+    assert len(struct.pages) == 1

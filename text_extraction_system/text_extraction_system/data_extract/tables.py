@@ -13,7 +13,7 @@ from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfparser import PDFParser
 
 from text_extraction_system.data_extract.camelot.camelot import extract_tables
-from text_extraction_system.pdf.pdf import extract_all_page_images
+from text_extraction_system.pdf.pdf import extract_page_images
 from text_extraction_system_api.dto import Rectangle, Table, DataFrameTable, TableList, DataFrameTableList
 
 log = getLogger(__name__)
@@ -58,7 +58,7 @@ def get_tables_from_pdf_camelot_dataframes(pdf_fn: str, accuracy_threshold: floa
         -> Tuple[TableList, DataFrameTableList]:
     image_dir = tempfile.mkdtemp()
     try:
-        with extract_all_page_images(pdf_fn) as page_images:
+        with extract_page_images(pdf_fn) as page_images:
             tables: List[CamelotTable] = list()
             with open(pdf_fn, 'rb') as in_file:
                 parser = PDFParser(in_file)
