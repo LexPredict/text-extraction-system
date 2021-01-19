@@ -164,3 +164,24 @@ def test_basic_api_call_back_cancel():
         srv.wait_for_test_results(15)
     except TimeoutError:
         pass
+
+
+def test_eternal_recursion():
+    fn = os.path.join(os.path.dirname(__file__), 'data', 'eternal_recursion_pdfminer.pdf')
+    client = TextExtractionSystemWebClient(test_settings.api_url)
+
+    def assert_func(rfile, headers):
+        log.info('Text extraction results are ready...')
+        rs: RequestStatus = RequestStatus.from_json(rfile)
+        assert rs.status != 'FAILURE'
+        log.info('Text extraction results look good. All assertions passed.')
+
+    srv = DocumentCallbackServer(bind_host=test_settings.call_back_server_bind_host,
+                                 bind_port=test_settings.call_back_server_bind_port,
+                                 test_func=assert_func)
+
+    client.schedule_data_extraction_task(fn,
+                                         call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
+                                         call_back_additional_info='hello world',
+                                         log_extra={'hello': 'world', 'test': True})
+    srv.wait_for_test_results(600)

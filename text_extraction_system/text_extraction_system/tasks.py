@@ -11,7 +11,7 @@ from typing import List, Dict, Optional
 import pycountry
 import requests
 from celery import Celery, chord
-from celery.signals import after_setup_logger
+from celery.signals import after_setup_logger, worker_process_init
 
 from text_extraction_system.celery_log import JSONFormatter, set_log_extra
 from text_extraction_system.config import get_settings
@@ -47,6 +47,19 @@ celery_app.conf.update(task_reject_on_worker_lost=True)
 celery_app.conf.update(worker_prefetch_multiplier=1)
 
 log = logging.getLogger(__name__)
+
+
+@worker_process_init.connect
+def setup_recursion_limit(*args, **kwargs):
+    # This is a workaround for pdfminer.six to not crash on too deep
+    # data structures in some PDF files. It has recursion internally which looks correct
+    # but does not work for some documents.
+    # Of course this is totally unsafe and a bad practice
+    # but it works.
+    # Without this we would have to fork and modify algorithms in pdfminer.six which
+    # would require much more development and testing work.
+    from text_extraction_system.commons.sysutils import increase_recursion_limit
+    increase_recursion_limit()
 
 
 @after_setup_logger.connect
