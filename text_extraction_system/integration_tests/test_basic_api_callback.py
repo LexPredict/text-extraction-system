@@ -167,7 +167,7 @@ def test_basic_api_call_back_cancel():
 
 
 def test_eternal_recursion():
-    fn = os.path.join(os.path.dirname(__file__), 'data', 'eternal_recursion_pdfminer.pdf')
+    fn = os.path.join(os.path.dirname(__file__), 'data', 'recursion1.pdf')
     client = TextExtractionSystemWebClient(test_settings.api_url)
 
     def assert_func(rfile, headers):
