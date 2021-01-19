@@ -60,6 +60,8 @@ def setup_recursion_limit(*args, **kwargs):
     # would require much more development and testing work.
     from text_extraction_system.commons.sysutils import increase_recursion_limit
     increase_recursion_limit()
+    import os
+    log.info(f'Recursion limit increased for a Celery worker process {os.getpid()}')
 
 
 @after_setup_logger.connect
