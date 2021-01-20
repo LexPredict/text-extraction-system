@@ -19,7 +19,7 @@ from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfparser import PDFParser
 
 from text_extraction_system.config import get_settings
-from text_extraction_system.processes import raise_from_process
+from text_extraction_system.processes import raise_from_process, render_process_msg
 
 log = getLogger(__name__)
 
@@ -76,6 +76,9 @@ def extract_page_images(pdf_fn: str,
         completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=600,
                                                              universal_newlines=True, stderr=PIPE, stdout=PIPE)
         raise_from_process(log, completed_process, process_title=lambda: f'Extract page images from {pdf_fn}')
+
+        if 'SEVERE' in completed_process.stdout or 'SEVERE' in completed_process.stderr:
+            raise Exception(f'PDFBox process output contains error messages\n{render_process_msg(completed_process)}')
 
         # Output of PDFToImage is a set of files with the names generated as:
         # {prefix}+{page_num_1_based}.{ext}
