@@ -50,7 +50,8 @@ PAGE_NUM_RE = re.compile(r'\d+$')
 def extract_page_images(pdf_fn: str,
                         start_page: int = None,
                         end_page: int = None,
-                        pdf_password: str = None) -> Generator[List[str], None, None]:
+                        pdf_password: str = None,
+                        timeout_sec: int = 1800) -> Generator[List[str], None, None]:
     java_modules_path = get_settings().java_modules_path
 
     temp_dir = mkdtemp(prefix='pdf_images_')
@@ -73,7 +74,7 @@ def extract_page_images(pdf_fn: str,
 
         args += [pdf_fn]
 
-        completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=600,
+        completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=timeout_sec,
                                                              universal_newlines=True, stderr=PIPE, stdout=PIPE)
         raise_from_process(log, completed_process, process_title=lambda: f'Extract page images from {pdf_fn}')
 
