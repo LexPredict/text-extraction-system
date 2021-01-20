@@ -38,7 +38,9 @@ async def post_text_extraction_task(file: UploadFile = File(...),
                                     doc_language: str = Form(default='en'),
                                     ocr_enable: bool = Form(default=True),
                                     request_id: str = Form(default=None),
-                                    log_extra_json_key_value: str = Form(default=None)):
+                                    log_extra_json_key_value: str = Form(default=None),
+                                    convert_to_pdf_timeout_sec: int = Form(default=1800),
+                                    pdf_to_images_timeout_sec: int = Form(default=1800)):
     webdav_client = get_webdav_client()
     request_id = get_valid_fn(request_id) if request_id else str(uuid4())
     log_extra = json.loads(log_extra_json_key_value) if log_extra_json_key_value else None
@@ -48,6 +50,8 @@ async def post_text_extraction_task(file: UploadFile = File(...),
                           request_date=datetime.now(),
                           doc_language=doc_language,
                           ocr_enable=ocr_enable,
+                          convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
+                          pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
                           request_callback_info=RequestCallbackInfo(
                               request_id=request_id,
                               original_file_name=file.filename,

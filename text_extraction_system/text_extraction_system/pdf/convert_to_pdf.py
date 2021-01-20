@@ -26,12 +26,14 @@ class InputFileDoesNotExist(ConvertToPDFFailed):
     pass
 
 
-def _run_process(args) -> CompletedProcess:
-    return subprocess.run(args, check=False, timeout=600, universal_newlines=True, stderr=PIPE, stdout=PIPE)
+def _run_process(args, timeout: int) -> CompletedProcess:
+    return subprocess.run(args, check=False, timeout=timeout, universal_newlines=True, stderr=PIPE, stdout=PIPE)
 
 
 @contextmanager
-def convert_to_pdf(src_fn: str, soffice_single_process_locking: bool = True) -> Generator[str, None, None]:
+def convert_to_pdf(src_fn: str,
+                   soffice_single_process_locking: bool = True,
+                   timeout_sec: int = 1800) -> Generator[str, None, None]:
     """
     Converts the specified file to pdf using Libre Office CLI.
     Libre Office allows specifying the output directory and does not allow specifying the output file name.
@@ -52,7 +54,7 @@ def convert_to_pdf(src_fn: str, soffice_single_process_locking: bool = True) -> 
             args = ['java', '-cp', f'{java_modules_path}/*',
                     'com.lexpredict.MakePDFFromImages',
                     out_fn, src_fn]
-            completed_process: CompletedProcess = _run_process(args)
+            completed_process: CompletedProcess = _run_process(args, timeout_sec)
         else:
             args = ['soffice', '--headless', '--invisible', '--nodefault', '--view', '--nolockcheck',
                     '--nologo', '--norestore', '--nofirststartwizard', '--convert-to', 'pdf', src_fn,
@@ -67,9 +69,9 @@ def convert_to_pdf(src_fn: str, soffice_single_process_locking: bool = True) -> 
                 with get_lock('soffice_single_process',
                               wait_required_listener=
                               lambda: log.info('Waiting for another conversion task to finish first...')):
-                    completed_process: CompletedProcess = _run_process(args)
+                    completed_process: CompletedProcess = _run_process(args, timeout_sec)
             else:
-                completed_process: CompletedProcess = _run_process(args)
+                completed_process: CompletedProcess = _run_process(args, timeout_sec)
 
         raise_from_process(log, completed_process, lambda: f'Converting {src_fn} to pdf.')
 

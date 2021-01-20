@@ -166,7 +166,8 @@ def process_document(task, request_id: str, request_callback_info: RequestCallba
                     process_pdf(local_converted_pdf_fn, req, webdav_client)
             else:
                 log.info(f'{req.original_file_name} | Converting to PDF...')
-                with convert_to_pdf(fn) as local_converted_pdf_fn:
+                with convert_to_pdf(fn, timeout_sec=req.convert_to_pdf_timeout_sec) \
+                        as local_converted_pdf_fn:
                     req.converted_to_pdf = os.path.splitext(req.original_document)[0] + '.converted.pdf'
                     webdav_client.upload(f'{request_id}/{req.converted_to_pdf}', local_converted_pdf_fn)
                     save_request_metadata(req)
@@ -208,7 +209,7 @@ def process_pdf(pdf_fn: str,
 
     log.info(f'{req.original_file_name} | Rendering PDF pages to images for further '
              f'using in table detection and OCR...')
-    with extract_page_images(pdf_fn) as page_image_fns:
+    with extract_page_images(pdf_fn, timeout_sec=req.pdf_to_images_timeout_sec) as page_image_fns:
         page_num_to_image_fn = {i: image_fn for i, image_fn in enumerate(page_image_fns)}
         log.info(f'{req.original_file_name} | Detecting pages which require OCR and pre-processing '
                  f' text pages...')

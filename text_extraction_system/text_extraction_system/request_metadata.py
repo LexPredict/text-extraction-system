@@ -60,6 +60,8 @@ class RequestMetadata:
     doc_language: Optional[str] = None
     pages_for_ocr: Optional[Dict[int, str]] = None
     error_message: Optional[str] = None
+    convert_to_pdf_timeout_sec: int = 1800
+    pdf_to_images_timeout_sec: int = 1800
 
     def append_error(self, problem: str, exc: Exception):
         error_message: List[str] = list()
