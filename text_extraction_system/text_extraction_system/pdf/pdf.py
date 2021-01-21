@@ -45,6 +45,16 @@ def iterate_pages(pdf_fn: str) -> Generator[LTPage, None, None]:
 
 PAGE_NUM_RE = re.compile(r'\d+$')
 
+PDF_BOX_CRASH = {
+    re.compile(r'SEVERE:\s+Cannot\sread.{1,100}image')
+}
+
+
+def raise_from_pdfbox_error_messages(completed_process: CompletedProcess):
+    for r in PDF_BOX_CRASH:
+        if r.search(completed_process.stderr) or r.search(completed_process.stdout):
+            raise Exception(f'PDFBox process output contains error messages\n{render_process_msg(completed_process)}')
+
 
 @contextmanager
 def extract_page_images(pdf_fn: str,
@@ -78,8 +88,7 @@ def extract_page_images(pdf_fn: str,
                                                              universal_newlines=True, stderr=PIPE, stdout=PIPE)
         raise_from_process(log, completed_process, process_title=lambda: f'Extract page images from {pdf_fn}')
 
-        if 'SEVERE' in completed_process.stdout or 'SEVERE' in completed_process.stderr:
-            raise Exception(f'PDFBox process output contains error messages\n{render_process_msg(completed_process)}')
+        raise_from_pdfbox_error_messages(completed_process)
 
         # Output of PDFToImage is a set of files with the names generated as:
         # {prefix}+{page_num_1_based}.{ext}
