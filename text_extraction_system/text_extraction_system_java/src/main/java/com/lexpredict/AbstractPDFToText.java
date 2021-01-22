@@ -31,35 +31,22 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.util.Matrix;
 import org.apache.pdfbox.util.Vector;
 import org.xml.sax.SAXException;
-import org.xml.sax.helpers.AttributesImpl;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.text.NumberFormat;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
 class AbstractPDF2Text extends PDFTextStripper {
-    /**
-     * Maximum recursive depth during AcroForm processing.
-     * Prevents theoretical AcroForm recursion bomb.
-     */
-    private final static int MAX_ACROFORM_RECURSIONS = 10;
-
-    /**
-     * Format used for signature dates
-     * TODO Make this thread-safe
-     */
-    private final SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ", Locale.ROOT);
     protected NumberFormat defaultNumberFormat = NumberFormat.getInstance(new Locale("en", "US"));
 
     final List<IOException> exceptions = new ArrayList<>();
     final PDDocument pdDocument;
-    int pageIndex = 0;
     int startPage = -1;
+    int pageIndex = -1;
     int unmappedUnicodeCharsPerPage = 0;
     int totalCharsPerPage = 0;
     protected final OutputStream fwText, fwCoords, fwPages;
@@ -76,19 +63,11 @@ class AbstractPDF2Text extends PDFTextStripper {
 
     @Override
     protected void startPage(PDPage page) throws IOException {
-        StringBuilder sb = new StringBuilder();
+        pageIndex++;
         PDRectangle area = page.getMediaBox();
-        sb.append(area.getLowerLeftX());
-        sb.append(",");
-        sb.append(area.getLowerLeftY());
-        sb.append(",");
-        sb.append(area.getWidth());
-        sb.append(",");
-        sb.append(area.getHeight());
-        sb.append(",");
-        sb.append(startPage);
-
-        writeToBuffer(sb, fwPages, true);
+        writeToBuffer(formatFloatNumbers("",
+                area.getLowerLeftX(), area.getLowerLeftY(),
+                area.getWidth(), area.getHeight()), fwPages, true);
     }
 
     protected void writeToBuffer(StringBuilder s, OutputStream fs, Boolean newLine) throws IOException {
@@ -122,13 +101,6 @@ class AbstractPDF2Text extends PDFTextStripper {
 
     @Override
     protected void startDocument(PDDocument pdf) {
-    }
-
-    private static void addNonNullAttribute(String name, String value, AttributesImpl attributes) {
-        if (name == null || value == null) {
-            return;
-        }
-        attributes.addAttribute("", name, name, "CDATA", value);
     }
 
     @Override

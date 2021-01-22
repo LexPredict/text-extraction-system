@@ -131,6 +131,7 @@ class PDF2Text extends AbstractPDF2Text {
         if (textPositions.size() > 0) {
             for (TextPosition pos : textPositions)
                 this.writeToBuffer(formatFloatNumbers(";",
+                        pageIndex,
                         pos.getX(), pos.getY(),
                         pos.getWidth(), pos.getHeight()), fwCoords, true);
         }
