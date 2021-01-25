@@ -11,8 +11,8 @@ import java.nio.file.Path;
 
 public class TestPDF2Text extends TestCase {
 
-    public void test_table_pdf() throws Exception {
-        try (InputStream stream = TestPDF2Text.class.getResourceAsStream("/sample_table.pdf")) {
+    public void test1() throws Exception {
+        try (InputStream stream = TestPDF2Text.class.getResourceAsStream("/structured_text.pdf")) {
             Path pText = Files.createTempFile(null, null);
             Path pCoords = Files.createTempFile(null, null);
             Path pPages = Files.createTempFile(null, null);
@@ -35,8 +35,8 @@ public class TestPDF2Text extends TestCase {
     protected static void printFile(File file) throws IOException {
         try (FileInputStream frText = new FileInputStream(file)) {
             String body = IOUtils.toString(frText, StandardCharsets.UTF_8.name());
-            System.out.print(body);
-            System.out.print("\n\n\n");
+            System.out.println("========================================");
+            System.out.println(body);
         }
     }
 }

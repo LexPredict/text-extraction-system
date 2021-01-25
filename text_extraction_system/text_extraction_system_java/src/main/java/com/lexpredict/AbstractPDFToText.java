@@ -81,8 +81,7 @@ class AbstractPDF2Text extends PDFTextStripper {
             fs.write(s.getBytes(StandardCharsets.UTF_8));
     }
 
-    protected String formatFloatNumbers(String termination, float ...n)
-    {
+    protected String formatFloatNumbers(String termination, float... n) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < n.length; i++) {
             sb.append(defaultNumberFormat.format(n[i]));
@@ -97,6 +96,8 @@ class AbstractPDF2Text extends PDFTextStripper {
     protected void endPage(PDPage page) throws IOException {
         totalCharsPerPage = 0;
         unmappedUnicodeCharsPerPage = 0;
+        // Without this it does not even add a line break when the next page starts.
+        this.fwText.write(new byte[]{'\n', '\f'});
     }
 
     @Override
@@ -120,7 +121,7 @@ class AbstractPDF2Text extends PDFTextStripper {
         }
     }
 
-    void extractBookmarkText(PDOutlineNode bookmark){
+    void extractBookmarkText(PDOutlineNode bookmark) {
         /*PDOutlineItem current = bookmark.getFirstChild();
 
         if (current != null) {
@@ -137,8 +138,10 @@ class AbstractPDF2Text extends PDFTextStripper {
             xhtml.endElement("ul");
         }*/
     }
+
     /**
      * we need to override this because we are overriding {@link #processPages(PDPageTree)}
+     *
      * @return
      */
     @Override
@@ -169,7 +172,6 @@ class AbstractPDF2Text extends PDFTextStripper {
                     && getCurrentPageNo() <= getEndPage()) {
                 processPage(page);
             }
-            pageIndex++;
         }
     }
 
@@ -194,8 +196,7 @@ class AbstractPDF2Text extends PDFTextStripper {
     }
 
     @Override
-    protected void showGlyph(Matrix textRenderingMatrix, PDFont font, int code, String unicode, Vector displacement) throws IOException
-    {
+    protected void showGlyph(Matrix textRenderingMatrix, PDFont font, int code, String unicode, Vector displacement) throws IOException {
         super.showGlyph(textRenderingMatrix, font, code, unicode, displacement);
         if (unicode == null || unicode.isEmpty()) {
             unmappedUnicodeCharsPerPage++;
