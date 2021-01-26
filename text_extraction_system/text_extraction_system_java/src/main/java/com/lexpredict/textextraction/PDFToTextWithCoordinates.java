@@ -263,11 +263,11 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     public static List<PageInfo> process(PDDocument document) throws Exception {
         PDFToTextWithCoordinates pdf2text = new PDFToTextWithCoordinates();
         pdf2text.document = document;
-        pdf2text.setAddMoreFormatting(true);
+        /*pdf2text.setAddMoreFormatting(true);
         pdf2text.setParagraphEnd(pdf2text.getLineSeparator());
         pdf2text.setPageStart(pdf2text.getLineSeparator());
         pdf2text.setArticleStart(pdf2text.getLineSeparator());
-        pdf2text.setArticleEnd(pdf2text.getLineSeparator());
+        pdf2text.setArticleEnd(pdf2text.getLineSeparator());*/
         pdf2text.startDocument(document);
         pdf2text.processPages(document.getPages());
         pdf2text.endDocument(document);
