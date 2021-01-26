@@ -5,7 +5,7 @@ import com.lexpredict.textextraction.dto.PageInfo;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.msgpack.jackson.dataformat.MessagePackFactory;
 
-import java.io.File;
+import java.io.*;
 import java.util.Arrays;
 import java.util.List;
 
@@ -16,11 +16,11 @@ public class GetTextFromPDF {
     public static final String PAGES_MSGPACK = "pages_msgpack";
 
     public static void main(String[] args) throws Exception {
-        if (args.length < 1) {
+        if (args.length < 2) {
             System.out.println("Extract text from text-based PDF (no OCR).");
             System.out.println("Usage: java -classpath .... "
                     + GetTextFromPDF.class.getName()
-                    + " <pdf_fn> [" + PLAIN_TEXT + "|" + PAGES_JSON + "|" + PAGES_MSGPACK + "] [password]");
+                    + " <pdf_fn> <output_fn> [" + PLAIN_TEXT + "|" + PAGES_JSON + "|" + PAGES_MSGPACK + "] [password]");
             ObjectMapper om = new ObjectMapper();
             PageInfo p = new PageInfo();
             p.text = "This is the text of page 1.";
@@ -47,28 +47,33 @@ public class GetTextFromPDF {
         }
 
         String pdf = args[0];
-        String format = "plain_text";
-        if (args.length > 1) format = args[1];
+        String outFn = args[1];
+        String format = PLAIN_TEXT;
+        if (args.length > 2) format = args[2];
 
         String password = null;
-        if (args.length > 2) password = args[2];
+        if (args.length > 3) password = args[3];
 
         try (PDDocument document = PDDocument.load(new File(pdf), password)) {
             List<PageInfo> pages = PDFToTextWithCoordinates.process(document);
 
-            if (PLAIN_TEXT.equals(format)) {
-                StringBuilder sb = new StringBuilder();
-                for (PageInfo p : pages) {
-                    sb.append(p.text);
-                    sb.append("\f");
+            try (OutputStream os = new FileOutputStream(outFn)) {
+                if (PLAIN_TEXT.equals(format)) {
+                    StringBuilder sb = new StringBuilder();
+                    for (PageInfo p : pages) {
+                        sb.append(p.text);
+                        sb.append("\f");
+                    }
+                    try (Writer w = new OutputStreamWriter(os)) {
+                        w.write(sb.toString());
+                    }
+                } else if (PAGES_JSON.equals(format)) {
+                    ObjectMapper om = new ObjectMapper();
+                    om.writerWithDefaultPrettyPrinter().writeValue(os, pages);
+                } else if (PAGES_MSGPACK.equals(format)) {
+                    ObjectMapper om = new ObjectMapper(new MessagePackFactory());
+                    om.writeValue(os, pages);
                 }
-                System.out.print(sb.toString());
-            } else if (PAGES_JSON.equals(format)) {
-                ObjectMapper om = new ObjectMapper();
-                om.writerWithDefaultPrettyPrinter().writeValue(System.out, pages);
-            } else if (PAGES_MSGPACK.equals(format)) {
-                ObjectMapper om = new ObjectMapper(new MessagePackFactory());
-                om.writeValue(System.out, pages);
             }
         }
     }

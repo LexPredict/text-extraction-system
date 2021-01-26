@@ -51,7 +51,7 @@ def test_basic_api_call_back():
                                          call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
                                          call_back_additional_info='hello world',
                                          log_extra={'hello': 'world', 'test': True})
-    srv.wait_for_test_results(60)
+    srv.wait_for_test_results(120)
 
 
 def test_basic_api_call_back_tables():

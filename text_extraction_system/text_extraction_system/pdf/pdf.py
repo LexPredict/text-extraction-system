@@ -130,33 +130,33 @@ def build_block_fn(src_fn: str, page_start: int, page_end: int) -> str:
     return fn
 
 
+@contextmanager
 def split_pdf_to_page_blocks(src_pdf_fn: str,
-                             dst_dir: str,
                              pages_per_block: int = 1,
-                             page_block_base_name: str = None, ) -> List[str]:
-    if not page_block_base_name:
-        page_block_base_name = os.path.basename(src_pdf_fn)
-    res: List[str] = list()
+                             page_block_base_name: str = None, ) -> Generator[List[str], None, None]:
     with pikepdf.open(src_pdf_fn) as pdf:
         if len(pdf.pages) < 1:
-            return res
+            yield []
+            return
 
         if len(pdf.pages) < pages_per_block:
-            dst_fn = os.path.join(dst_dir, page_block_base_name)
-            shutil.copy(src_pdf_fn, dst_fn)
-            res.append(dst_fn)
-            return res
+            yield [src_pdf_fn]
+            return
 
-        page_start: int = 0
-        out_pdf: Optional[pikepdf.Pdf] = None
+        if not page_block_base_name:
+            page_block_base_name = os.path.basename(src_pdf_fn)
+        temp_dir = mkdtemp()
         try:
+            res: List[str] = list()
+            page_start: int = 0
+            out_pdf: Optional[pikepdf.Pdf] = None
             for n, page in enumerate(pdf.pages):
                 if n % pages_per_block == 0:
                     if out_pdf is not None:
                         out_fn = build_block_fn(str(page_block_base_name), page_start, n - 1)
-                        out_pdf.save(os.path.join(dst_dir, out_fn))
+                        out_pdf.save(os.path.join(temp_dir, out_fn))
                         out_pdf.close()
-                        res.append(os.path.join(dst_dir, out_fn))
+                        res.append(os.path.join(temp_dir, out_fn))
 
                     page_start = n
                     out_pdf = pikepdf.new()
@@ -165,28 +165,16 @@ def split_pdf_to_page_blocks(src_pdf_fn: str,
 
             if out_pdf is not None and len(out_pdf.pages) > 0:
                 out_fn = build_block_fn(str(page_block_base_name), page_start, n)
-                out_pdf.save(os.path.join(dst_dir, out_fn))
-                res.append(os.path.join(dst_dir, out_fn))
+                out_pdf.save(os.path.join(temp_dir, out_fn))
+                out_pdf.close()
+                res.append(os.path.join(temp_dir, out_fn))
+            yield res
         finally:
-            out_pdf.close()
-
-    return res
-
-
-def join_pdf_blocks(block_fns: List[str], dst_fn: str):
-    if len(block_fns) == 1:
-        shutil.copy(block_fns[0], dst_fn)
-        return
-
-    with pikepdf.new() as dst_pdf:  # type: pikepdf.Pdf
-        for block_fn in block_fns:
-            with pikepdf.open(block_fn) as block_pdf:
-                dst_pdf.pages.extend(block_pdf.pages)
-        dst_pdf.save(dst_fn)
+            shutil.rmtree(temp_dir)
 
 
 @contextmanager
-def merge_pfd_pages(original_pdf_fn: str, replace_page_num_to_page_pdf_fn: Dict[int, str]) \
+def merge_pdf_pages(original_pdf_fn: str, replace_page_num_to_page_pdf_fn: Dict[int, str]) \
         -> Generator[str, None, None]:
     temp_dir = mkdtemp()
     try:
@@ -201,19 +189,6 @@ def merge_pfd_pages(original_pdf_fn: str, replace_page_num_to_page_pdf_fn: Dict[
                         dst_pdf.pages.append(replace_pdf.pages[0])
             dst_pdf_fn = os.path.join(temp_dir, os.path.basename(original_pdf_fn))
             dst_pdf.save(dst_pdf_fn)
-            yield dst_pdf_fn
-    finally:
-        shutil.rmtree(temp_dir)
-
-
-@contextmanager
-def cleanup_pdf(original_pdf_fn: str) -> Generator[str, None, None]:
-    temp_dir = mkdtemp()
-    try:
-        with pikepdf.open(original_pdf_fn) as pdf:  # type: pikepdf.Pdf
-            pdf.remove_unreferenced_resources()
-            dst_pdf_fn = os.path.join(temp_dir, os.path.basename(original_pdf_fn))
-            pdf.save(dst_pdf_fn)
             yield dst_pdf_fn
     finally:
         shutil.rmtree(temp_dir)

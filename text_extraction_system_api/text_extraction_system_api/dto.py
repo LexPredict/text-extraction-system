@@ -44,6 +44,9 @@ class PlainTextPage:
     number: int
     start: int
     end: int
+    text: str
+    box: List[float]
+    char_boxes: List[List[float]]
 
 
 @pydantic_dataclass

@@ -1,4 +1,4 @@
-import itertools
+import json
 import json
 import logging
 import os
@@ -10,20 +10,19 @@ from typing import List, Dict, Optional
 
 import pycountry
 import requests
+from camelot.core import Table as CamelotTable
 from celery import Celery, chord
 from celery.signals import after_setup_logger, worker_process_init
 
 from text_extraction_system.celery_log import JSONFormatter, set_log_extra
 from text_extraction_system.config import get_settings
-from text_extraction_system.constants import pages_for_ocr, pages_ocred, pages_pre_processed, from_original_doc, \
-    task_ids
-from text_extraction_system.data_extract.data_extract import extract_text_and_structure, pre_extract_data
+from text_extraction_system.constants import pages_ocred, task_ids, pages_for_processing, pages_tables
+from text_extraction_system.data_extract.data_extract import extract_text_and_structure, process_pdf_page, \
+    PDFPageProcessingResults
 from text_extraction_system.data_extract.tables import get_table_dtos_from_camelot_output
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
-from text_extraction_system.internal_dto import PDFPagePreProcessResults
-from text_extraction_system.ocr.ocr import ocr_page_to_pdf
 from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
-from text_extraction_system.pdf.pdf import merge_pfd_pages, cleanup_pdf, extract_page_images
+from text_extraction_system.pdf.pdf import merge_pdf_pages, split_pdf_to_page_blocks
 from text_extraction_system.request_metadata import RequestCallbackInfo, RequestMetadata, \
     save_request_metadata, \
     load_request_metadata
@@ -158,12 +157,7 @@ def process_document(task, request_id: str, request_callback_info: RequestCallba
         with webdav_client.get_as_local_fn(f'{request_id}/{req.original_document}') as (fn, _remote_path):
             ext = os.path.splitext(fn)[1]
             if ext and ext.lower() == '.pdf':
-                # cleanup pdf and convert it to the format understood by other pdf libs
-                with cleanup_pdf(fn) as local_converted_pdf_fn:
-                    req.converted_to_pdf = os.path.splitext(req.original_document)[0] + '.converted.pdf'
-                    webdav_client.upload(f'{request_id}/{req.converted_to_pdf}', local_converted_pdf_fn)
-                    save_request_metadata(req)
-                    process_pdf(local_converted_pdf_fn, req, webdav_client)
+                process_pdf(fn, req, webdav_client)
             else:
                 log.info(f'{req.original_file_name} | Converting to PDF...')
                 with convert_to_pdf(fn, timeout_sec=req.convert_to_pdf_timeout_sec) \
@@ -178,101 +172,91 @@ def process_document(task, request_id: str, request_callback_info: RequestCallba
 def process_pdf(pdf_fn: str,
                 req: RequestMetadata,
                 webdav_client: WebDavClient):
-    """
-    Steps:
-
-    Render page images - we need them anyway for table detection (Camelot).
-    First loop over the PDF pages:
-        - Find pages requiring OCR.
-        - But maybe no pages require OCR and we could extract tables and text right in the first and single loop.
-    We extract text per page anyway.
-
-    Iterating over the PDF pages and building the layouts costs much. Trying to minimize the number of loops.
-    Camelot's read_pdf() internally splits PDF into pages itself and renders page images.
-    Integrating it into our loop and replacing the Ghostscript call with our page images made by pdf2img.
-
-    Right in the first loop:
-        1. If page layout requires OCR -> send page image to OCR.
-        2. If page layout does not require OCR -> extract text from page, extract tables.
-    Accumulate the per-page extraction results in some structure.
-    Result of the first loop:
-        1. Dict of page_num -> PageExtractionResults(page_text, page_tables)
-            for pages not requiring OCR. Pickled to webdav.
-        2. Dict of page_num -> page image fn in webdav
-            for pages requiring OCR.
-    Pages requiring OCR are sent to OCR tasks with chord.
-    Each OCR task makes a one-page PDF from image, extracts data from it,
-        gets Dict of single page num -> PageExtractionResults(page_text, page_tables), stores them to WebDav.
-    When all OCR tasks are finished we merge all dicts into one and concatenate the results.
-    """
     log.info(f'{req.original_file_name} | Pre-processing PDF document')
+    log.info(f'{req.original_file_name} | Splitting to pages to parallelize processing...')
+    with split_pdf_to_page_blocks(pdf_fn, pages_per_block=1) as pdf_page_fns:
+        webdav_client.mkdir(f'{req.request_id}/{pages_for_processing}')
+        webdav_client.mkdir(f'{req.request_id}/{pages_ocred}')
+        webdav_client.mkdir(f'{req.request_id}/{pages_tables}')
+        task_signatures = list()
+        i = 0
 
-    log.info(f'{req.original_file_name} | Rendering PDF pages to images for further '
-             f'using in table detection and OCR...')
-    with extract_page_images(pdf_fn, timeout_sec=req.pdf_to_images_timeout_sec) as page_image_fns:
-        page_num_to_image_fn = {i: image_fn for i, image_fn in enumerate(page_image_fns)}
-        log.info(f'{req.original_file_name} | Detecting pages which require OCR and pre-processing '
-                 f' text pages...')
-        pre_process_results = pre_extract_data(pdf_fn=pdf_fn,
-                                               page_images_fns=page_num_to_image_fn,
-                                               page_num_starts_from=0,
-                                               ocr_enabled=req.ocr_enable,
-                                               log_processing_page=lambda pn:
-                                               log.info(f'{req.original_file_name} | '
-                                                        f'Processing page {pn}...')
-                                               )
+        ocr_language = req.doc_language or 'eng'
+        if len(ocr_language) == 2:
+            try:
+                ocr_language = pycountry.languages.get(alpha_2=ocr_language).alpha_3
+            except AttributeError:
+                ocr_language = 'eng'
 
-        if not pre_process_results.pages_to_ocr:
-            log.info(f'{req.original_file_name} | PDF document does not need any OCR work. '
-                     f'Proceeding to the data extraction...')
-            extract_data_and_finish(pre_process_results.ready_results, req, webdav_client)
-        else:
-            log.info(f'{req.original_file_name} | PDF document needs OCR '
-                     f'for {len(pre_process_results.pages_to_ocr)} pages.\n'
-                     f'Scheduling OCR tasks...')
-            webdav_client.mkdir(f'{req.request_id}/{pages_pre_processed}')
-            webdav_client.mkdir(f'{req.request_id}/{pages_for_ocr}')
-            webdav_client.mkdir(f'{req.request_id}/{pages_ocred}')
+        for pdf_page_fn in pdf_page_fns:
+            i += 1
+            pdf_page_base_fn = os.path.basename(pdf_page_fn)
+            webdav_client.upload(f'{req.request_id}/{pages_for_processing}/{pdf_page_base_fn}',
+                                 pdf_page_fn)
+            task_signatures.append(process_pdf_page_task.s(req.request_id,
+                                                           req.original_file_name,
+                                                           pdf_page_base_fn,
+                                                           i,
+                                                           ocr_language,
+                                                           req.request_callback_info.log_extra))
 
-            webdav_client.upload_to(pickle.dumps(pre_process_results.ready_results),
-                                    f'{req.request_id}/{pages_pre_processed}/{from_original_doc}')
+        log.info(f'{req.original_file_name} | Scheduling {len(task_signatures)} sub-tasks...')
+        c = chord(task_signatures)(finish_pdf_processing
+                                   .s(req.request_id, req.request_callback_info)
+                                   .set(link_error=[ocr_error_callback.s(req.request_id,
+                                                                         req.request_callback_info)]))
+        register_task_id(webdav_client, req.request_id, c.id)
+        for ar in c.parent.children:
+            register_task_id(webdav_client, req.request_id, ar.id)
 
-            ocr_language = req.doc_language or 'eng'
-            if len(ocr_language) == 2:
-                try:
-                    ocr_language = pycountry.languages.get(alpha_2=ocr_language).alpha_3
-                except AttributeError:
-                    ocr_language = 'eng'
 
-            req.pages_for_ocr = dict()
-            task_signatures = list()
-            for page_num, image_fn in pre_process_results.pages_to_ocr.items():
-                basename = os.path.basename(image_fn)
-                webdav_client.upload(f'{req.request_id}/{pages_for_ocr}/{basename}',
-                                     image_fn)
-                req.pages_for_ocr[page_num] = basename
-                dst_basename = os.path.splitext(basename)[0] + '.pdf'
-                dst_preprocess_basename = os.path.splitext(basename)[0] + '.pickle'
-                task_signatures.append(ocr_and_preprocess.s(
-                    req.original_file_name,
-                    req.request_id,
-                    pdf_fn,
-                    page_num,
-                    f'{req.request_id}/{pages_for_ocr}/{basename}',
-                    f'{req.request_id}/{pages_ocred}/{dst_basename}',
-                    f'{req.request_id}/{pages_pre_processed}/{dst_preprocess_basename}',
-                    ocr_language,
-                    req.request_callback_info.log_extra))
+def page_num_to_fn(page_num: int) -> str:
+    return f'{page_num:05}'
 
-            save_request_metadata(req)
-            log.info(f'{req.original_file_name} | Starting sub-tasks for OCR-ing pdf pages:\n{req.pages_for_ocr}')
-            c = chord(task_signatures)(merge_ocred_pages_and_extract_data
-                .s(req.request_id, req.request_callback_info)
-                .set(
-                link_error=[ocr_error_callback.s(req.request_id, req.request_callback_info)]))
-            register_task_id(webdav_client, req.request_id, c.id)
-            for ar in c.parent.children:
-                register_task_id(webdav_client, req.request_id, ar.id)
+
+@celery_app.task(acks_late=True, bind=True)
+def process_pdf_page_task(_task,
+                          request_id: str,
+                          original_file_name: str,
+                          pdf_page_base_fn: str,
+                          page_number: int,
+                          ocr_language: str,
+                          log_extra: Dict[str, str] = None):
+    set_log_extra(log_extra)
+    webdav_client = get_webdav_client()
+    req = load_request_metadata(request_id)
+    if not req:
+        log.warning(
+            f'{original_file_name} | Could not process pdf page {page_number}: {pdf_page_base_fn}.\n'
+            f'Request files do not exist at webdav storage.\n'
+            f'Probably the request was already canceled.\n'
+            f'(#{request_id})')
+        return None
+    if req.status != STATUS_PENDING:
+        log.info(
+            f'{original_file_name} | Canceling pdf page processing sub-task for page {page_number}:'
+            f' {pdf_page_base_fn} (request #{request_id})\n'
+            f'because the request is already in status {req.status}.')
+        return None
+    log.info(f'{original_file_name} | Processing PDF page {page_number}...')
+    try:
+        with webdav_client.get_as_local_fn(f'{req.request_id}/{pages_for_processing}/{pdf_page_base_fn}') \
+                as (local_pdf_page_fn, _remote_path):
+            with process_pdf_page(local_pdf_page_fn,
+                                  page_num=page_number,
+                                  ocr_enabled=req.ocr_enable,
+                                  ocr_language=ocr_language) as page_proc_res:  # type: PDFPageProcessingResults
+                if page_proc_res.page_requires_ocr:
+                    webdav_client.upload(f'{req.request_id}/{pages_ocred}/{page_num_to_fn(page_number)}.pdf',
+                                         page_proc_res.ocred_page_fn)
+                if page_proc_res.camelot_tables:
+                    webdav_client.pickle(page_proc_res.camelot_tables,
+                                         f'{req.request_id}/{pages_tables}/{page_num_to_fn(page_number)}.pickle')
+    except Exception as e:
+        raise Exception(f'{original_file_name} |  Exception caught while processing '
+                        f'PDF page {page_number}: {pdf_page_base_fn}') from e
+
+    return page_number
 
 
 @celery_app.task(bind=True)
@@ -282,58 +266,10 @@ def ocr_error_callback(task, some_id: str, request_id: str, req_callback_info: R
 
 
 @celery_app.task(acks_late=True, bind=True)
-def ocr_and_preprocess(task,
-                       original_file_name: str,
-                       request_id: str,
-                       pdf_fn: str,
-                       page_num: int,
-                       page_image_webdav_path: str,
-                       page_pdf_dst_webdav_path: str,
-                       pre_process_results_dst_webdav_path: str,
-                       ocr_language: str = 'eng',
-                       log_extra: Dict[str, str] = None
-                       ) -> Optional[str]:
-    set_log_extra(log_extra)
-    webdav_client = get_webdav_client()
-    req = load_request_metadata(request_id)
-    if not req:
-        log.warning(
-            f'Not OCR-ing page {page_num} of {pdf_fn}.\n'
-            f'Request files do not exist.\n'
-            f'Probably the request was already canceled.\n'
-            f'{pdf_fn} (#{request_id})')
-        return None
-    if req.status != STATUS_PENDING:
-        log.info(f'Canceling OCR sub-task for file: {pdf_fn}, page {page_num}. (request #{request_id})\n'
-                 f'because the request is already in status {req.status}.')
-        return None
-    log.info(f'OCR-ing page {page_num} of {pdf_fn}: {page_image_webdav_path}...')
-    try:
-        with webdav_client.get_as_local_fn(page_image_webdav_path) \
-                as (local_image_src, _remote_path):
-            with ocr_page_to_pdf(local_image_src, language=ocr_language) as local_pdf_fn:
-                webdav_client.upload(page_pdf_dst_webdav_path, local_pdf_fn)
-                page_images_fns = {page_num: local_image_src}
-                pre_process_results = pre_extract_data(pdf_fn=local_pdf_fn,
-                                                       page_images_fns=page_images_fns,
-                                                       page_num_starts_from=page_num,
-                                                       ocr_enabled=False,
-                                                       log_processing_page=lambda page_num:
-                                                       log.info(f'{original_file_name} | '
-                                                                f'Processing page {page_num}...'))
-                webdav_client.upload_to(pickle.dumps(pre_process_results.ready_results[page_num]),
-                                        pre_process_results_dst_webdav_path)
-    except Exception as e:
-        raise Exception(f'Exception caught while OCR-ing and pre-processing image: {page_image_webdav_path}') from e
-
-    return page_pdf_dst_webdav_path
-
-
-@celery_app.task(acks_late=True, bind=True)
-def merge_ocred_pages_and_extract_data(task,
-                                       _ocred_page_paths: List[str],
-                                       request_id: str,
-                                       req_callback_info: RequestCallbackInfo):
+def finish_pdf_processing(task,
+                          _ocred_page_nums: List[int],
+                          request_id: str,
+                          req_callback_info: RequestCallbackInfo):
     with handle_errors(request_id, req_callback_info):
         req: RequestMetadata = load_request_metadata(request_id)
         if not req:
@@ -345,7 +281,7 @@ def merge_ocred_pages_and_extract_data(task,
         log.info(f'{req.original_file_name} | Re-combining OCR-ed pdf blocks and processing the '
                  f'data extraction for request #{request_id}')
         webdav_client: WebDavClient = get_webdav_client()
-        if req.status != STATUS_PENDING or not webdav_client.is_dir(f'{req.request_id}/{pages_for_ocr}'):
+        if req.status != STATUS_PENDING or not webdav_client.is_dir(f'{req.request_id}/{pages_for_processing}'):
             log.info(f'{req.original_file_name} | Request is already processed/failed/canceled (#{request_id})')
             return
         temp_dir = tempfile.mkdtemp()
@@ -353,47 +289,46 @@ def merge_ocred_pages_and_extract_data(task,
             pages_dir = os.path.join(temp_dir, 'pages')
             os.mkdir(pages_dir)
 
-            merged_pre_process_results: Dict[int, PDFPagePreProcessResults] = webdav_client.unpickle(
-                f'{req.request_id}/{pages_pre_processed}/{from_original_doc}')
+            camelot_tables_total: List[CamelotTable] = list()
+            for remote_base_fn in webdav_client.list(f'{request_id}/{pages_tables}'):
+                camelot_tables_of_page: List[CamelotTable] \
+                    = webdav_client.unpickle(f'{request_id}/{pages_tables}/{remote_base_fn}')
+                camelot_tables_total += camelot_tables_of_page
 
             repl_page_num_to_fn: Dict[int, str] = dict()
-            for page_num, image_fn in req.pages_for_ocr.items():
-                basename = os.path.splitext(image_fn)[0]
-                remote_page_pdf_fn = f'{req.request_id}/{pages_ocred}/{basename}.pdf'
-                local_page_pdf_fn = os.path.join(pages_dir, basename)
+            for remote_base_fn in webdav_client.list(f'{request_id}/{pages_ocred}'):
+                remote_page_pdf_fn = f'{req.request_id}/{pages_ocred}/{remote_base_fn}'
+                local_page_pdf_fn = os.path.join(pages_dir, remote_base_fn)
                 webdav_client.download(remote_page_pdf_fn, local_page_pdf_fn)
+                page_num = int(os.path.splitext(remote_base_fn)[0])
                 repl_page_num_to_fn[page_num] = local_page_pdf_fn
 
-                page_pre_process_results: PDFPagePreProcessResults = \
-                    webdav_client.unpickle(f'{req.request_id}/{pages_pre_processed}/{basename}.pickle')
-                merged_pre_process_results[page_num] = page_pre_process_results
+            if repl_page_num_to_fn:
+                original_pdf_in_storage = req.converted_to_pdf or req.original_document
+                local_orig_pdf_fn = os.path.join(temp_dir, original_pdf_in_storage)
 
-            original_pdf_in_storage = req.converted_to_pdf or req.original_document
-
-            local_orig_pdf_fn = os.path.join(temp_dir, original_pdf_in_storage)
-            req.ocred_pdf = os.path.splitext(original_pdf_in_storage)[0] + '.ocred.pdf'
-
-            webdav_client.download(f'{req.request_id}/{original_pdf_in_storage}', local_orig_pdf_fn)
-            with merge_pfd_pages(local_orig_pdf_fn, repl_page_num_to_fn) as local_merged_pdf_fn:
-                webdav_client.upload(f'{req.request_id}/{req.ocred_pdf}', local_merged_pdf_fn)
-                save_request_metadata(req)
-                extract_data_and_finish(merged_pre_process_results, req, webdav_client)
+                webdav_client.download(f'{req.request_id}/{original_pdf_in_storage}', local_orig_pdf_fn)
+                with merge_pdf_pages(local_orig_pdf_fn, repl_page_num_to_fn) as local_merged_pdf_fn:
+                    req.ocred_pdf = os.path.splitext(original_pdf_in_storage)[0] + '.ocred.pdf'
+                    webdav_client.upload(f'{req.request_id}/{req.ocred_pdf}', local_merged_pdf_fn)
+                    extract_data_and_finish(req, webdav_client, local_merged_pdf_fn, camelot_tables_total)
+            else:
+                remote_fn = req.converted_to_pdf or req.original_document
+                with webdav_client.get_as_local_fn(f'{req.request_id}/{remote_fn}') as (local_pdf_fn, _remote_path):
+                    extract_data_and_finish(req, webdav_client, local_pdf_fn, camelot_tables_total)
 
         finally:
             shutil.rmtree(temp_dir)
 
 
-def extract_data_and_finish(pre_processed_pages: Dict[int, PDFPagePreProcessResults],
-                            req: RequestMetadata,
-                            webdav_client: WebDavClient):
+def extract_data_and_finish(req: RequestMetadata,
+                            webdav_client: WebDavClient,
+                            local_pdf_fn: str,
+                            camelot_tables: List[CamelotTable]):
     req.pdf_file = req.ocred_pdf or req.converted_to_pdf or req.original_document
     pdf_fn_in_storage_base = os.path.splitext(req.original_document)[0]
 
-    # tika_xhtml: str = tika_extract_xhtml(pdf_fn)
-    # req.tika_xhtml_file = pdf_fn_in_storage_base + '.tika.xhtml'
-    # webdav_client.upload_to(tika_xhtml, f'{req.request_id}/{req.tika_xhtml_file}')
-
-    text, plain_text_structure = extract_text_and_structure(pre_processed_pages)
+    text, plain_text_structure = extract_text_and_structure(local_pdf_fn)
     req.plain_text_file = pdf_fn_in_storage_base + '.plain.txt'
     webdav_client.upload_to(text.encode('utf-8'), f'{req.request_id}/{req.plain_text_file}')
 
@@ -401,7 +336,6 @@ def extract_data_and_finish(pre_processed_pages: Dict[int, PDFPagePreProcessResu
     plain_text_structure = json.dumps(plain_text_structure.to_dict(), indent=2)
     webdav_client.upload_to(plain_text_structure.encode('utf-8'), f'{req.request_id}/{req.plain_text_structure_file}')
 
-    camelot_tables = itertools.chain(*[p.camelot_tables for p in pre_processed_pages.values()])
     tables, df_tables = get_table_dtos_from_camelot_output(camelot_tables)
     if tables and tables.tables or df_tables and df_tables.tables:
         req.tables_json_file = pdf_fn_in_storage_base + '.tables.json'
@@ -417,9 +351,9 @@ def extract_data_and_finish(pre_processed_pages: Dict[int, PDFPagePreProcessResu
         if req.ocred_pdf and req.ocred_pdf != req.pdf_file:
             webdav_client.clean(f'{req.request_id}/{req.ocred_pdf}')
         if req.pages_for_ocr:
-            webdav_client.clean(f'{req.request_id}/{pages_for_ocr}')
+            webdav_client.clean(f'{req.request_id}/{pages_for_processing}')
             webdav_client.clean(f'{req.request_id}/{pages_ocred}')
-            webdav_client.clean(f'{req.request_id}/{pages_pre_processed}')
+            webdav_client.clean(f'{req.request_id}/{pages_tables}')
 
     req.status = STATUS_DONE
 
