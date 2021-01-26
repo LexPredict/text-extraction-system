@@ -44,7 +44,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-class PDFToTextWithCoordinates extends PDFTextStripper {
+/**
+ * Extracts plain text from PDF together with the bounding boxes of each page and character.
+ *
+ * Based on the code from Apache TIKA and Apache PDFBox which
+ * was originally licensed under Apache 2.0 license (https://tika.apache.org/license.html).
+ */
+public class PDFToTextWithCoordinates extends PDFTextStripper {
     int startPage = -1;
     int pageIndex = -1;
     int unmappedUnicodeCharsPerPage = 0;
