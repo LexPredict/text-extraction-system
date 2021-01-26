@@ -1,4 +1,4 @@
-package com.lexpredict;
+package com.lexpredict.textextraction;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -24,6 +24,7 @@ public class MakePDFFromImages {
                     + MakePDFFromImages.class.getName()
                     + " <dst_pdf_fn> <image_fn_1> <image_fn_2> ... <image_fn_n>");
             System.out.println(Arrays.asList(args));
+            return;
         }
 
         String outPdf = args[0];

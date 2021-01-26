@@ -1,4 +1,4 @@
-package com.lexpredict;
+package com.lexpredict.textextraction;
 
 import junit.framework.TestCase;
 import org.apache.commons.io.FileUtils;

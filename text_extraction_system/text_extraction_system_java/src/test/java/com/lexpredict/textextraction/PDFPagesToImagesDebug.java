@@ -1,4 +1,4 @@
-package com.lexpredict;
+package com.lexpredict.textextraction;
 
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.interactive.form.PDAcroForm;
