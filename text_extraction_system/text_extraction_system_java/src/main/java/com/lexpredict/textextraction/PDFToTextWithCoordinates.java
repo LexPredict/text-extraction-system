@@ -17,10 +17,14 @@
  * Modifications copyright (C) 2020 ContraxSuite, LLC
  */
 
-package com.lexpredict;
+package com.lexpredict.textextraction;
 
+import com.lexpredict.textextraction.dto.PageInfo;
+import org.apache.pdfbox.cos.COSArray;
+import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.PDPageTree;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
@@ -28,76 +32,30 @@ import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDDocume
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineItem;
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineNode;
 import org.apache.pdfbox.text.PDFTextStripper;
+import org.apache.pdfbox.text.TextPosition;
 import org.apache.pdfbox.util.Matrix;
 import org.apache.pdfbox.util.Vector;
 import org.xml.sax.SAXException;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.charset.StandardCharsets;
-import java.text.NumberFormat;
+import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
+import java.util.Set;
 
-class AbstractPDF2Text extends PDFTextStripper {
-    protected NumberFormat defaultNumberFormat = NumberFormat.getInstance(new Locale("en", "US"));
-
-    final List<IOException> exceptions = new ArrayList<>();
-    final PDDocument pdDocument;
+class PDFToTextWithCoordinates extends PDFTextStripper {
     int startPage = -1;
     int pageIndex = -1;
     int unmappedUnicodeCharsPerPage = 0;
     int totalCharsPerPage = 0;
-    protected final OutputStream fwText, fwCoords, fwPages;
 
-    AbstractPDF2Text(PDDocument pdDocument,
-                     OutputStream fwText,
-                     OutputStream fwCoords,
-                     OutputStream fwPages) throws IOException {
-        this.pdDocument = pdDocument;
-        this.fwText = fwText;
-        this.fwCoords = fwCoords;
-        this.fwPages = fwPages;
-    }
+    protected List<PageInfo> pages = new ArrayList<>();
 
-    @Override
-    protected void startPage(PDPage page) throws IOException {
-        pageIndex++;
-        PDRectangle area = page.getMediaBox();
-        writeToBuffer(formatFloatNumbers("",
-                area.getLowerLeftX(), area.getLowerLeftY(),
-                area.getWidth(), area.getHeight()), fwPages, true);
-    }
+    protected PageInfo curPage;
 
-    protected void writeToBuffer(StringBuilder s, OutputStream fs, Boolean newLine) throws IOException {
-        writeToBuffer(s.toString(), fs, newLine);
-    }
-
-    protected void writeToBuffer(String s, OutputStream fs, Boolean newLine) throws IOException {
-        if (newLine)
-            fs.write((s + "\n").getBytes(StandardCharsets.UTF_8));
-        else
-            fs.write(s.getBytes(StandardCharsets.UTF_8));
-    }
-
-    protected String formatFloatNumbers(String termination, float... n) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < n.length; i++) {
-            sb.append(defaultNumberFormat.format(n[i]));
-            if (i < n.length - 1)
-                sb.append(",");
-        }
-        sb.append(termination);
-        return sb.toString();
-    }
-
-    @Override
-    protected void endPage(PDPage page) throws IOException {
-        totalCharsPerPage = 0;
-        unmappedUnicodeCharsPerPage = 0;
-        // Without this it does not even add a line break when the next page starts.
-        this.fwText.write(new byte[]{'\n', '\f'});
+    protected PDFToTextWithCoordinates() throws IOException {
+        super();
     }
 
     @Override
@@ -112,6 +70,26 @@ class AbstractPDF2Text extends PDFTextStripper {
         } catch (Exception e) {
             throw new IOException("Unable to end a document", e);
         }
+    }
+
+    @Override
+    protected void startPage(PDPage page) throws IOException {
+        pageIndex++;
+        this.curPage = new PageInfo();
+        PDRectangle area = page.getMediaBox();
+        this.curPage.box = new double[]{area.getLowerLeftX(), area.getLowerLeftY(),
+                area.getWidth(), area.getHeight()};
+        this.curPage.char_boxes = new ArrayList<>();
+        this.output = new StringWriter();
+    }
+
+    @Override
+    protected void endPage(PDPage page) throws IOException {
+        writeParagraphEnd();
+        totalCharsPerPage = 0;
+        unmappedUnicodeCharsPerPage = 0;
+        this.curPage.text = this.output.toString();
+        this.pages.add(this.curPage);
     }
 
     void extractBookmarkText() throws SAXException, IOException {
@@ -203,4 +181,100 @@ class AbstractPDF2Text extends PDFTextStripper {
         }
         totalCharsPerPage++;
     }
+
+    @Override
+    protected void writeString(String text, List<TextPosition> textPositions) throws IOException {
+        super.writeString(text, textPositions);
+        if (textPositions != null) {
+            for (TextPosition pos : textPositions) {
+                this.curPage.char_boxes.add(new double[]{pos.getX(), pos.getY(),
+                        pos.getWidth(), pos.getHeight()});
+            }
+        }
+    }
+
+
+    static class AngleCollector extends PDFTextStripper {
+        Set<Integer> angles = new HashSet<>();
+
+        public Set<Integer> getAngles() {
+            return angles;
+        }
+
+        AngleCollector() throws IOException {
+        }
+
+        @Override
+        protected void processTextPosition(TextPosition text) {
+            Matrix m = text.getTextMatrix();
+            m.concatenate(text.getFont().getFontMatrix());
+            int angle = (int) Math.round(Math.toDegrees(Math.atan2(m.getShearY(), m.getScaleY())));
+            angle = (angle + 360) % 360;
+            angles.add(angle);
+        }
+    }
+
+    @Override
+    public void processPage(PDPage page) throws IOException {
+        try {
+            this.startPage(page);
+            detectAnglesAndProcessPage(page);
+        } finally {
+            this.endPage(page);
+        }
+    }
+
+    private void detectAnglesAndProcessPage(PDPage page) throws IOException {
+        //copied and pasted from https://issues.apache.org/jira/secure/attachment/12947452/ExtractAngledText.java
+        //PDFBOX-4371
+        AngleCollector angleCollector = new AngleCollector(); // alternatively, reset angles
+        angleCollector.setStartPage(getCurrentPageNo());
+        angleCollector.setEndPage(getCurrentPageNo());
+        angleCollector.getText(document);
+
+        int rotation = page.getRotation();
+        page.setRotation(0);
+
+        for (Integer angle : angleCollector.getAngles()) {
+            if (angle == 0) {
+                super.processPage(page);
+            } else {
+                // prepend a transformation
+                try (PDPageContentStream cs = new PDPageContentStream(document,
+                        page, PDPageContentStream.AppendMode.PREPEND, false)) {
+                    cs.transform(Matrix.getRotateInstance(-Math.toRadians(angle), 0, 0));
+                }
+                super.processPage(page);
+                // remove transformation
+                COSArray contents = (COSArray) page.getCOSObject().getItem(COSName.CONTENTS);
+                contents.remove(0);
+            }
+        }
+        page.setRotation(rotation);
+    }
+
+    @Override
+    protected void processTextPosition(TextPosition text) {
+        Matrix m = text.getTextMatrix();
+        m.concatenate(text.getFont().getFontMatrix());
+        int angle = (int) Math.round(Math.toDegrees(Math.atan2(m.getShearY(), m.getScaleY())));
+        if (angle == 0) {
+            super.processTextPosition(text);
+        }
+    }
+
+    public static List<PageInfo> process(PDDocument document) throws Exception {
+        PDFToTextWithCoordinates pdf2text = new PDFToTextWithCoordinates();
+        pdf2text.document = document;
+        pdf2text.setAddMoreFormatting(true);
+        pdf2text.setParagraphEnd(pdf2text.getLineSeparator());
+        pdf2text.setPageStart(pdf2text.getLineSeparator());
+        pdf2text.setArticleStart(pdf2text.getLineSeparator());
+        pdf2text.setArticleEnd(pdf2text.getLineSeparator());
+        pdf2text.startDocument(document);
+        pdf2text.processPages(document.getPages());
+        pdf2text.endDocument(document);
+        return pdf2text.pages;
+    }
+
 }
