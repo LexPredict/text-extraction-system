@@ -13,6 +13,7 @@ kombu==5.0.2
 lxml==4.5.2
 marshmallow==3.8.0
 marshmallow-enum==1.5.1
+msgpack==1.0.2
 nltk==3.5
 numpy==1.19.4
 opencv-python==4.4.0.46

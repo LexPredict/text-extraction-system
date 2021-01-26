@@ -1,15 +1,14 @@
 import os
 import re
-import shutil
 import tempfile
 import time
 
 import pikepdf
 
-from text_extraction_system.data_extract.data_extract import extract_text_pdfminer
-from text_extraction_system.pdf.pdf import split_pdf_to_page_blocks, join_pdf_blocks, \
-    merge_pfd_pages, extract_page_images, iterate_pages, page_requires_ocr
 from text_extraction_system.commons.tests.commons import with_default_settings
+from text_extraction_system.data_extract.data_extract import extract_text_pdfminer
+from text_extraction_system.pdf.pdf import merge_pdf_pages, \
+    split_pdf_to_page_blocks, extract_page_images, iterate_pages, page_requires_ocr
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
@@ -42,22 +41,16 @@ def test_extract_images():
 
 def test_split_pdf1():
     fn = os.path.join(data_dir, 'pdf_9_pages.pdf')
-    temp_dir = tempfile.mkdtemp()
-    try:
-        block_files = split_pdf_to_page_blocks(fn, temp_dir, 3)
+    with split_pdf_to_page_blocks(fn, 3) as block_files:
         assert len(block_files) == 3
         for fn in block_files:
             with pikepdf.open(fn) as pdf:
                 assert len(pdf.pages) == 3
-    finally:
-        shutil.rmtree(temp_dir)
 
 
 def test_split_pdf2():
     fn = os.path.join(data_dir, 'pdf_9_pages.pdf')
-    temp_dir = tempfile.mkdtemp()
-    try:
-        block_files = split_pdf_to_page_blocks(fn, temp_dir, 4)
+    with split_pdf_to_page_blocks(fn, 4) as block_files:
         assert len(block_files) == 3
         with pikepdf.open(block_files[0]) as pdf:
             assert len(pdf.pages) == 4
@@ -65,15 +58,11 @@ def test_split_pdf2():
             assert len(pdf.pages) == 4
         with pikepdf.open(block_files[2]) as pdf:
             assert len(pdf.pages) == 1
-    finally:
-        shutil.rmtree(temp_dir)
 
 
 def test_split_pdf_text():
     fn = os.path.join(data_dir, 'pdf_9_pages.pdf')
-    temp_dir = tempfile.mkdtemp()
-    try:
-        block_files = split_pdf_to_page_blocks(fn, temp_dir, 4)
+    with split_pdf_to_page_blocks(fn, 4) as block_files:
         txt1 = str(extract_text_pdfminer(block_files[0]))
         txt2 = str(extract_text_pdfminer(block_files[1]))
         txt3 = str(extract_text_pdfminer(block_files[2]))
@@ -99,122 +88,53 @@ def test_split_pdf_text():
         assert 'This is page 9.' not in txt2
 
         assert len(block_files) == 3
-    finally:
-        shutil.rmtree(temp_dir)
 
 
 def test_split_pdf_file_names1():
     fn = os.path.join(data_dir, 'pdf_9_pages.pdf')
-    temp_dir = tempfile.mkdtemp()
-    try:
-        block_files = split_pdf_to_page_blocks(fn, temp_dir, 4)
+    with split_pdf_to_page_blocks(fn, 4) as block_files:
         assert os.path.basename(block_files[0]) == 'pdf_9_pages_0001_0004.pdf'
         assert os.path.basename(block_files[1]) == 'pdf_9_pages_0005_0008.pdf'
         assert os.path.basename(block_files[2]) == 'pdf_9_pages_0009.pdf'
-    finally:
-        shutil.rmtree(temp_dir)
 
 
 def test_split_pdf_file_names2():
     fn = os.path.join(data_dir, 'pdf_9_pages.pdf')
-    temp_dir = tempfile.mkdtemp()
-    try:
-        block_files = split_pdf_to_page_blocks(fn, temp_dir, 3)
+    with split_pdf_to_page_blocks(fn, 3) as block_files:
         assert os.path.basename(block_files[0]) == 'pdf_9_pages_0001_0003.pdf'
         assert os.path.basename(block_files[1]) == 'pdf_9_pages_0004_0006.pdf'
         assert os.path.basename(block_files[2]) == 'pdf_9_pages_0007_0009.pdf'
-    finally:
-        shutil.rmtree(temp_dir)
 
 
 def test_split_pdf_file_names3():
     fn = os.path.join(data_dir, 'pdf_9_pages.pdf')
-    temp_dir = tempfile.mkdtemp()
-    try:
-        block_files = split_pdf_to_page_blocks(fn, temp_dir, 1)
+    with split_pdf_to_page_blocks(fn, 1) as block_files:
         assert os.path.basename(block_files[0]) == 'pdf_9_pages_0001.pdf'
         assert os.path.basename(block_files[1]) == 'pdf_9_pages_0002.pdf'
         assert os.path.basename(block_files[-1]) == 'pdf_9_pages_0009.pdf'
-    finally:
-        shutil.rmtree(temp_dir)
 
 
 def test_split_pdf_file_names4():
     fn = os.path.join(data_dir, 'pdf_9_pages.pdf')
-    temp_dir = tempfile.mkdtemp()
-    try:
-        block_files = split_pdf_to_page_blocks(fn, temp_dir, 11)
+    with split_pdf_to_page_blocks(fn, 11) as block_files:
         assert len(block_files) == 1
         assert block_files[0].endswith('pdf_9_pages.pdf')
-    finally:
-        shutil.rmtree(temp_dir)
 
 
 def test_split_pdf_file_names5():
     fn = os.path.join(data_dir, 'pdf_9_pages.pdf')
-    temp_dir = tempfile.mkdtemp()
-    try:
-        block_files = split_pdf_to_page_blocks(fn, temp_dir, 3, page_block_base_name='qwerty.pdf')
+    with split_pdf_to_page_blocks(fn, 3, page_block_base_name='qwerty.pdf') as block_files:
         assert os.path.basename(block_files[0]) == 'qwerty_0001_0003.pdf'
         assert os.path.basename(block_files[1]) == 'qwerty_0004_0006.pdf'
         assert os.path.basename(block_files[2]) == 'qwerty_0007_0009.pdf'
-    finally:
-        shutil.rmtree(temp_dir)
 
 
 def test_split_pdf_file_names6():
     fn = os.path.join(data_dir, 'pdf_9_pages.pdf')
     temp_dir = tempfile.mkdtemp()
-    try:
-        block_files = split_pdf_to_page_blocks(fn, temp_dir, 11, page_block_base_name='aaa.pdf')
+    with split_pdf_to_page_blocks(fn, 11, page_block_base_name='aaa.pdf') as block_files:
         assert len(block_files) == 1
-        assert os.path.basename(block_files[0]) == 'aaa.pdf'
-    finally:
-        shutil.rmtree(temp_dir)
-
-
-def test_join_pdfs1():
-    fn = os.path.join(data_dir, 'pdf_9_pages.pdf')
-    temp_dir = tempfile.mkdtemp()
-    try:
-        block_files = split_pdf_to_page_blocks(fn, temp_dir, 4)
-
-        dst_fn = tempfile.mktemp(suffix='.pdf')
-        try:
-            join_pdf_blocks(block_files, dst_fn)
-            with pikepdf.open(dst_fn) as joined_pdf:
-                assert len(joined_pdf.pages) == 9
-            txt = str(extract_text_pdfminer(dst_fn))
-            for i in range(1, 9):
-                assert f'This is page {i}.' in txt
-
-        finally:
-            os.remove(dst_fn)
-
-    finally:
-        shutil.rmtree(temp_dir)
-
-
-def test_join_pdfs2():
-    fn = os.path.join(data_dir, 'pdf_9_pages.pdf')
-    temp_dir = tempfile.mkdtemp()
-    try:
-        block_files = [fn]
-
-        dst_fn = tempfile.mktemp(suffix='.pdf')
-        try:
-            join_pdf_blocks(block_files, dst_fn)
-            with pikepdf.open(dst_fn) as joined_pdf:
-                assert len(joined_pdf.pages) == 9
-            txt = str(extract_text_pdfminer(dst_fn))
-            for i in range(1, 9):
-                assert f'This is page {i}.' in txt
-
-        finally:
-            os.remove(dst_fn)
-
-    finally:
-        shutil.rmtree(temp_dir)
+        assert os.path.basename(block_files[0]) == 'pdf_9_pages.pdf'
 
 
 def test_merge_pdf_pages():
@@ -222,7 +142,7 @@ def test_merge_pdf_pages():
     repl_pages = {1: os.path.join(data_dir, 'replacement_page.pdf'),
                   3: os.path.join(data_dir, 'smile.pdf')}
     should_be_deleted = list()
-    with merge_pfd_pages(orig_pdf, repl_pages) as pdf_fn:
+    with merge_pdf_pages(orig_pdf, repl_pages) as pdf_fn:
         should_be_deleted.append(pdf_fn)
         txt = extract_text_pdfminer(pdf_fn)
     for fn in should_be_deleted:
@@ -246,18 +166,13 @@ def test_compare_image_extraction_performance():
         page_num = len(image_file_names)
         print(f'Extracted {page_num} images')
     all_pages_at_once_seconds = time.time() - start
-    page_dir = tempfile.mkdtemp()
     page_num = 0
-    try:
-        page_pdf_fns = split_pdf_to_page_blocks(pdf_fn, page_dir)
-
+    with split_pdf_to_page_blocks(pdf_fn, page_dir) as page_pdf_fns:
         start = time.time()
         for page_fn in page_pdf_fns:
             with extract_page_images(page_fn) as _image_file_names:
                 page_num += 1
         all_pages_separately_seconds = time.time() - start
-    finally:
-        shutil.rmtree(page_dir)
 
     print(f'All pages at once time: {all_pages_at_once_seconds:.3f}s\n'
           f'All pages separately time: {all_pages_separately_seconds:.3f}s')

@@ -52,7 +52,7 @@ def convert_to_pdf(src_fn: str,
         if src_ext.lower() in {'.tiff', '.jpg', '.jpeg', '.png'}:
             java_modules_path = get_settings().java_modules_path
             args = ['java', '-cp', f'{java_modules_path}/*',
-                    'com.lexpredict.MakePDFFromImages',
+                    'com.lexpredict.textextraction.MakePDFFromImages',
                     out_fn, src_fn]
             completed_process: CompletedProcess = _run_process(args, timeout_sec)
         else:

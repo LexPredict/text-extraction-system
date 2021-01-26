@@ -80,7 +80,6 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
     @Override
     protected void startPage(PDPage page) throws IOException {
-        pageIndex++;
         this.curPage = new PageInfo();
         PDRectangle area = page.getMediaBox();
         this.curPage.box = new double[]{area.getLowerLeftX(), area.getLowerLeftY(),
@@ -152,6 +151,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         //        {
         super.setStartPage(-1);
         for (PDPage page : pages) {
+            pageIndex++;
             if (getCurrentPageNo() >= getStartPage()
                     && getCurrentPageNo() <= getEndPage()) {
                 processPage(page);
@@ -222,15 +222,6 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
     @Override
     public void processPage(PDPage page) throws IOException {
-        try {
-            this.startPage(page);
-            detectAnglesAndProcessPage(page);
-        } finally {
-            this.endPage(page);
-        }
-    }
-
-    private void detectAnglesAndProcessPage(PDPage page) throws IOException {
         //copied and pasted from https://issues.apache.org/jira/secure/attachment/12947452/ExtractAngledText.java
         //PDFBOX-4371
         AngleCollector angleCollector = new AngleCollector(); // alternatively, reset angles
