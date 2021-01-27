@@ -3,12 +3,13 @@ package com.lexpredict.textextraction;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lexpredict.textextraction.dto.PageInfo;
 import junit.framework.TestCase;
-import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pdfbox.pdmodel.PDDocument;
 
-import java.io.*;
-import java.nio.charset.StandardCharsets;
+import java.io.InputStream;
+import java.io.StringWriter;
 import java.util.List;
+
 
 public class TestPDF2Text extends TestCase {
 
@@ -32,6 +33,25 @@ public class TestPDF2Text extends TestCase {
                 String txt = p.text.replaceAll("\n", "").replaceAll("\f", "");
                 TestCase.assertEquals(txt.length(), p.char_boxes.size());
 
+            }
+        }
+    }
+
+
+    public void test_paragraphs() throws Exception {
+        try (InputStream stream = TestPDF2Text.class
+                .getResourceAsStream("/RESO_20120828-01_Building_Remodel__1.pdf")) {
+            try (PDDocument document = PDDocument.load(stream)) {
+                List<PageInfo> pages = PDFToTextWithCoordinates.process(document);
+                PageInfo firstPage = pages.get(0);
+                System.out.println(firstPage.text);
+
+                assertEquals("Test document contains 7 paragraphs starting with 'WHEREAS'.",
+                        StringUtils.countMatches(firstPage.text, "\n\nWHEREAS"), 7);
+
+                assertTrue("It should not add obsolete empty line after each line of text " +
+                                "(paragraph false-positives). Tuned by PDFTextStripper.setDropThreshold().",
+                        firstPage.text.contains("with \nthe powers"));
             }
         }
     }

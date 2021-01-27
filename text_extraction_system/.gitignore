@@ -53,6 +53,5 @@ sve/
 tmp/
 docker/deploy/temp
 
-tika/*.jar
 java_modules/*.jar
 models/*
