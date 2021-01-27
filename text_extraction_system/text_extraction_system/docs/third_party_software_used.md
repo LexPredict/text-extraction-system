@@ -38,3 +38,20 @@ Apache Software Foundation
 ### License
 [Apache License 2.0](apache20.txt)
 
+
+## Apache TIKA
+https://tika.apache.org
+
+### Description
+The Apache Tika™ toolkit detects and extracts metadata and text from over a thousand different file types (such as PPT, XLS, and PDF).
+
+### Developer
+Apache Software Foundation
+
+### License
+[Apache License 2.0](apache20.txt)
+
+### Usage Notes
+Text Extraction System does not use TIKA itself but contains a java module which is 
+based on the similar Java code from the TIKA sources. The module is intended for extracting text and coordinates from 
+PDF files with PDFBox. 

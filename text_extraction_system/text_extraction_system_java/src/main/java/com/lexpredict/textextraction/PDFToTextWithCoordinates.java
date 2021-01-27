@@ -1,22 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- * Modifications copyright (C) 2020 ContraxSuite, LLC
- */
-
 package com.lexpredict.textextraction;
 
 import com.lexpredict.textextraction.dto.PageInfo;
@@ -261,13 +242,27 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     }
 
     public static List<PageInfo> process(PDDocument document) throws Exception {
+        return process(document, -1, Integer.MAX_VALUE);
+    }
+
+    public static List<PageInfo> process(PDDocument document, int startPage, int endPage) throws Exception {
         PDFToTextWithCoordinates pdf2text = new PDFToTextWithCoordinates();
         pdf2text.document = document;
-        /*pdf2text.setAddMoreFormatting(true);
-        pdf2text.setParagraphEnd(pdf2text.getLineSeparator());
-        pdf2text.setPageStart(pdf2text.getLineSeparator());
-        pdf2text.setArticleStart(pdf2text.getLineSeparator());
-        pdf2text.setArticleEnd(pdf2text.getLineSeparator());*/
+        pdf2text.setStartPage(startPage);
+        pdf2text.setEndPage(endPage);
+        pdf2text.setAddMoreFormatting(true);
+        pdf2text.setParagraphStart("\n");
+        pdf2text.setSortByPosition(true);
+
+        // This prevents false-matches in paragraph detection
+        // See TestPDF2Text.test_paragraphs()
+        pdf2text.setDropThreshold(3f);
+
+        //pdf2text.setPageStart(pdf2text.getLineSeparator());
+        //pdf2text.setArticleStart(pdf2text.getLineSeparator());
+        //pdf2text.setArticleEnd(pdf2text.getLineSeparator());
+        //pdf2text.setIndentThreshold(1.5f);
+        
         pdf2text.startDocument(document);
         pdf2text.processPages(document.getPages());
         pdf2text.endDocument(document);
