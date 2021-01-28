@@ -21,6 +21,8 @@ import org.xml.sax.SAXException;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -41,6 +43,12 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     protected List<double[]> charBBoxesWithPageNums;
 
     protected int curPageStartOffset;
+
+    protected double r(double d) {
+        BigDecimal bd = BigDecimal.valueOf(d);
+        bd = bd.setScale(2, RoundingMode.HALF_UP);
+        return bd.doubleValue();
+    }
 
     protected PDFToTextWithCoordinates() throws IOException {
         super();
@@ -71,8 +79,8 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         super.endPage(page);
         PDRectangle area = page.getMediaBox();
         PDFPlainTextPage pp = new PDFPlainTextPage();
-        pp.bbox = new double[]{area.getLowerLeftX(), area.getLowerLeftY(),
-                area.getWidth(), area.getHeight()};
+        pp.bbox = new double[]{r(area.getLowerLeftX()), r(area.getLowerLeftY()),
+                r(area.getWidth()), r(area.getHeight())};
         int curPageEndOffset = this.charBBoxesWithPageNums == null ? 0 : this.charBBoxesWithPageNums.size();
         pp.location = new int[] {this.curPageStartOffset, curPageEndOffset};
         this.pages.add(pp);
@@ -165,8 +173,8 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         super.writeString(text, textPositions);
         if (textPositions != null) {
             for (TextPosition pos : textPositions) {
-                this.charBBoxesWithPageNums.add(new double[]{pos.getX(), pos.getY(),
-                        pos.getWidth(), pos.getHeight()});
+                this.charBBoxesWithPageNums.add(new double[]{r(pos.getX()), r(pos.getY()),
+                        r(pos.getWidth()), r(pos.getHeight())});
             }
         }
     }
