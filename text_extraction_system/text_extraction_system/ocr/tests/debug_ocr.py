@@ -8,14 +8,14 @@ from text_extraction_system.data_extract.data_extract import extract_text_and_st
 
 @with_default_settings
 def p():
-    fn = '...'
-    with extract_page_images(fn, 1, 1) as image_fns:
+    fn = '..'
+    with extract_page_images(fn, 54, 54) as image_fns:
         for image_fn in image_fns:
-            shutil.copy(image_fn, '...')
+            shutil.copy(image_fn, '..')
             with ocr_page_to_pdf(image_fn) as page_pdf_fn:
-                shutil.copy(page_pdf_fn, '...')
+                shutil.copy(page_pdf_fn, '..')
                 text, struct = extract_text_and_structure(page_pdf_fn)
-                assert '...' in text
+                #assert '...' in text
 
 
 p()

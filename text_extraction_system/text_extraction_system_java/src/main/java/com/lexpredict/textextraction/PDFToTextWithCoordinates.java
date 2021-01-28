@@ -27,7 +27,7 @@ import java.util.Set;
 
 /**
  * Extracts plain text from PDF together with the bounding boxes of each page and character.
- *
+ * <p>
  * Based on the code from Apache TIKA and Apache PDFBox which
  * was originally licensed under Apache 2.0 license (https://tika.apache.org/license.html).
  */
@@ -180,6 +180,49 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         }
     }
 
+    protected void addNonPrintableCharBoxes(String nonPrintableText) {
+        if (nonPrintableText != null && !nonPrintableText.isEmpty()) {
+            for (int i = 0; i < nonPrintableText.length(); i++) {
+                this.curPage.char_boxes.add(null);
+            }
+        }
+    }
+
+    @Override
+    protected void writeLineSeparator() throws IOException {
+        super.writeLineSeparator();
+        this.addNonPrintableCharBoxes(getLineSeparator());
+    }
+
+    @Override
+    protected void writeWordSeparator() throws IOException {
+        super.writeWordSeparator();
+        this.addNonPrintableCharBoxes(getWordSeparator());
+    }
+
+    @Override
+    protected void writeParagraphStart() throws IOException {
+        super.writeParagraphStart();
+        this.addNonPrintableCharBoxes(getParagraphStart());
+    }
+
+    @Override
+    protected void writeParagraphEnd() throws IOException {
+        super.writeParagraphEnd();
+        this.addNonPrintableCharBoxes(getParagraphEnd());
+    }
+
+    @Override
+    protected void writePageStart() throws IOException {
+        super.writePageStart();
+        this.addNonPrintableCharBoxes(getPageStart());
+    }
+
+    @Override
+    protected void writePageEnd() throws IOException {
+        super.writePageEnd();
+        this.addNonPrintableCharBoxes(getPageEnd());
+    }
 
     static class AngleCollector extends PDFTextStripper {
         Set<Integer> angles = new HashSet<>();
@@ -262,7 +305,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         //pdf2text.setArticleStart(pdf2text.getLineSeparator());
         //pdf2text.setArticleEnd(pdf2text.getLineSeparator());
         //pdf2text.setIndentThreshold(1.5f);
-        
+
         pdf2text.startDocument(document);
         pdf2text.processPages(document.getPages());
         pdf2text.endDocument(document);
