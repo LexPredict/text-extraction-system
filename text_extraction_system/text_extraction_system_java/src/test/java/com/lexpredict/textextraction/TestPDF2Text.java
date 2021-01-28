@@ -30,8 +30,10 @@ public class TestPDF2Text extends TestCase {
                 System.out.println(sw);
 
                 PageInfo p = pages.get(0);
-                String txt = p.text.replaceAll("\n", "").replaceAll("\f", "");
+                String txt = p.text;
                 TestCase.assertEquals(txt.length(), p.char_boxes.size());
+
+                TestCase.assertFalse(pages.get(0).char_boxes.equals(pages.get(1).char_boxes));
 
             }
         }
@@ -52,6 +54,24 @@ public class TestPDF2Text extends TestCase {
                 assertTrue("It should not add obsolete empty line after each line of text " +
                                 "(paragraph false-positives). Tuned by PDFTextStripper.setDropThreshold().",
                         firstPage.text.contains("with \nthe powers"));
+            }
+        }
+    }
+
+    public void test_paragraphs1() throws Exception {
+        try (InputStream stream = TestPDF2Text.class
+                .getResourceAsStream("/RESO_20120828-01_Building_Remodel__54.pdf")) {
+            try (PDDocument document = PDDocument.load(stream)) {
+                List<PageInfo> pages = PDFToTextWithCoordinates.process(document);
+                PageInfo firstPage = pages.get(0);
+                System.out.println(firstPage.text);
+
+                /*assertEquals("Test document contains 7 paragraphs starting with 'WHEREAS'.",
+                        StringUtils.countMatches(firstPage.text, "\n\nWHEREAS"), 7);
+
+                assertTrue("It should not add obsolete empty line after each line of text " +
+                                "(paragraph false-positives). Tuned by PDFTextStripper.setDropThreshold().",
+                        firstPage.text.contains("with \nthe powers"));*/
             }
         }
     }
