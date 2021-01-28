@@ -13,7 +13,7 @@ def test_text_structure_extraction():
     assert 'idea if it is really' in text
     assert 'etect the sections' in text
     assert len(struct.pages) == 2
-    assert len(struct.paragraphs) == 5
+    assert len(struct.paragraphs) == 6
     assert len(struct.sentences) == 15
 
     # should be 2 sections but its a problem of lexnlp

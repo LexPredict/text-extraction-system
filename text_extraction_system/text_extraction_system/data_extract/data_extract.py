@@ -60,22 +60,16 @@ def extract_text_and_structure(pdf_fn: str, pdf_password: str = None, timeout_se
         raise_from_pdfbox_error_messages(completed_process)
 
         with open(out_fn, 'rb') as pages_f:
-            # see object structure in com.lexpredict.textextraction.dto.PageInfo
-            pages_mb: List[Dict[str, Any]] = msgpack.unpack(pages_f)
+            # see object structure in com.lexpredict.textextraction.dto.PDFPlainText
+            pdfbox_res: Dict[str, Any] = msgpack.unpack(pages_f)
 
         pages = list()
 
-        text = PAGE_SEPARATOR.join(p['text'] for p in pages_mb)
+        text = pdfbox_res['text']
         num: int = 0
-        page_start: int = 0
-        for p in pages_mb:
-            p_res = PlainTextPage(number=num, start=page_start, end=page_start + len(p['text']),
-                                  char_boxes=p['char_boxes'], box=p['box'], text=p['text'])
-            if num < len(pages_mb) - 1:
-                p_res.end += len(PAGE_SEPARATOR)
-
+        for p in pdfbox_res['pages']:
+            p_res = PlainTextPage(number=num, start=p['location'][0], end=p['location'][1], bbox=p['bbox'])
             pages.append(p_res)
-            page_start = p_res.end
             num += 1
 
         sentence_spans = get_sentence_span_list(text)
@@ -115,7 +109,8 @@ def extract_text_and_structure(pdf_fn: str, pdf_password: str = None, timeout_se
                                         pages=pages,
                                         sentences=sentences,
                                         paragraphs=paragraphs,
-                                        sections=sections)
+                                        sections=sections,
+                                        char_bboxes_with_page_nums=pdfbox_res['charBBoxesWithPageNums'])
 
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
