@@ -294,7 +294,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         pdf2text.setStartPage(startPage);
         pdf2text.setEndPage(endPage);
         pdf2text.setAddMoreFormatting(true);
-        pdf2text.setParagraphStart("\n");
+        pdf2text.setParagraphEnd("\n");
         pdf2text.setSortByPosition(true);
 
         // This prevents false-matches in paragraph detection
