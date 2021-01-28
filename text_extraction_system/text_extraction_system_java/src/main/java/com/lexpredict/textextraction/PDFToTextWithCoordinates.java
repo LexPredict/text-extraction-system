@@ -1,6 +1,7 @@
 package com.lexpredict.textextraction;
 
-import com.lexpredict.textextraction.dto.PageInfo;
+import com.lexpredict.textextraction.dto.PDFPlainText;
+import com.lexpredict.textextraction.dto.PDFPlainTextPage;
 import org.apache.pdfbox.cos.COSArray;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -34,12 +35,12 @@ import java.util.Set;
 public class PDFToTextWithCoordinates extends PDFTextStripper {
     int startPage = -1;
     int pageIndex = -1;
-    int unmappedUnicodeCharsPerPage = 0;
-    int totalCharsPerPage = 0;
 
-    protected List<PageInfo> pages = new ArrayList<>();
+    protected List<PDFPlainTextPage> pages;
 
-    protected PageInfo curPage;
+    protected List<double[]> charBBoxesWithPageNums;
+
+    protected int curPageStartOffset;
 
     protected PDFToTextWithCoordinates() throws IOException {
         super();
@@ -61,21 +62,20 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
     @Override
     protected void startPage(PDPage page) throws IOException {
-        this.curPage = new PageInfo();
-        PDRectangle area = page.getMediaBox();
-        this.curPage.box = new double[]{area.getLowerLeftX(), area.getLowerLeftY(),
-                area.getWidth(), area.getHeight()};
-        this.curPage.char_boxes = new ArrayList<>();
-        this.output = new StringWriter();
+        super.startPage(page);
+        this.curPageStartOffset = this.charBBoxesWithPageNums == null ? 0 : this.charBBoxesWithPageNums.size();
     }
 
     @Override
     protected void endPage(PDPage page) throws IOException {
-        writeParagraphEnd();
-        totalCharsPerPage = 0;
-        unmappedUnicodeCharsPerPage = 0;
-        this.curPage.text = this.output.toString();
-        this.pages.add(this.curPage);
+        super.endPage(page);
+        PDRectangle area = page.getMediaBox();
+        PDFPlainTextPage pp = new PDFPlainTextPage();
+        pp.bbox = new double[]{area.getLowerLeftX(), area.getLowerLeftY(),
+                area.getWidth(), area.getHeight()};
+        int curPageEndOffset = this.charBBoxesWithPageNums == null ? 0 : this.charBBoxesWithPageNums.size();
+        pp.location = new int[] {this.curPageStartOffset, curPageEndOffset};
+        this.pages.add(pp);
     }
 
     void extractBookmarkText() throws SAXException, IOException {
@@ -161,20 +161,11 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     }
 
     @Override
-    protected void showGlyph(Matrix textRenderingMatrix, PDFont font, int code, String unicode, Vector displacement) throws IOException {
-        super.showGlyph(textRenderingMatrix, font, code, unicode, displacement);
-        if (unicode == null || unicode.isEmpty()) {
-            unmappedUnicodeCharsPerPage++;
-        }
-        totalCharsPerPage++;
-    }
-
-    @Override
     protected void writeString(String text, List<TextPosition> textPositions) throws IOException {
         super.writeString(text, textPositions);
         if (textPositions != null) {
             for (TextPosition pos : textPositions) {
-                this.curPage.char_boxes.add(new double[]{pos.getX(), pos.getY(),
+                this.charBBoxesWithPageNums.add(new double[]{pos.getX(), pos.getY(),
                         pos.getWidth(), pos.getHeight()});
             }
         }
@@ -183,7 +174,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     protected void addNonPrintableCharBoxes(String nonPrintableText) {
         if (nonPrintableText != null && !nonPrintableText.isEmpty()) {
             for (int i = 0; i < nonPrintableText.length(); i++) {
-                this.curPage.char_boxes.add(null);
+                this.charBBoxesWithPageNums.add(null);
             }
         }
     }
@@ -223,6 +214,20 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         super.writePageEnd();
         this.addNonPrintableCharBoxes(getPageEnd());
     }
+
+    @Override
+    protected void endArticle() throws IOException {
+        super.endArticle();
+        this.addNonPrintableCharBoxes(getArticleEnd());
+    }
+
+    @Override
+    protected void startArticle(boolean isLTR) throws IOException {
+        super.startArticle(isLTR);
+        this.addNonPrintableCharBoxes(getArticleStart());
+    }
+
+
 
     static class AngleCollector extends PDFTextStripper {
         Set<Integer> angles = new HashSet<>();
@@ -284,18 +289,23 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         }
     }
 
-    public static List<PageInfo> process(PDDocument document) throws Exception {
+    public static PDFPlainText process(PDDocument document) throws Exception {
         return process(document, -1, Integer.MAX_VALUE);
     }
 
-    public static List<PageInfo> process(PDDocument document, int startPage, int endPage) throws Exception {
+    public static PDFPlainText process(PDDocument document, int startPage, int endPage) throws Exception {
         PDFToTextWithCoordinates pdf2text = new PDFToTextWithCoordinates();
         pdf2text.document = document;
+        pdf2text.output = new StringWriter();
+        pdf2text.charBBoxesWithPageNums = new ArrayList<>();
+        pdf2text.pages = new ArrayList<>();
         pdf2text.setStartPage(startPage);
         pdf2text.setEndPage(endPage);
         pdf2text.setAddMoreFormatting(true);
         pdf2text.setParagraphEnd("\n");
+        pdf2text.setPageEnd("\n\f");
         pdf2text.setSortByPosition(true);
+        pdf2text.setShouldSeparateByBeads(true);
 
         // This prevents false-matches in paragraph detection
         // See TestPDF2Text.test_paragraphs()
@@ -309,7 +319,11 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         pdf2text.startDocument(document);
         pdf2text.processPages(document.getPages());
         pdf2text.endDocument(document);
-        return pdf2text.pages;
+        PDFPlainText res = new PDFPlainText();
+        res.text = pdf2text.output.toString();
+        res.pages = pdf2text.pages;
+        res.charBBoxesWithPageNums = pdf2text.charBBoxesWithPageNums;
+        return res;
     }
 
 }

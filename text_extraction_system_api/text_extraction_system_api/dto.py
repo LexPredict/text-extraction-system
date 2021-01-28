@@ -44,9 +44,7 @@ class PlainTextPage:
     number: int
     start: int
     end: int
-    text: str
-    box: List[float]
-    char_boxes: List[List[float]]
+    bbox: List[float]
 
 
 @pydantic_dataclass
@@ -99,6 +97,7 @@ class PlainTextStructure:
     sentences: List[PlainTextSentence]
     paragraphs: List[PlainTextParagraph]
     sections: List[PlainTextSection]
+    char_bboxes_with_page_nums: List[List[float]]
 
 
 @pydantic_dataclass
