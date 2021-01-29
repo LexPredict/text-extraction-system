@@ -73,6 +73,9 @@ pushd ${DOLLAR}{PROJECT_DIR}
 if [ "${DOLLAR}{ROLE}" == "unit_tests" ]; then
   startup
   su ${SHARED_USER_NAME} -c "${DOLLAR}{ACTIVATE_VENV} && ulimit -n 65535 && pytest text_extraction_system"
+elif [ "${DOLLAR}{ROLE}" == "signal_debug" ]; then
+  startup
+  su ${SHARED_USER_NAME} -c "${DOLLAR}{ACTIVATE_VENV} && ulimit -n 65535 && python text_extraction_system/signal_debug.py"
 elif [ "${DOLLAR}{ROLE}" == "web-api" ]; then
   startup
   su ${SHARED_USER_NAME} -c "${DOLLAR}{ACTIVATE_VENV} && ulimit -n 65535 && uvicorn --host 0.0.0.0 --port 8000 text_extraction_system.web_api:app"
