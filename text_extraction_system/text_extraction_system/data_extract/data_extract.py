@@ -61,7 +61,7 @@ def extract_text_and_structure(pdf_fn: str, pdf_password: str = None, timeout_se
 
         with open(out_fn, 'rb') as pages_f:
             # see object structure in com.lexpredict.textextraction.dto.PDFPlainText
-            pdfbox_res: Dict[str, Any] = msgpack.unpack(pages_f)
+            pdfbox_res: Dict[str, Any] = msgpack.unpack(pages_f, raw=False)
 
         pages = list()
 
