@@ -67,31 +67,6 @@ services:
         max-file: 5
         max-size: 10m
 
-  tes-signal-debug:
-    image: ${TEXT_EXTRACTION_SYSTEM_IMAGE}
-    networks:
-      ${TEXT_EXTRACTION_SWARM_NETWORK}:
-    command: ["signal_debug"]
-    environment:
-      - "text_extraction_system_celery_broker=redis://${DOCKER_REDIS_HOST_NAME}:6379/0"
-      - "text_extraction_system_celery_backend=redis://${DOCKER_REDIS_HOST_NAME}:6379/0"
-      - "text_extraction_system_webdav_url=http://${DOCKER_WEBDAV_HOSTNAME}:80"
-      - "text_extraction_system_webdav_username=${DOCKER_WEBDAV_AUTH_USER}"
-      - "text_extraction_system_webdav_password=${DOCKER_WEBDAV_AUTH_PASSWORD}"
-      - "text_extraction_system_delete_temp_files_on_request_finish=${TEXT_EXTRACTION_SYSTEM_DELETE_TEMP_FILES_ON_REQUEST_FINISHED}"
-      - "text_extraction_system_keep_failed_files=${TEXT_EXTRACTION_SYSTEM_KEEP_FAILED_FILES}"
-    deploy:
-      mode: global # Exactly one instance per node. Primitive AWS autoscaling solution.
-      placement:
-        constraints: [node.role != manager]
-    stop_signal: SIGQUIT
-    stop_grace_period: 1m
-    logging:
-      driver: "json-file"
-      options:
-        max-file: 5
-        max-size: 10m
-
   tes-web-api:
     image: ${TEXT_EXTRACTION_SYSTEM_IMAGE}
     networks:
