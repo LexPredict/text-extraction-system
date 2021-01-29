@@ -46,6 +46,7 @@ RUN apt-get -y update --fix-missing && \
     chown -R -v ${SHARED_USER_NAME}:${SHARED_USER_NAME} /text_extraction_system/start.sh && \
     chmod ug+x /text_extraction_system/start.sh
 
+STOPSIGNAL SIGQUIT
 USER ${SHARED_USER_NAME}
 WORKDIR /text_extraction_system
 ENTRYPOINT ["./start.sh"]
