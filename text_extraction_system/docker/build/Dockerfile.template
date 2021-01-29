@@ -10,7 +10,7 @@ COPY ./temp/java_modules /text_extraction_system/java_modules
 ${LEXNLP_COPY_CMD}
 COPY ./temp/requirements.txt /
 COPY ./temp/.env.local_dev_example /
-COPY ./temp/start.sh /
+COPY ./temp/start.sh /text_extraction_system/
 COPY ./temp/deploy-docker-swarm /deploy-docker-swarm
 
 RUN ls -l /
@@ -23,14 +23,13 @@ RUN apt-get -y update --fix-missing && \
     apt-get install -y -q apt-utils lsb-release gcc-9 g++ software-properties-common wget apt-transport-https locales && \
 	echo "Ubuntu version: " && lsb_release -a && \
 	echo "GCC version: " && gcc-9 -v && \
-	apt-get install -y git curl htop virtualenv libpq-dev python3-dev img2pdf libreoffice maven libpoppler-dev poppler-utils && \
+	apt-get install -y git curl htop libpq-dev python3-dev python3-pip img2pdf libreoffice maven libpoppler-dev poppler-utils && \
 	locale-gen --purge  en_US en_US.UTF-8 && \
 	echo -e \'LANG="en_US.UTF-8"\nLANGUAGE="en_US:en"\n\' > /etc/default/locale && \
 	mkdir -p /text_extraction_system/models && \
 	wget https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin -O /text_extraction_system/models/lid.176.bin && \
-	virtualenv -p /usr/bin/python3 /text_extraction_system/venv && chmod ug+x /text_extraction_system/venv/bin/activate && \
-	. /text_extraction_system/venv/bin/activate && python --version && pip install -r /requirements.txt && ${LEXNLP_MASTER_INSTALL_CMD} && pip install -c /requirements.txt -e /text_extraction_system_api && deactivate && \
-    su - ${SHARED_USER_NAME} -c ". /text_extraction_system/venv/bin/activate && python -m nltk.downloader averaged_perceptron_tagger punkt stopwords words maxent_ne_chunker wordnet && deactivate" && \
+	python3 --version && pip3 install -r /requirements.txt && ${LEXNLP_MASTER_INSTALL_CMD} && pip3 install -c /requirements.txt -e /text_extraction_system_api && \
+    su - ${SHARED_USER_NAME} -c "python3 -m nltk.downloader averaged_perceptron_tagger punkt stopwords words maxent_ne_chunker wordnet" && \
     apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-ita tesseract-ocr-fra tesseract-ocr-spa tesseract-ocr-deu tesseract-ocr-rus && \
     apt-get purge -y gcc-9 g++ build-essential linux-headers* && \
 	apt-get clean autoclean && \
@@ -44,7 +43,9 @@ RUN apt-get -y update --fix-missing && \
     rm -rf /var/lib/apt/lists && \
     chown -R -v ${SHARED_USER_NAME}:${SHARED_USER_NAME} /text_extraction_system && \
     chown -R -v ${SHARED_USER_NAME}:${SHARED_USER_NAME} /lexnlp && \
-    chown -R -v ${SHARED_USER_NAME}:${SHARED_USER_NAME} /start.sh && \
-    chmod ug+x /start.sh
+    chown -R -v ${SHARED_USER_NAME}:${SHARED_USER_NAME} /text_extraction_system/start.sh && \
+    chmod ug+x /text_extraction_system/start.sh
 
-ENTRYPOINT ["/tini", "./start.sh"]
+USER ${SHARED_USER_NAME}
+WORKDIR /text_extraction_system
+ENTRYPOINT ["./start.sh"]
