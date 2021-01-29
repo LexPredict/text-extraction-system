@@ -41,11 +41,9 @@ function print_usage () {
   echo "You can use the generated Docker Swarm config to quickly get the working system."
 }
 
-PROJECT_DIR="/text_extraction_system"
-VENV_PATH="/text_extraction_system/venv/bin/activate"
-ACTIVATE_VENV="export LANG=C.UTF-8 && cd ${DOLLAR}{PROJECT_DIR} && . ${DOLLAR}{VENV_PATH} "
 CPU_CORES=${DOLLAR}(grep -c ^processor /proc/cpuinfo)
 CPU_QUARTER_CORES=${DOLLAR}(( ${DOLLAR}{CPU_CORES} > 4 ? ${DOLLAR}{CPU_CORES} / 4 : 1 ))
+SHARED_USER_NAME=$(whoami)
 
 ROLE=${DOLLAR}1
 echo "${DOLLAR}{ROLE}"
@@ -65,32 +63,26 @@ function startup () {
       done
       echo "Dependencies are ready. Starting up..."
   fi
+  ulimit -n 65535
 }
-
-pushd ${DOLLAR}{PROJECT_DIR}
-
 
 if [ "${DOLLAR}{ROLE}" == "unit_tests" ]; then
   startup
-  su ${SHARED_USER_NAME} -c "${DOLLAR}{ACTIVATE_VENV} && ulimit -n 65535 && pytest text_extraction_system"
+  exec pytest text_extraction_system
 elif [ "${DOLLAR}{ROLE}" == "signal_debug" ]; then
   startup
-  su ${SHARED_USER_NAME} -c "${DOLLAR}{ACTIVATE_VENV} && ulimit -n 65535 && python text_extraction_system/signal_debug.py"
+  exec python3 text_extraction_system/signal_debug.py
 elif [ "${DOLLAR}{ROLE}" == "web-api" ]; then
   startup
-  su ${SHARED_USER_NAME} -c "${DOLLAR}{ACTIVATE_VENV} && ulimit -n 65535 && uvicorn --host 0.0.0.0 --port 8000 text_extraction_system.web_api:app"
+  exec uvicorn --host 0.0.0.0 --port 8000 text_extraction_system.web_api:app
 elif [ "${DOLLAR}{ROLE}" == "celery-worker" ]; then
   startup
-  mkdir -p /data/celery_worker_state/db
-  chown ${SHARED_USER_NAME}:${SHARED_USER_NAME} /data/celery_worker_state/db
-  su ${SHARED_USER_NAME} -c "${DOLLAR}{ACTIVATE_VENV} && \
-   ulimit -n 65535 && \
-   celery -A text_extraction_system.tasks worker \
+   exec celery -A text_extraction_system.tasks worker \
       -l INFO \
       --concurrency=${DOLLAR}{CPU_QUARTER_CORES} \
       -Ofair \
       -n celery@%h \
-      --statedb=/data/celery_worker_state/db/celery-worker-state-${DOLLAR}{HOSTNAME}.db"
+      --statedb=/data/celery_worker_state/celery-worker-state-${DOLLAR}{HOSTNAME}.db
 elif [ "${DOLLAR}{ROLE}" == "generate-swarm-scripts" ]; then
   echo "Copying Docker Swarm deployment scripts to the mounted volume at: ${DOLLAR}{COPY_DST_DIR}..."
   if [[ ! -d /deploy_scripts_dst  ]]; then
@@ -106,7 +98,7 @@ elif [ "${DOLLAR}{ROLE}" == "generate-swarm-scripts" ]; then
 
 elif [ "${DOLLAR}{ROLE}" == "shell" ]; then
   echo "Starting bash..."
-  /bin/bash
+  exec /bin/bash
 else
   print_usage
 fi
