@@ -1,8 +1,7 @@
 FROM ${TEXT_EXTRACTION_SYSTEM_IMAGE_FROM}
 ENV DEBIAN_FRONTEND noninteractive
 ENV LANG C.UTF-8
-ADD https://github.com/krallin/tini/releases/download/v0.19.0/tini /tini
-RUN chmod +x /tini
+
 
 COPY ./temp/text_extraction_system /text_extraction_system
 COPY ./temp/text_extraction_system_api /text_extraction_system_api
@@ -41,6 +40,8 @@ RUN apt-get -y update --fix-missing && \
     rm -rf /root/.cache/pip/ && \
     rm -rf /lexpredict-contraxsuite-core/.git/ && \
     rm -rf /var/lib/apt/lists && \
+    mkdir -p /data/celery_worker_state && \
+    chown -R -v ${SHARED_USER_NAME}:${SHARED_USER_NAME} /data && \
     chown -R -v ${SHARED_USER_NAME}:${SHARED_USER_NAME} /text_extraction_system && \
     chown -R -v ${SHARED_USER_NAME}:${SHARED_USER_NAME} /lexnlp && \
     chown -R -v ${SHARED_USER_NAME}:${SHARED_USER_NAME} /text_extraction_system/start.sh && \

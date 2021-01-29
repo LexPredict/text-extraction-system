@@ -69,7 +69,7 @@ function startup () {
 if [ "${DOLLAR}{ROLE}" == "unit_tests" ]; then
   startup
   exec pytest text_extraction_system
-elif [ "${DOLLAR}{ROLE}" == "signal_debug" ]; then
+elif [ "${DOLLAR}{ROLE}" == "signal-debug" ]; then
   startup
   exec python3 text_extraction_system/signal_debug.py
 elif [ "${DOLLAR}{ROLE}" == "web-api" ]; then
