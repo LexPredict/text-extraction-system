@@ -72,6 +72,7 @@ services:
     networks:
       ${TEXT_EXTRACTION_SWARM_NETWORK}:
     command: ["web-api"]
+    stop_signal: SIGTERM
     environment:
       - "text_extraction_system_celery_broker=redis://${DOCKER_REDIS_HOST_NAME}:6379/0"
       - "text_extraction_system_celery_backend=redis://${DOCKER_REDIS_HOST_NAME}:6379/0"
