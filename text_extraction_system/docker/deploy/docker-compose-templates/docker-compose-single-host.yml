@@ -14,6 +14,12 @@ services:
       AUTH_TYPE: Basic
       USERNAME: ${DOCKER_WEBDAV_AUTH_USER}
       PASSWORD: ${DOCKER_WEBDAV_AUTH_PASSWORD}
+    sysctls:
+      net.ipv4.vs.conn_reuse_mode: 0
+      net.ipv4.vs.expire_nodest_conn: 1
+      net.ipv4.tcp_keepalive_time: 600
+      net.ipv4.tcp_keepalive_intvl: 60
+      net.ipv4.tcp_keepalive_probes: 3
     logging:
       driver: "json-file"
       options:
@@ -28,6 +34,12 @@ services:
     image: ${DOCKER_REDIS_IMAGE}
     networks:
       ${TEXT_EXTRACTION_SWARM_NETWORK}:
+    sysctls:
+      net.ipv4.vs.conn_reuse_mode: 0
+      net.ipv4.vs.expire_nodest_conn: 1
+      net.ipv4.tcp_keepalive_time: 600
+      net.ipv4.tcp_keepalive_intvl: 60
+      net.ipv4.tcp_keepalive_probes: 3
     logging:
       driver: "json-file"
       options:
@@ -44,6 +56,12 @@ services:
     image: ${TEXT_EXTRACTION_SYSTEM_IMAGE}
     networks:
       ${TEXT_EXTRACTION_SWARM_NETWORK}:
+    sysctls:
+      net.ipv4.vs.conn_reuse_mode: 0
+      net.ipv4.vs.expire_nodest_conn: 1
+      net.ipv4.tcp_keepalive_time: 600
+      net.ipv4.tcp_keepalive_intvl: 60
+      net.ipv4.tcp_keepalive_probes: 3
     command: ["celery-worker"]
     environment:
       - "text_extraction_system_celery_broker=redis://${DOCKER_REDIS_HOST_NAME}:6379/0"
@@ -69,6 +87,12 @@ services:
     image: ${TEXT_EXTRACTION_SYSTEM_IMAGE}
     networks:
       ${TEXT_EXTRACTION_SWARM_NETWORK}:
+    sysctls:
+      net.ipv4.vs.conn_reuse_mode: 0
+      net.ipv4.vs.expire_nodest_conn: 1
+      net.ipv4.tcp_keepalive_time: 600
+      net.ipv4.tcp_keepalive_intvl: 60
+      net.ipv4.tcp_keepalive_probes: 3
     command: ["web-api"]
     stop_signal: SIGTERM
     environment:
