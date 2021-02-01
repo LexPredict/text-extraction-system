@@ -7,7 +7,7 @@ echo "Image name: ${TEXT_EXTRACTION_SYSTEM_IMAGE}"
 export DOLLAR='$' # escape $ in envsubst
 
 if [[ "${INSTALL_LEXNLP_MASTER,,}" = "true" ]]; then
-    export LEXNLP_MASTER_INSTALL_CMD="&& pip install -r requirements-lexnlp.txt"
+    export LEXNLP_MASTER_INSTALL_CMD="&& pip3 install -r requirements-lexnlp.txt"
 else
     export LEXNLP_MASTER_INSTALL_CMD=""
 fi
@@ -41,7 +41,7 @@ cp ../../.env.local_dev_example ./temp
 if [[ "${LEXNLP_PROJECT_PATH}" == "" ]]; then
   echo "Will install lexnlp from its GIT repo..."
   cp ../../requirements-lexnlp.txt ./temp/
-  export LEXNLP_MASTER_INSTALL_CMD="pip install -c /requirements.txt -r /requirements-lexnlp.txt"
+  export LEXNLP_MASTER_INSTALL_CMD="pip3 install -c /requirements.txt -r /requirements-lexnlp.txt"
   export LEXNLP_COPY_CMD="COPY ./temp/requirements-lexnlp.txt /"
 else
   echo "Copying lexnlp from ${LEXNLP_PROJECT_PATH}"
@@ -53,7 +53,7 @@ else
         --exclude='/docs/' \
         --exclude='/scripts/' \
         ${LEXNLP_PROJECT_PATH}/ ./temp/lexnlp -a --copy-links -v
-  export LEXNLP_MASTER_INSTALL_CMD="pip install -c /requirements.txt -e /lexnlp"
+  export LEXNLP_MASTER_INSTALL_CMD="pip3 install -c /requirements.txt -e /lexnlp"
   export LEXNLP_COPY_CMD="COPY ./temp/lexnlp /lexnlp"
 fi
 
