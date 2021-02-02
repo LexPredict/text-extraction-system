@@ -3,6 +3,8 @@ echo "Applying setenv.sh..."
 
 export DOLLAR=$
 
+export TEXT_EXTRACTION_STACK_NAME=text_extraction
+
 export TEXT_EXTRACTION_SYSTEM_IMAGE=lexpredict/lexpredict-text-extraction-system:latest
 export TEXT_EXTRACTION_SWARM_NETWORK=contraxsuite_contrax_net
 

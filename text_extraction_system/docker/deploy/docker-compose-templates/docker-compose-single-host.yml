@@ -64,9 +64,9 @@ services:
       net.ipv4.tcp_keepalive_probes: 3
     command: ["celery-worker"]
     environment:
-      - "text_extraction_system_celery_broker=redis://${DOCKER_REDIS_HOST_NAME}:6379/0"
-      - "text_extraction_system_celery_backend=redis://${DOCKER_REDIS_HOST_NAME}:6379/0"
-      - "text_extraction_system_webdav_url=http://${DOCKER_WEBDAV_HOSTNAME}:80"
+      - "text_extraction_system_celery_broker=redis://${TEXT_EXTRACTION_STACK_NAME}.${DOCKER_REDIS_HOST_NAME}:6379/0"
+      - "text_extraction_system_celery_backend=redis://${TEXT_EXTRACTION_STACK_NAME}.${DOCKER_REDIS_HOST_NAME}:6379/0"
+      - "text_extraction_system_webdav_url=http://${TEXT_EXTRACTION_STACK_NAME}.${DOCKER_WEBDAV_HOSTNAME}:80"
       - "text_extraction_system_webdav_username=${DOCKER_WEBDAV_AUTH_USER}"
       - "text_extraction_system_webdav_password=${DOCKER_WEBDAV_AUTH_PASSWORD}"
       - "text_extraction_system_delete_temp_files_on_request_finish=${TEXT_EXTRACTION_SYSTEM_DELETE_TEMP_FILES_ON_REQUEST_FINISHED}"
@@ -96,9 +96,9 @@ services:
     command: ["web-api"]
     stop_signal: SIGTERM
     environment:
-      - "text_extraction_system_celery_broker=redis://${DOCKER_REDIS_HOST_NAME}:6379/0"
-      - "text_extraction_system_celery_backend=redis://${DOCKER_REDIS_HOST_NAME}:6379/0"
-      - "text_extraction_system_webdav_url=http://${DOCKER_WEBDAV_HOSTNAME}:80"
+      - "text_extraction_system_celery_broker=redis://${TEXT_EXTRACTION_STACK_NAME}.${DOCKER_REDIS_HOST_NAME}:6379/0"
+      - "text_extraction_system_celery_backend=redis://${TEXT_EXTRACTION_STACK_NAME}.${DOCKER_REDIS_HOST_NAME}:6379/0"
+      - "text_extraction_system_webdav_url=http://${TEXT_EXTRACTION_STACK_NAME}.${DOCKER_WEBDAV_HOSTNAME}:80"
       - "text_extraction_system_webdav_username=${DOCKER_WEBDAV_AUTH_USER}"
       - "text_extraction_system_webdav_password=${DOCKER_WEBDAV_AUTH_PASSWORD}"
       - "text_extraction_system_delete_temp_files_on_request_finish=${TEXT_EXTRACTION_SYSTEM_DELETE_TEMP_FILES_ON_REQUEST_FINISHED}"
