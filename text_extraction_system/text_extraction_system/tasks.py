@@ -139,8 +139,9 @@ def handle_errors(request_id: str, request_callback_info: RequestCallbackInfo):
         set_log_extra(request_callback_info.log_extra)
         yield
     except Exception as e:
+        log.error(f'{request_callback_info.original_file_name} | Exception caught while processing the document',
+                  exc_info=e)
         deliver_error(request_id, request_callback_info, exc=e)
-        raise e
 
 
 @celery_app.task(acks_late=True, bind=True)
