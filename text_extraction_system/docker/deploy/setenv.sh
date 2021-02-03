@@ -18,6 +18,7 @@ export DOCKER_REDIS_IMAGE=redis:6.0.9
 export DOCKER_REDIS_HOST_NAME=tes_redis
 
 export DOCKER_WEBDAV_HOSTNAME=tes_webdav
+export DOCKER_WEBDAV_PORT=8765
 export DOCKER_WEBDAV_IMAGE=bytemark/webdav:2.4
 export DOCKER_WEBDAV_AUTH_USER=$(uuidgen)
 export DOCKER_WEBDAV_AUTH_PASSWORD=$(uuidgen)

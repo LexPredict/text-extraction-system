@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     celery_broker: str
     celery_backend: str
     webdav_url: str
+    webdav_root: str
     webdav_username: str
     webdav_password: str
     java_modules_path: str = os.path.join(project_root, 'java_modules')

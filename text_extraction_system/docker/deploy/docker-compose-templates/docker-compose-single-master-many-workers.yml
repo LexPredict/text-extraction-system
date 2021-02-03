@@ -29,6 +29,11 @@ services:
       replicas: 1
       placement:
         constraints: [node.role == manager]
+    ports:
+      - mode: host
+        protocol: tcp
+        published: ${DOCKER_WEBDAV_PORT}
+        target: 80
 
   ${DOCKER_REDIS_HOST_NAME}:
     image: ${DOCKER_REDIS_IMAGE}
@@ -66,7 +71,7 @@ services:
     environment:
       - "text_extraction_system_celery_broker=redis://tasks.${DOCKER_REDIS_HOST_NAME}:6379/0"
       - "text_extraction_system_celery_backend=redis://tasks.${DOCKER_REDIS_HOST_NAME}:6379/0"
-      - "text_extraction_system_webdav_url=http://tasks.${DOCKER_WEBDAV_HOSTNAME}:80"
+      - "text_extraction_system_webdav_url=http://tasks.${DOCKER_WEBDAV_HOSTNAME}:${DOCKER_WEBDAV_PORT}"
       - "text_extraction_system_webdav_username=${DOCKER_WEBDAV_AUTH_USER}"
       - "text_extraction_system_webdav_password=${DOCKER_WEBDAV_AUTH_PASSWORD}"
       - "text_extraction_system_delete_temp_files_on_request_finish=${TEXT_EXTRACTION_SYSTEM_DELETE_TEMP_FILES_ON_REQUEST_FINISHED}"
@@ -100,7 +105,7 @@ services:
     environment:
       - "text_extraction_system_celery_broker=redis://tasks.${DOCKER_REDIS_HOST_NAME}:6379/0"
       - "text_extraction_system_celery_backend=redis://tasks.${DOCKER_REDIS_HOST_NAME}:6379/0"
-      - "text_extraction_system_webdav_url=http://tasks.${DOCKER_WEBDAV_HOSTNAME}:80"
+      - "text_extraction_system_webdav_url=http://tasks.${DOCKER_WEBDAV_HOSTNAME}:${DOCKER_WEBDAV_PORT}"
       - "text_extraction_system_webdav_username=${DOCKER_WEBDAV_AUTH_USER}"
       - "text_extraction_system_webdav_password=${DOCKER_WEBDAV_AUTH_PASSWORD}"
       - "text_extraction_system_delete_temp_files_on_request_finish=${TEXT_EXTRACTION_SYSTEM_DELETE_TEMP_FILES_ON_REQUEST_FINISHED}"
