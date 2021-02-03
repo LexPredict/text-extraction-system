@@ -17,8 +17,8 @@ export DOCKER_REDIS_HOST_NAME=tes_redis
 
 export DOCKER_WEBDAV_HOSTNAME=tes_webdav
 export DOCKER_WEBDAV_IMAGE=bytemark/webdav:2.4
-export DOCKER_WEBDAV_AUTH_USER=user
-export DOCKER_WEBDAV_AUTH_PASSWORD=password
+export DOCKER_WEBDAV_AUTH_USER=$(uuidgen)
+export DOCKER_WEBDAV_AUTH_PASSWORD=$(uuidgen)
 
 CUSTOM_SETTINGS_FILE=setenv_local.sh
 if [[ -f "${CUSTOM_SETTINGS_FILE}"  ]]; then
