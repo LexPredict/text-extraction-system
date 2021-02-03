@@ -5,6 +5,7 @@ export DOLLAR=$
 
 export TEXT_EXTRACTION_STACK_NAME=text_extraction
 
+export TEXT_EXTRACTION_SYSTEM_ROOT_PATH=/text_extraction_system
 export TEXT_EXTRACTION_SYSTEM_IMAGE=lexpredict/lexpredict-text-extraction-system:latest
 export TEXT_EXTRACTION_SWARM_NETWORK=contraxsuite_contrax_net
 
@@ -18,8 +19,8 @@ export DOCKER_REDIS_HOST_NAME=tes_redis
 
 export DOCKER_WEBDAV_HOSTNAME=tes_webdav
 export DOCKER_WEBDAV_IMAGE=bytemark/webdav:2.4
-export DOCKER_WEBDAV_AUTH_USER=user
-export DOCKER_WEBDAV_AUTH_PASSWORD=password
+export DOCKER_WEBDAV_AUTH_USER=$(uuidgen)
+export DOCKER_WEBDAV_AUTH_PASSWORD=$(uuidgen)
 
 CUSTOM_SETTINGS_FILE=setenv_local.sh
 if [[ -f "${CUSTOM_SETTINGS_FILE}"  ]]; then
