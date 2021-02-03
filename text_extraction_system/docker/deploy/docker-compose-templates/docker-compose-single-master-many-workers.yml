@@ -81,6 +81,7 @@ services:
       - "text_extraction_system_webdav_password=${DOCKER_WEBDAV_AUTH_PASSWORD}"
       - "text_extraction_system_delete_temp_files_on_request_finish=${TEXT_EXTRACTION_SYSTEM_DELETE_TEMP_FILES_ON_REQUEST_FINISHED}"
       - "text_extraction_system_keep_failed_files=${TEXT_EXTRACTION_SYSTEM_KEEP_FAILED_FILES}"
+      - "text_extraction_system_root_path=${TEXT_EXTRACTION_SYSTEM_ROOT_PATH}"
     logging:
       driver: "json-file"
       options:
