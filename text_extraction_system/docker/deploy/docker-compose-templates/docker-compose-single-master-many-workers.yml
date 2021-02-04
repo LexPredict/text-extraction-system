@@ -8,6 +8,12 @@ services:
     image: ${DOCKER_WEBDAV_IMAGE}
     networks:
       ${TEXT_EXTRACTION_SWARM_NETWORK}:
+    sysctls:
+      net.ipv4.vs.conn_reuse_mode: 0
+      net.ipv4.vs.expire_nodest_conn: 1
+      net.ipv4.tcp_keepalive_time: 600
+      net.ipv4.tcp_keepalive_intvl: 60
+      net.ipv4.tcp_keepalive_probes: 3
     volumes:
       - file_storage:/var/lib/dav
     environment:   # No need for auth - in prod envs the server is not accessible from outside of our network
@@ -23,11 +29,26 @@ services:
       replicas: 1
       placement:
         constraints: [node.role == manager]
+    ports:
+      # We publish the webdav service into the host network to avoid occasional problems
+      # with Docker Swarm virtual network / routing under high load.
+      # See webdav url for web api and celery - they use the host ip of the node on which
+      # the deployment script is executed.
+      - mode: host
+        protocol: tcp
+        published: ${DOCKER_WEBDAV_PORT}
+        target: 80
 
   ${DOCKER_REDIS_HOST_NAME}:
     image: ${DOCKER_REDIS_IMAGE}
     networks:
       ${TEXT_EXTRACTION_SWARM_NETWORK}:
+    sysctls:
+      net.ipv4.vs.conn_reuse_mode: 0
+      net.ipv4.vs.expire_nodest_conn: 1
+      net.ipv4.tcp_keepalive_time: 600
+      net.ipv4.tcp_keepalive_intvl: 60
+      net.ipv4.tcp_keepalive_probes: 3
     logging:
       driver: "json-file"
       options:
@@ -44,11 +65,17 @@ services:
     image: ${TEXT_EXTRACTION_SYSTEM_IMAGE}
     networks:
       ${TEXT_EXTRACTION_SWARM_NETWORK}:
+    sysctls:
+      net.ipv4.vs.conn_reuse_mode: 0
+      net.ipv4.vs.expire_nodest_conn: 1
+      net.ipv4.tcp_keepalive_time: 600
+      net.ipv4.tcp_keepalive_intvl: 60
+      net.ipv4.tcp_keepalive_probes: 3
     command: ["celery-worker"]
     environment:
-      - "text_extraction_system_celery_broker=redis://${DOCKER_REDIS_HOST_NAME}:6379/0"
-      - "text_extraction_system_celery_backend=redis://${DOCKER_REDIS_HOST_NAME}:6379/0"
-      - "text_extraction_system_webdav_url=http://${DOCKER_WEBDAV_HOSTNAME}:80"
+      - "text_extraction_system_celery_broker=redis://tasks.${DOCKER_REDIS_HOST_NAME}:6379/0"
+      - "text_extraction_system_celery_backend=redis://tasks.${DOCKER_REDIS_HOST_NAME}:6379/0"
+      - "text_extraction_system_webdav_url=http://${DOCKER_MASTER_NODE_IP}:${DOCKER_WEBDAV_PORT}"
       - "text_extraction_system_webdav_username=${DOCKER_WEBDAV_AUTH_USER}"
       - "text_extraction_system_webdav_password=${DOCKER_WEBDAV_AUTH_PASSWORD}"
       - "text_extraction_system_delete_temp_files_on_request_finish=${TEXT_EXTRACTION_SYSTEM_DELETE_TEMP_FILES_ON_REQUEST_FINISHED}"
@@ -71,16 +98,23 @@ services:
     image: ${TEXT_EXTRACTION_SYSTEM_IMAGE}
     networks:
       ${TEXT_EXTRACTION_SWARM_NETWORK}:
+    sysctls:
+      net.ipv4.vs.conn_reuse_mode: 0
+      net.ipv4.vs.expire_nodest_conn: 1
+      net.ipv4.tcp_keepalive_time: 600
+      net.ipv4.tcp_keepalive_intvl: 60
+      net.ipv4.tcp_keepalive_probes: 3
     command: ["web-api"]
     stop_signal: SIGTERM
     environment:
-      - "text_extraction_system_celery_broker=redis://${DOCKER_REDIS_HOST_NAME}:6379/0"
-      - "text_extraction_system_celery_backend=redis://${DOCKER_REDIS_HOST_NAME}:6379/0"
-      - "text_extraction_system_webdav_url=http://${DOCKER_WEBDAV_HOSTNAME}:80"
+      - "text_extraction_system_celery_broker=redis://tasks.${DOCKER_REDIS_HOST_NAME}:6379/0"
+      - "text_extraction_system_celery_backend=redis://tasks.${DOCKER_REDIS_HOST_NAME}:6379/0"
+      - "text_extraction_system_webdav_url=http://${DOCKER_MASTER_NODE_IP}:${DOCKER_WEBDAV_PORT}"
       - "text_extraction_system_webdav_username=${DOCKER_WEBDAV_AUTH_USER}"
       - "text_extraction_system_webdav_password=${DOCKER_WEBDAV_AUTH_PASSWORD}"
       - "text_extraction_system_delete_temp_files_on_request_finish=${TEXT_EXTRACTION_SYSTEM_DELETE_TEMP_FILES_ON_REQUEST_FINISHED}"
       - "text_extraction_system_keep_failed_files=${TEXT_EXTRACTION_SYSTEM_KEEP_FAILED_FILES}"
+      - "text_extraction_system_root_path=${TEXT_EXTRACTION_SYSTEM_ROOT_PATH}"
     logging:
       driver: "json-file"
       options:

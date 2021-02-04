@@ -22,7 +22,7 @@ RUN apt-get -y update --fix-missing && \
     apt-get install -y -q apt-utils lsb-release gcc-9 g++ software-properties-common wget apt-transport-https locales && \
 	echo "Ubuntu version: " && lsb_release -a && \
 	echo "GCC version: " && gcc-9 -v && \
-	apt-get install -y git curl htop libpq-dev python3-dev python3-pip img2pdf libreoffice maven libpoppler-dev poppler-utils && \
+	apt-get install -y git curl htop python3-dev python3-pip libreoffice dnsutils iputils-ping && \
 	locale-gen --purge  en_US en_US.UTF-8 && \
 	echo -e \'LANG="en_US.UTF-8"\nLANGUAGE="en_US:en"\n\' > /etc/default/locale && \
 	mkdir -p /text_extraction_system/models && \

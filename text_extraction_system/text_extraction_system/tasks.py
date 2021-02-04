@@ -139,8 +139,9 @@ def handle_errors(request_id: str, request_callback_info: RequestCallbackInfo):
         set_log_extra(request_callback_info.log_extra)
         yield
     except Exception as e:
+        log.error(f'{request_callback_info.original_file_name} | Exception caught while processing the document',
+                  exc_info=e)
         deliver_error(request_id, request_callback_info, exc=e)
-        raise e
 
 
 @celery_app.task(acks_late=True, bind=True)
@@ -202,7 +203,7 @@ def process_pdf(pdf_fn: str,
 
         log.info(f'{req.original_file_name} | Scheduling {len(task_signatures)} sub-tasks...')
         c = chord(task_signatures)(finish_pdf_processing
-                                   .s(req.request_id, req.request_callback_info)
+                                   .s(req.request_id, req.original_file_name, req.request_callback_info)
                                    .set(link_error=[ocr_error_callback.s(req.request_id,
                                                                          req.request_callback_info)]))
         register_task_id(webdav_client, req.request_id, c.id)
@@ -269,13 +270,13 @@ def ocr_error_callback(task, some_id: str, request_id: str, req_callback_info: R
 def finish_pdf_processing(task,
                           _ocred_page_nums: List[int],
                           request_id: str,
+                          original_file_name: str,
                           req_callback_info: RequestCallbackInfo):
     with handle_errors(request_id, req_callback_info):
         req: RequestMetadata = load_request_metadata(request_id)
         if not req:
-            log.info(f'{req.original_file_name} | Not re-combining OCR-ed pdf blocks and not '
-                     f'processing the data extraction '
-                     f'for request {request_id}'
+            log.info(f'{original_file_name} | Not re-combining OCR-ed pdf blocks and not '
+                     f'processing the data extraction for request {request_id}.\n'
                      f'Request files do not exist. Probably the request was already canceled.')
             return False
         log.info(f'{req.original_file_name} | Re-combining OCR-ed pdf blocks and processing the '
