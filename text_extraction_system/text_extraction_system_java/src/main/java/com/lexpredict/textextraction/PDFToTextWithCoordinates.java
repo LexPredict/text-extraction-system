@@ -173,7 +173,9 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         super.writeString(text, textPositions);
         if (textPositions != null) {
             for (TextPosition pos : textPositions) {
-                this.charBBoxesWithPageNums.add(new double[]{r(pos.getX()), r(pos.getY()),
+                this.charBBoxesWithPageNums.add(new double[]{
+                        getCurrentPageNo(),
+                        r(pos.getX()), r(pos.getY()),
                         r(pos.getWidth()), r(pos.getHeight())});
             }
         }
@@ -182,7 +184,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     protected void addNonPrintableCharBoxes(String nonPrintableText) {
         if (nonPrintableText != null && !nonPrintableText.isEmpty()) {
             for (int i = 0; i < nonPrintableText.length(); i++) {
-                this.charBBoxesWithPageNums.add(null);
+                this.charBBoxesWithPageNums.add(new double[] {getCurrentPageNo(), 0, 0, 0, 0});
             }
         }
     }
