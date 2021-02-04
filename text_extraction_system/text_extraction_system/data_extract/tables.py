@@ -33,7 +33,7 @@ def get_table_dtos_from_camelot_output(camelot_tables: Iterable[CamelotTable],
                 width=t.cells[-1][-1].x2 - t.cells[0][0].x1,
                 height=t.cells[0][0].y2 - t.cells[-1][-1].y1
             ),
-            page=t.page + 1
+            page=t.page
         ) for t in camelot_tables  # type: CamelotTable
         if t.accuracy > accuracy_threshold and len(t.cells) > 0 and len(t.cells[0]) > 0
     ]
@@ -47,7 +47,7 @@ def get_table_dtos_from_camelot_output(camelot_tables: Iterable[CamelotTable],
                 width=t.cells[-1][-1].x2 - t.cells[0][0].x1,
                 height=t.cells[0][0].y2 - t.cells[-1][-1].y1
             ),
-            page=t.page + 1
+            page=t.page
         ) for t in camelot_tables  # type: CamelotTable
         if t.accuracy > accuracy_threshold and len(t.cells) > 0 and len(t.cells[0]) > 0
     ]

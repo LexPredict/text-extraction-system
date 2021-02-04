@@ -139,8 +139,8 @@ def test_split_pdf_file_names6():
 
 def test_merge_pdf_pages():
     orig_pdf = os.path.join(data_dir, 'pdf_text_4_pages.pdf')
-    repl_pages = {1: os.path.join(data_dir, 'replacement_page.pdf'),
-                  3: os.path.join(data_dir, 'smile.pdf')}
+    repl_pages = {2: os.path.join(data_dir, 'replacement_page.pdf'),
+                  4: os.path.join(data_dir, 'smile.pdf')}
     should_be_deleted = list()
     with merge_pdf_pages(orig_pdf, repl_pages) as pdf_fn:
         should_be_deleted.append(pdf_fn)
