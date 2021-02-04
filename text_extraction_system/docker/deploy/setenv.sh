@@ -23,6 +23,8 @@ export DOCKER_WEBDAV_IMAGE=bytemark/webdav:2.4
 export DOCKER_WEBDAV_AUTH_USER=$(uuidgen)
 export DOCKER_WEBDAV_AUTH_PASSWORD=$(uuidgen)
 
+export DOCKER_MASTER_NODE_IP=$(docker node inspect self --format '{{ .Status.Addr  }}')
+
 CUSTOM_SETTINGS_FILE=setenv_local.sh
 if [[ -f "${CUSTOM_SETTINGS_FILE}"  ]]; then
   echo "Applying ${CUSTOM_SETTINGS_FILE}..."
