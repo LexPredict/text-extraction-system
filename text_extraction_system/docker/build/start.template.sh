@@ -74,7 +74,7 @@ elif [ "${DOLLAR}{ROLE}" == "signal-debug" ]; then
   exec python3 text_extraction_system/signal_debug.py
 elif [ "${DOLLAR}{ROLE}" == "web-api" ]; then
   startup
-  exec uvicorn --host 0.0.0.0 --port 8000 --root-path ${DOLLAR}{text_extraction_system_root_path} text_extraction_system.web_api:app
+  exec uvicorn --host 0.0.0.0 --port 8000 text_extraction_system.web_api:app
 elif [ "${DOLLAR}{ROLE}" == "celery-worker" ]; then
   startup
    exec celery -A text_extraction_system.tasks worker \
