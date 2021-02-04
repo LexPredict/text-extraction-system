@@ -181,7 +181,7 @@ def merge_pdf_pages(original_pdf_fn: str, replace_page_num_to_page_pdf_fn: Dict[
         with pikepdf.open(original_pdf_fn) as pdf:  # type: pikepdf.Pdf
             dst_pdf: pikepdf.Pdf = pikepdf.new()
             for n, page in enumerate(pdf.pages):
-                replace_pdf_fn: str = replace_page_num_to_page_pdf_fn.get(n)
+                replace_pdf_fn: str = replace_page_num_to_page_pdf_fn.get(n + 1)
                 if not replace_pdf_fn:
                     dst_pdf.pages.append(page)
                 else:

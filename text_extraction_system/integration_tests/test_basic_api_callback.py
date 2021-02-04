@@ -185,3 +185,38 @@ def test_eternal_recursion():
                                          call_back_additional_info='hello world',
                                          log_extra={'hello': 'world', 'test': True})
     srv.wait_for_test_results(600)
+
+
+def test_proper_page_merge_in():
+    fn = os.path.join(os.path.dirname(__file__), 'data', 'apache2_license_partially_images.odt')
+    client = TextExtractionSystemWebClient(test_settings.api_url)
+
+    def assert_func(rfile, headers):
+        log.info('Text extraction results are ready...')
+        rs: RequestStatus = RequestStatus.from_json(rfile)
+        assert rs.status == 'DONE'
+        assert os.path.basename(fn) == rs.original_file_name
+        assert rs.converted_cleaned_pdf
+        assert rs.plain_text_extracted
+        assert rs.plain_text_structure_extracted
+        assert rs.additional_info == 'hello world'
+
+        text = client.get_plain_text(rs.request_id)
+        text_struct: PlainTextStructure = client.get_plain_text_structure(rs.request_id)
+        assert len(text_struct.pages) == 4
+        assert 'REPRODUCTION, AND DISTRIBUTION' in text  # page 1
+        assert 'subsequently incorporated' in text  # page 2
+        assert 'conditions stated in this License. ' in text  # page 3
+        assert 'See the License for the specific language governing' in text  # page 4
+
+        log.info('Text extraction results look good. All assertions passed.')
+
+    srv = DocumentCallbackServer(bind_host=test_settings.call_back_server_bind_host,
+                                 bind_port=test_settings.call_back_server_bind_port,
+                                 test_func=assert_func)
+
+    client.schedule_data_extraction_task(fn,
+                                         call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
+                                         call_back_additional_info='hello world',
+                                         log_extra={'hello': 'world', 'test': True})
+    srv.wait_for_test_results(120)
