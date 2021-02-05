@@ -13,6 +13,7 @@ import requests
 from camelot.core import Table as CamelotTable
 from celery import Celery, chord
 from celery.signals import after_setup_logger, worker_process_init
+from webdav3.exceptions import RemoteResourceNotFound
 
 from text_extraction_system.celery_log import JSONFormatter, set_log_extra
 from text_extraction_system.config import get_settings
@@ -102,7 +103,14 @@ def register_task_id(webdav_client: WebDavClient, request_id: str, task_id: str)
 
 
 def get_request_task_ids(webdav_client: WebDavClient, request_id: str) -> List[str]:
-    return [s.strip('/') for s in webdav_client.list(f'{request_id}/{task_ids}')]
+    try:
+        return [s.strip('/') for s in webdav_client.list(f'{request_id}/{task_ids}')]
+    except RemoteResourceNotFound:
+        metadata = load_request_metadata(request_id)
+        if metadata is None:
+            # the upload task was purged. Don't complain on missing request data
+            return []
+        raise
 
 
 def deliver_error(request_id: str,
