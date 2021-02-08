@@ -47,11 +47,14 @@ def test_basic_api_call_back():
                                  bind_port=test_settings.call_back_server_bind_port,
                                  test_func=assert_func)
 
-    client.schedule_data_extraction_task(fn,
-                                         call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
-                                         call_back_additional_info='hello world',
-                                         log_extra={'hello': 'world', 'test': True})
+    request_id = client.schedule_data_extraction_task(fn,
+                                                      call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
+                                                      call_back_additional_info='hello world',
+                                                      log_extra={'hello': 'world', 'test': True})
     srv.wait_for_test_results(120)
+
+    # the following additionally tests if we are able to delete directories
+    client.delete_data_extraction_task_files(request_id)
 
 
 def test_basic_api_call_back_tables():

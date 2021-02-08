@@ -90,7 +90,7 @@ async def purge_text_extraction_task(request_id: str):
             problems[task_id] = HumanReadableTraceBackException \
                 .from_exception(ex) \
                 .human_readable_format()
-    get_webdav_client().clean(f'{request_id}')
+    get_webdav_client().clean(f'{request_id}/')
     return TaskCancelResult(request_id=request_id,
                             task_ids=celery_task_ids,
                             successfully_revoked=success,
@@ -146,7 +146,7 @@ async def get_searchable_pdf(request_id: str):
 
 @app.delete('/api/v1/data_extraction_tasks/{request_id}/results/')
 async def delete_request_files(request_id: str):
-    get_webdav_client().clean(f'{request_id}')
+    get_webdav_client().clean(f'{request_id}/')
 
 
 @app.get('/api/v1/system_info.json', response_model=SystemInfo)
