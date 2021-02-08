@@ -5,12 +5,6 @@
 set -e
 source setenv.sh
 
-# build nginx-based webdav image locally
-# (it is small and has almost nothing to push to dockerhub)
-pushd nginx-webdav
-./prepare-image.sh
-popd
-
 mkdir -p ./temp
 echo "Starting with docker-compose config: ${DOCKER_COMPOSE_FILE}"
 envsubst < ./docker-compose-templates/${DOCKER_COMPOSE_FILE} > ./temp/${DOCKER_COMPOSE_FILE}
