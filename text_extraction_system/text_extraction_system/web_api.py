@@ -9,6 +9,7 @@ from zipfile import ZipFile
 
 import pandas
 from fastapi import FastAPI, File, UploadFile, Form, Response
+from webdav3.exceptions import RemoteResourceNotFound
 
 from text_extraction_system import version
 from text_extraction_system.celery_log import HumanReadableTraceBackException
@@ -91,6 +92,11 @@ async def purge_text_extraction_task(request_id: str):
                 .from_exception(ex) \
                 .human_readable_format()
     get_webdav_client().clean(f'{request_id}/')
+    try:
+        get_webdav_client().clean(f'{request_id}/')
+    except RemoteResourceNotFound:
+        problems[''] = f'Request "{request_id}" is not instantiated on WebDAV'
+
     return TaskCancelResult(request_id=request_id,
                             task_ids=celery_task_ids,
                             successfully_revoked=success,
