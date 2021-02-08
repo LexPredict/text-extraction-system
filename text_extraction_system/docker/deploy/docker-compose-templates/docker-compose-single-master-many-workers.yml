@@ -15,7 +15,7 @@ services:
       net.ipv4.tcp_keepalive_intvl: 60
       net.ipv4.tcp_keepalive_probes: 3
     volumes:
-      - file_storage:/var/lib/dav
+      - webdav_file_storage:/data
     environment:   # No need for auth - in prod envs the server is not accessible from outside of our network
       AUTH_TYPE: Basic
       USERNAME: ${DOCKER_WEBDAV_AUTH_USER}
@@ -128,7 +128,7 @@ services:
       - 8000:8000
 
 volumes:
-  file_storage:
+  webdav_file_storage:
   redis_data:
   celery_worker_state:
 
