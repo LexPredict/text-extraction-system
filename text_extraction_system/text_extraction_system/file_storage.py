@@ -19,6 +19,7 @@ class WebDavClient(Client):
             'webdav_hostname': settings.webdav_url,
             'webdav_login': settings.webdav_username,
             'webdav_password': settings.webdav_password,
+            'disable_check': True
         })
 
     def unpickle(self, remote_path: str) -> Any:
