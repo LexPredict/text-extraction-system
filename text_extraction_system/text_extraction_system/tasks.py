@@ -172,7 +172,8 @@ def process_document(task, request_id: str, request_callback_info: RequestCallba
                 with convert_to_pdf(fn, timeout_sec=req.convert_to_pdf_timeout_sec) \
                         as local_converted_pdf_fn:
                     req.converted_to_pdf = os.path.splitext(req.original_document)[0] + '.converted.pdf'
-                    webdav_client.upload(f'{request_id}/{req.converted_to_pdf}', local_converted_pdf_fn)
+                    webdav_client.upload_file(remote_path=f'{request_id}/{req.converted_to_pdf}',
+                                              local_path=local_converted_pdf_fn)
                     save_request_metadata(req)
                     process_pdf(local_converted_pdf_fn, req, webdav_client)
         return True
@@ -200,7 +201,7 @@ def process_pdf(pdf_fn: str,
         for pdf_page_fn in pdf_page_fns:
             i += 1
             pdf_page_base_fn = os.path.basename(pdf_page_fn)
-            webdav_client.upload(f'{req.request_id}/{pages_for_processing}/{pdf_page_base_fn}',
+            webdav_client.upload_file(f'{req.request_id}/{pages_for_processing}/{pdf_page_base_fn}',
                                  pdf_page_fn)
             task_signatures.append(process_pdf_page_task.s(req.request_id,
                                                            req.original_file_name,
@@ -256,8 +257,8 @@ def process_pdf_page_task(_task,
                                   ocr_enabled=req.ocr_enable,
                                   ocr_language=ocr_language) as page_proc_res:  # type: PDFPageProcessingResults
                 if page_proc_res.page_requires_ocr:
-                    webdav_client.upload(f'{req.request_id}/{pages_ocred}/{page_num_to_fn(page_number)}.pdf',
-                                         page_proc_res.ocred_page_fn)
+                    webdav_client.upload_file(remote_path=f'{req.request_id}/{pages_ocred}/{page_num_to_fn(page_number)}.pdf',
+                                         local_path=page_proc_res.ocred_page_fn)
                 if page_proc_res.camelot_tables:
                     webdav_client.pickle(page_proc_res.camelot_tables,
                                          f'{req.request_id}/{pages_tables}/{page_num_to_fn(page_number)}.pickle')
@@ -308,7 +309,7 @@ def finish_pdf_processing(task,
             for remote_base_fn in webdav_client.list(f'{request_id}/{pages_ocred}'):
                 remote_page_pdf_fn = f'{req.request_id}/{pages_ocred}/{remote_base_fn}'
                 local_page_pdf_fn = os.path.join(pages_dir, remote_base_fn)
-                webdav_client.download(remote_page_pdf_fn, local_page_pdf_fn)
+                webdav_client.download_file(remote_page_pdf_fn, local_page_pdf_fn)
                 page_num = int(os.path.splitext(remote_base_fn)[0])
                 repl_page_num_to_fn[page_num] = local_page_pdf_fn
 
@@ -316,10 +317,10 @@ def finish_pdf_processing(task,
                 original_pdf_in_storage = req.converted_to_pdf or req.original_document
                 local_orig_pdf_fn = os.path.join(temp_dir, original_pdf_in_storage)
 
-                webdav_client.download(f'{req.request_id}/{original_pdf_in_storage}', local_orig_pdf_fn)
+                webdav_client.download_file(f'{req.request_id}/{original_pdf_in_storage}', local_orig_pdf_fn)
                 with merge_pdf_pages(local_orig_pdf_fn, repl_page_num_to_fn) as local_merged_pdf_fn:
                     req.ocred_pdf = os.path.splitext(original_pdf_in_storage)[0] + '.ocred.pdf'
-                    webdav_client.upload(f'{req.request_id}/{req.ocred_pdf}', local_merged_pdf_fn)
+                    webdav_client.upload_file(f'{req.request_id}/{req.ocred_pdf}', local_merged_pdf_fn)
                     extract_data_and_finish(req, webdav_client, local_merged_pdf_fn, camelot_tables_total)
             else:
                 remote_fn = req.converted_to_pdf or req.original_document
@@ -360,9 +361,9 @@ def extract_data_and_finish(req: RequestMetadata,
         if req.ocred_pdf and req.ocred_pdf != req.pdf_file:
             webdav_client.clean(f'{req.request_id}/{req.ocred_pdf}')
         if req.pages_for_ocr:
-            webdav_client.clean(f'{req.request_id}/{pages_for_processing}')
-            webdav_client.clean(f'{req.request_id}/{pages_ocred}')
-            webdav_client.clean(f'{req.request_id}/{pages_tables}')
+            webdav_client.clean(f'{req.request_id}/{pages_for_processing}/')
+            webdav_client.clean(f'{req.request_id}/{pages_ocred}/')
+            webdav_client.clean(f'{req.request_id}/{pages_tables}/')
 
     req.status = STATUS_DONE
 
