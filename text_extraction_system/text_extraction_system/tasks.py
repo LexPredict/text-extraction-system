@@ -360,9 +360,9 @@ def extract_data_and_finish(req: RequestMetadata,
         if req.ocred_pdf and req.ocred_pdf != req.pdf_file:
             webdav_client.clean(f'{req.request_id}/{req.ocred_pdf}')
         if req.pages_for_ocr:
-            webdav_client.clean(f'{req.request_id}/{pages_for_processing}')
-            webdav_client.clean(f'{req.request_id}/{pages_ocred}')
-            webdav_client.clean(f'{req.request_id}/{pages_tables}')
+            webdav_client.clean(f'{req.request_id}/{pages_for_processing}/')
+            webdav_client.clean(f'{req.request_id}/{pages_ocred}/')
+            webdav_client.clean(f'{req.request_id}/{pages_tables}/')
 
     req.status = STATUS_DONE
 
