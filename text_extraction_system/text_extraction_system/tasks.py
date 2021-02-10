@@ -1,5 +1,4 @@
 import json
-import json
 import logging
 import os
 import pickle
@@ -12,12 +11,13 @@ import pycountry
 import requests
 from camelot.core import Table as CamelotTable
 from celery import Celery, chord
-from celery.signals import after_setup_logger, worker_process_init
+from celery.signals import after_setup_logger, worker_process_init, before_task_publish, task_success, task_failure, \
+    task_revoked
 from webdav3.exceptions import RemoteResourceNotFound
 
 from text_extraction_system.celery_log import JSONFormatter, set_log_extra
 from text_extraction_system.config import get_settings
-from text_extraction_system.constants import pages_ocred, task_ids, pages_for_processing, pages_tables
+from text_extraction_system.constants import pages_ocred, task_ids, pages_for_processing, pages_tables, tasks_pending, queue_celery_beat
 from text_extraction_system.data_extract.data_extract import extract_text_and_structure, process_pdf_page, \
     PDFPageProcessingResults
 from text_extraction_system.data_extract.tables import get_table_dtos_from_camelot_output
@@ -28,6 +28,8 @@ from text_extraction_system.request_metadata import RequestCallbackInfo, Request
     save_request_metadata, \
     load_request_metadata
 from text_extraction_system.result_delivery.celery_client import send_task
+from text_extraction_system.task_health.task_health import store_pending_task_info_in_webdav, \
+    remove_pending_task_info_from_webdav, re_schedule_unknown_pending_tasks
 from text_extraction_system_api.dto import RequestStatus
 from text_extraction_system_api.dto import STATUS_FAILURE, STATUS_PENDING, STATUS_DONE
 
@@ -37,6 +39,9 @@ celery_app = Celery(
     'celery_app',
     backend=settings.celery_backend,
     broker=settings.celery_broker,
+    task_serializer='pickle',
+    result_serializer='pickle',
+    accept_content=['application/json', 'application/x-python-serialize']
 )
 
 celery_app.conf.update(task_track_started=True)
@@ -45,6 +50,13 @@ celery_app.conf.update(accept_content=['pickle', 'json'])
 celery_app.conf.update(task_acks_late=True)
 celery_app.conf.update(task_reject_on_worker_lost=True)
 celery_app.conf.update(worker_prefetch_multiplier=1)
+
+
+def init_task_tracking(*args, **kwargs):
+    get_webdav_client().mkdir(tasks_pending)
+
+
+init_task_tracking()
 
 log = logging.getLogger(__name__)
 
@@ -96,6 +108,43 @@ def setup_loggers(*args, **kwargs):
     pdfpage_log.setLevel(logging.WARNING)
     pdfdocument_log.setLevel(logging.WARNING)
     converter_log.setLevel(logging.WARNING)
+
+
+@before_task_publish.connect
+def on_before_task_publish(sender,
+                           body,
+                           exchange,
+                           routing_key,
+                           headers,
+                           properties,
+                           declare,
+                           retry_policy, *args, **kwargs):
+    log.info(f'Registering task: #{headers["id"]} - {headers["task"]}')
+    store_pending_task_info_in_webdav(body=body,
+                                      exchange=exchange,
+                                      routing_key=routing_key,
+                                      headers=headers,
+                                      properties=properties,
+                                      declare=declare,
+                                      retry_policy=retry_policy)
+
+
+@task_success.connect
+def on_task_success(sender, *args, **kwargs):
+    log.info(f'Unregistering on task_success: #{sender.request.id} - {sender.request.task}')
+    remove_pending_task_info_from_webdav(sender.request.id, sender.request.task)
+
+
+@task_failure.connect
+def on_task_failure(sender, *args, **kwargs):
+    log.info(f'Unregistering on task_failure: #{sender.request.id} - {sender.request.task}')
+    remove_pending_task_info_from_webdav(sender.request.id, sender.request.task)
+
+
+@task_revoked.connect
+def task_post_run(task_id: str, task: str, *args, **kwargs):
+    log.info(f'Unregistering on task_revoked: #{task_id} - {task}')
+    remove_pending_task_info_from_webdav(task_id, task)
 
 
 def register_task_id(webdav_client: WebDavClient, request_id: str, task_id: str):
@@ -202,7 +251,7 @@ def process_pdf(pdf_fn: str,
             i += 1
             pdf_page_base_fn = os.path.basename(pdf_page_fn)
             webdav_client.upload_file(f'{req.request_id}/{pages_for_processing}/{pdf_page_base_fn}',
-                                 pdf_page_fn)
+                                      pdf_page_fn)
             task_signatures.append(process_pdf_page_task.s(req.request_id,
                                                            req.original_file_name,
                                                            pdf_page_base_fn,
@@ -257,8 +306,9 @@ def process_pdf_page_task(_task,
                                   ocr_enabled=req.ocr_enable,
                                   ocr_language=ocr_language) as page_proc_res:  # type: PDFPageProcessingResults
                 if page_proc_res.page_requires_ocr:
-                    webdav_client.upload_file(remote_path=f'{req.request_id}/{pages_ocred}/{page_num_to_fn(page_number)}.pdf',
-                                         local_path=page_proc_res.ocred_page_fn)
+                    webdav_client.upload_file(
+                        remote_path=f'{req.request_id}/{pages_ocred}/{page_num_to_fn(page_number)}.pdf',
+                        local_path=page_proc_res.ocred_page_fn)
                 if page_proc_res.camelot_tables:
                     webdav_client.pickle(page_proc_res.camelot_tables,
                                          f'{req.request_id}/{pages_tables}/{page_num_to_fn(page_number)}.pickle')
@@ -405,3 +455,14 @@ def deliver_results(req: RequestCallbackInfo, req_status: RequestStatus):
                       f'task_name: {req.call_back_celery_task_name}\n', exc_info=err)
 
     log.info(f'{req.original_file_name} | Finished processing request (#{req.request_id}).')
+
+
+@celery_app.task(acks_late=True, bind=True, queue=queue_celery_beat)
+def check_task_health(task):
+    re_schedule_unknown_pending_tasks(log=log)
+
+
+@celery_app.on_after_configure.connect
+def setup_periodic_tasks(sender, **kwargs):
+    log.info('Scheduling periodic task health checking...')
+    sender.add_periodic_task(schedule=30.0, sig=check_task_health.s(), name='Check task health')

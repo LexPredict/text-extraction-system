@@ -170,7 +170,7 @@ class JSONFormatter(json_log_formatter.JSONFormatter):
                 'log_task_id': task.request.id,
                 'log_task_name': task.name
             })
-            log_extra = getattr(task, 'log_extra')
+            log_extra = getattr(task, 'log_extra', None)
             if log_extra:
                 res.update(log_extra)
 

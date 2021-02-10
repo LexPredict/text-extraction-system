@@ -5,3 +5,7 @@ pages_for_processing = 'pages_for_processing'
 pages_tables = 'pages_tables'
 from_original_doc = 'from_original_doc.pickle'
 task_ids = 'task_ids'
+
+tasks_pending = 'tasks_pending'
+queue_celery_beat = 'beat'
+
