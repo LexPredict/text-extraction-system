@@ -78,11 +78,22 @@ elif [ "${DOLLAR}{ROLE}" == "web-api" ]; then
 elif [ "${DOLLAR}{ROLE}" == "celery-worker" ]; then
   startup
    exec celery -A text_extraction_system.tasks worker \
+      -Q default \
       -l INFO \
       --concurrency=${DOLLAR}{CPU_QUARTER_CORES} \
       -Ofair \
       -n celery@%h \
       --statedb=/data/celery_worker_state/celery-worker-state-${DOLLAR}{HOSTNAME}.db
+elif [ "${DOLLAR}{ROLE}" == "celery-beat" ]; then
+  startup
+   exec celery -A text_extraction_system.tasks worker \
+      -B \
+      -Q beat \
+      -l INFO \
+      --concurrency=1 \
+      -Ofair \
+      -n beat@%h \
+      --statedb=/data/celery_worker_state/celery-beat-state-${DOLLAR}{HOSTNAME}.db
 elif [ "${DOLLAR}{ROLE}" == "generate-swarm-scripts" ]; then
   echo "Copying Docker Swarm deployment scripts to the mounted volume at: ${DOLLAR}{COPY_DST_DIR}..."
   if [[ ! -d /deploy_scripts_dst  ]]; then
