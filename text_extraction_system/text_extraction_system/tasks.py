@@ -17,7 +17,8 @@ from webdav3.exceptions import RemoteResourceNotFound
 
 from text_extraction_system.celery_log import JSONFormatter, set_log_extra
 from text_extraction_system.config import get_settings
-from text_extraction_system.constants import pages_ocred, task_ids, pages_for_processing, pages_tables, tasks_pending, queue_celery_beat
+from text_extraction_system.constants import pages_ocred, task_ids, pages_for_processing, pages_tables, \
+    queue_celery_beat
 from text_extraction_system.data_extract.data_extract import extract_text_and_structure, process_pdf_page, \
     PDFPageProcessingResults
 from text_extraction_system.data_extract.tables import get_table_dtos_from_camelot_output
@@ -29,9 +30,8 @@ from text_extraction_system.request_metadata import RequestCallbackInfo, Request
     load_request_metadata
 from text_extraction_system.result_delivery.celery_client import send_task
 from text_extraction_system.task_health.task_health import store_pending_task_info_in_webdav, \
-    remove_pending_task_info_from_webdav, re_schedule_unknown_pending_tasks
-from text_extraction_system_api.dto import RequestStatus
-from text_extraction_system_api.dto import STATUS_FAILURE, STATUS_PENDING, STATUS_DONE
+    remove_pending_task_info_from_webdav, re_schedule_unknown_pending_tasks, init_task_tracking
+from text_extraction_system_api.dto import RequestStatus, STATUS_FAILURE, STATUS_PENDING, STATUS_DONE
 
 settings = get_settings()
 
@@ -50,11 +50,6 @@ celery_app.conf.update(accept_content=['pickle', 'json'])
 celery_app.conf.update(task_acks_late=True)
 celery_app.conf.update(task_reject_on_worker_lost=True)
 celery_app.conf.update(worker_prefetch_multiplier=1)
-
-
-def init_task_tracking(*args, **kwargs):
-    get_webdav_client().mkdir(tasks_pending)
-
 
 init_task_tracking()
 
