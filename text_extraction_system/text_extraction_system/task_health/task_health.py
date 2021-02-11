@@ -74,6 +74,7 @@ def re_schedule_unknown_pending_tasks(log: Logger) -> List[Tuple[str, str]]:
     if not broker_url.startswith('redis:'):
         raise Exception('Only Redis broker supported for the task health tracking.')
     restarted_tasks: List[Tuple[str, str]] = list()
+    failed_to_restart_tasks: List[Tuple[str, str]] = list()
     start_time = datetime.now()
     unknown_pending_tasks = get_unknown_pending_tasks()
     for task_id in unknown_pending_tasks:
@@ -95,14 +96,18 @@ def re_schedule_unknown_pending_tasks(log: Logger) -> List[Tuple[str, str]]:
                 restarted_tasks.append((task_id, task_name))
 
         except Exception as ex:
-            log.error(f'Unable to re-send lost pending task: #{task_id} - {task_name or "unknown name"}', exc_info=ex)
-    time_spent = datetime.now() - start_time
-    msg = f'Found {len(unknown_pending_tasks)} and restarted {len(restarted_tasks)} unknown/lost tasks ' \
-          f'registered at Webdav but not found in Redis queue.\n' \
-          f'Time spent: {time_spent}\n'
-    if restarted_tasks:
-        msg += f'Tasks:\n' + '\n'.join([' - '.join(item) for item in restarted_tasks])
-    log.info(msg)
+            failed_to_restart_tasks.append((task_id, task_name))
+            log.error(f'Unable to restart lost pending task: #{task_id} - {task_name or "unknown name"}', exc_info=ex)
+    if unknown_pending_tasks:
+        time_spent = datetime.now() - start_time
+        msg = f'Found {len(unknown_pending_tasks)} and restarted {len(restarted_tasks)} unknown/lost tasks ' \
+              f'registered at Webdav but not found in Redis queue.\n' \
+              f'Time spent: {time_spent}\n'
+        if restarted_tasks:
+            msg += f'Restarted tasks:\n' + '\n'.join([' - '.join(item) for item in restarted_tasks])
+        if failed_to_restart_tasks:
+            msg += f'Failed to restart tasks:\n' + '\n'.join([' - '.join(item) for item in failed_to_restart_tasks])
+        log.info(msg)
     return restarted_tasks
 
 

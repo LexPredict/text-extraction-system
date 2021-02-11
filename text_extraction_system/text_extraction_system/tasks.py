@@ -114,7 +114,7 @@ def on_before_task_publish(sender,
                            properties,
                            declare,
                            retry_policy, *args, **kwargs):
-    log.info(f'Registering task: #{headers["id"]} - {headers["task"]}')
+    # log.info(f'Registering task: #{headers["id"]} - {headers["task"]}')
     store_pending_task_info_in_webdav(body=body,
                                       exchange=exchange,
                                       routing_key=routing_key,
@@ -126,19 +126,19 @@ def on_before_task_publish(sender,
 
 @task_success.connect
 def on_task_success(sender, *args, **kwargs):
-    log.info(f'Unregistering on task_success: #{sender.request.id} - {sender.request.task}')
+    # log.info(f'Unregistering on task_success: #{sender.request.id} - {sender.request.task}')
     remove_pending_task_info_from_webdav(sender.request.id, sender.request.task)
 
 
 @task_failure.connect
 def on_task_failure(sender, *args, **kwargs):
-    log.info(f'Unregistering on task_failure: #{sender.request.id} - {sender.request.task}')
+    # log.info(f'Unregistering on task_failure: #{sender.request.id} - {sender.request.task}')
     remove_pending_task_info_from_webdav(sender.request.id, sender.request.task)
 
 
 @task_revoked.connect
 def task_post_run(task_id: str, task: str, *args, **kwargs):
-    log.info(f'Unregistering on task_revoked: #{task_id} - {task}')
+    # log.info(f'Unregistering on task_revoked: #{task_id} - {task}')
     remove_pending_task_info_from_webdav(task_id, task)
 
 
