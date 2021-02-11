@@ -78,10 +78,10 @@ def re_schedule_unknown_pending_tasks(log: Logger) -> List[Tuple[str, str]]:
     start_time = datetime.now()
     unknown_pending_tasks = get_unknown_pending_tasks()
     for task_id in unknown_pending_tasks:
-        task_name: Optional[str] = None
+        task_name: Optional[str] = 'unknown'
         try:
             task_info: Dict = webdav_client.unpickle(remote_path=f'{tasks_pending}/{task_id}')
-            task_name = task_info['headers']['task']
+            task_name = task_info['headers']['task'] or 'unknown'
 
             with Connection(broker_url) as conn:
                 producer = conn.Producer(serializer='json')
@@ -97,7 +97,7 @@ def re_schedule_unknown_pending_tasks(log: Logger) -> List[Tuple[str, str]]:
 
         except Exception as ex:
             failed_to_restart_tasks.append((task_id, task_name))
-            log.error(f'Unable to restart lost pending task: #{task_id} - {task_name or "unknown name"}', exc_info=ex)
+            log.error(f'Unable to restart lost pending task: #{task_id} - {task_name}', exc_info=ex)
     if unknown_pending_tasks:
         time_spent = datetime.now() - start_time
         msg = f'Found {len(unknown_pending_tasks)} and restarted {len(restarted_tasks)} unknown/lost tasks ' \
