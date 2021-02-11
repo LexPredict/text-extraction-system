@@ -78,7 +78,7 @@ elif [ "${DOLLAR}{ROLE}" == "web-api" ]; then
 elif [ "${DOLLAR}{ROLE}" == "celery-worker" ]; then
   startup
    exec celery -A text_extraction_system.tasks worker \
-      -Q default \
+      -X beat \
       -l INFO \
       --concurrency=${DOLLAR}{CPU_QUARTER_CORES} \
       -Ofair \
