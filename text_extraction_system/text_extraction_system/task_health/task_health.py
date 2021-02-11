@@ -13,6 +13,10 @@ from text_extraction_system.constants import tasks_pending, queue_celery_beat
 from text_extraction_system.file_storage import get_webdav_client
 
 
+def init_task_tracking(*args, **kwargs):
+    get_webdav_client().mkdir(tasks_pending)
+
+
 def store_pending_task_info_in_webdav(body,
                                       exchange,
                                       routing_key,
