@@ -80,12 +80,47 @@ services:
       - "text_extraction_system_webdav_password=${DOCKER_WEBDAV_AUTH_PASSWORD}"
       - "text_extraction_system_delete_temp_files_on_request_finish=${TEXT_EXTRACTION_SYSTEM_DELETE_TEMP_FILES_ON_REQUEST_FINISHED}"
       - "text_extraction_system_keep_failed_files=${TEXT_EXTRACTION_SYSTEM_KEEP_FAILED_FILES}"
+      - "STARTUP_DEPS_READY_CMD=curl http://${DOCKER_MASTER_NODE_IP}:${DOCKER_WEBDAV_PORT}"
     volumes:
       - celery_worker_state:/data/celery_worker_state
     deploy:
       mode: global # Exactly one instance per node. Primitive AWS autoscaling solution.
       placement:
         constraints: [node.role != manager]
+    stop_signal: SIGQUIT
+    stop_grace_period: 1m
+    logging:
+      driver: "json-file"
+      options:
+        max-file: 5
+        max-size: 10m
+
+  tes-celery-beat:
+    image: ${TEXT_EXTRACTION_SYSTEM_IMAGE}
+    networks:
+      ${TEXT_EXTRACTION_SWARM_NETWORK}:
+    sysctls:
+      net.ipv4.vs.conn_reuse_mode: 0
+      net.ipv4.vs.expire_nodest_conn: 1
+      net.ipv4.tcp_keepalive_time: 600
+      net.ipv4.tcp_keepalive_intvl: 60
+      net.ipv4.tcp_keepalive_probes: 3
+    command: ["celery-beat"]
+    environment:
+      - "text_extraction_system_celery_broker=redis://tasks.${DOCKER_REDIS_HOST_NAME}:6379/0"
+      - "text_extraction_system_celery_backend=redis://tasks.${DOCKER_REDIS_HOST_NAME}:6379/0"
+      - "text_extraction_system_webdav_url=http://${DOCKER_MASTER_NODE_IP}:${DOCKER_WEBDAV_PORT}"
+      - "text_extraction_system_webdav_username=${DOCKER_WEBDAV_AUTH_USER}"
+      - "text_extraction_system_webdav_password=${DOCKER_WEBDAV_AUTH_PASSWORD}"
+      - "text_extraction_system_delete_temp_files_on_request_finish=${TEXT_EXTRACTION_SYSTEM_DELETE_TEMP_FILES_ON_REQUEST_FINISHED}"
+      - "text_extraction_system_keep_failed_files=${TEXT_EXTRACTION_SYSTEM_KEEP_FAILED_FILES}"
+      - "STARTUP_DEPS_READY_CMD=curl http://${DOCKER_MASTER_NODE_IP}:${DOCKER_WEBDAV_PORT}"
+    volumes:
+      - celery_worker_state:/data/celery_worker_state
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
     stop_signal: SIGQUIT
     stop_grace_period: 1m
     logging:
@@ -115,6 +150,7 @@ services:
       - "text_extraction_system_delete_temp_files_on_request_finish=${TEXT_EXTRACTION_SYSTEM_DELETE_TEMP_FILES_ON_REQUEST_FINISHED}"
       - "text_extraction_system_keep_failed_files=${TEXT_EXTRACTION_SYSTEM_KEEP_FAILED_FILES}"
       - "text_extraction_system_root_path=${TEXT_EXTRACTION_SYSTEM_ROOT_PATH}"
+      - "STARTUP_DEPS_READY_CMD=curl http://${DOCKER_MASTER_NODE_IP}:${DOCKER_WEBDAV_PORT}"
     logging:
       driver: "json-file"
       options:

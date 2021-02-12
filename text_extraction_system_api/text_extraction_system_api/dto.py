@@ -53,9 +53,9 @@ class PlainTextPage:
 class PlainTextSection:
     start: int
     end: int
-    title: str
-    title_start: int
-    title_end: int
+    title: Optional[str]
+    title_start: Optional[int]
+    title_end: Optional[int]
     level: int
     abs_level: int
 
@@ -91,7 +91,7 @@ class PlainTextSentence:
 @dataclass_json
 @dataclass
 class PlainTextStructure:
-    title: str
+    title: Optional[str]
     language: str
     pages: List[PlainTextPage]
     sentences: List[PlainTextSentence]
