@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sudo apt-get install virtualenv libpq-dev python3-dev img2pdf libreoffice maven libpoppler-dev poppler-utils
+sudo apt-get install virtualenv libpq-dev python3-dev img2pdf libreoffice maven
 
 # ensure this is the expected Python executable
 virtualenv -p /usr/local/bin/python3.6 venv
@@ -17,4 +17,4 @@ pip install -e ../text_extraction_system_api
 mkdir models
 wget https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin -O ./models/lid.176.bin
 
-./prepare_tika.sh
+./build_java_modules.sh

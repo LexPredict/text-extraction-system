@@ -25,6 +25,8 @@ venv/
 ENV/
 venv36/
 venv38/
+.venv/
+
 
 **/.idea/*
 **/.vs_code/*
