@@ -34,8 +34,9 @@ cd ./text-extraction-system
 Install the compatible Python version using the official installation instructions if needed.
 #### 3. Install required system libraries and Setup Python virtual environment
 ```
-./prepare_dev_env_ubuntu_20_04.sh
-``` 
+./prepare_dev_env_ubuntu_20_04_python_3_8.sh
+```
+Or use the appropriate script for the OS and Python version you are working with. 
 #### 5. Prepare project config files
 ```
 cp ./docker/setenv_local.local_dev_example.sh ./docker/setenv_local.sh
