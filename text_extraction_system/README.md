@@ -47,6 +47,13 @@ Check/update the configuration files contents if needed.
 #### 6. Deploy Postgres and other required third-party software to the local Docker Swarm cluster
 ```
 sudo docker -v
+```
+You need to create a swarm-scoped network before the stack is deployed, so create it if it doesn't already exist.
+```
+sudo docker network create --driver overlay contraxsuite_contrax_net
+```
+and then
+```
 sudo docker swarm init
 
 cd ./docker/deploy
