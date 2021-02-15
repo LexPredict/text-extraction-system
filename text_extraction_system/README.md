@@ -39,7 +39,7 @@ Install the compatible Python version using the official installation instructio
 Or use the appropriate script for the OS and Python version you are working with. 
 #### 5. Prepare project config files
 ```
-cp ./docker/setenv_local.local_dev_example.sh ./docker/setenv_local.sh
+cp ./docker/deploy/setenv_local.local_dev_example.sh ./docker/deploy/setenv_local.sh
 cp .env.local_dev_example .env
 cp .test_env.local_dev_example .test_env
 ```
