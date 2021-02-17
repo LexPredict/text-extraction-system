@@ -459,10 +459,10 @@ def deliver_results(req: RequestCallbackInfo, req_status: RequestStatus):
 
 @celery_app.task(acks_late=True, bind=True, queue=queue_celery_beat)
 def check_task_health(task):
-    re_schedule_unknown_pending_tasks(log=log)
+    re_schedule_unknown_pending_tasks(log=log, app=celery_app)
 
 
 @celery_app.on_after_configure.connect
 def setup_periodic_tasks(sender, **kwargs):
     log.info('Scheduling periodic task health checking...')
-    sender.add_periodic_task(schedule=30.0, sig=check_task_health.s(), name='Check task health')
+    sender.add_periodic_task(schedule=120.0, sig=check_task_health.s(), name='Check task health')
