@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sudo apt-get install virtualenv libpq-dev python3-dev img2pdf libreoffice maven
+sudo apt-get install virtualenv libpq-dev python3-dev img2pdf libreoffice maven tesseract-ocr libtesseract-dev
 
 # ensure this is the expected Python executable
 virtualenv -p /usr/local/bin/python3.6 venv
