@@ -417,9 +417,9 @@ def extract_data_and_finish(req: RequestMetadata,
     if not final_check_req:
         log.info(f'{req.original_file_name} | Canceling results delivery '
                  f'because the request files are already removed (#{req.request_id})')
-    elif final_check_req.status != STATUS_DONE:
+    elif final_check_req.status in {STATUS_DONE, STATUS_FAILURE}:
         log.info(f'{req.original_file_name} | Canceling results delivery '
-                 f'because the request appeared in DONE status already (#{req.request_id})')
+                 f'because the request processing is already finished (#{req.request_id})')
     else:
         save_request_metadata(req)
         deliver_results(req.request_callback_info, req.to_request_status())
