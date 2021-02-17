@@ -150,11 +150,7 @@ def get_request_task_ids(webdav_client: WebDavClient, request_id: str) -> List[s
     try:
         return [s.strip('/') for s in webdav_client.list(f'{request_id}/{task_ids}')]
     except RemoteResourceNotFound:
-        metadata = load_request_metadata(request_id)
-        if metadata is None:
-            # the upload task was purged. Don't complain on missing request data
-            return []
-        raise
+        return []
 
 
 def deliver_error(request_id: str,
@@ -412,12 +408,17 @@ def extract_data_and_finish(req: RequestMetadata,
 
     req.status = STATUS_DONE
 
-    if load_request_metadata(req.request_id):
-        save_request_metadata(req)
-        deliver_results(req.request_callback_info, req.to_request_status())
-    else:
+    final_check_req = load_request_metadata(req.request_id)
+
+    if not final_check_req:
         log.info(f'{req.original_file_name} | Canceling results delivery '
                  f'because the request files are already removed (#{req.request_id})')
+    elif final_check_req.status != STATUS_DONE:
+        log.info(f'{req.original_file_name} | Canceling results delivery '
+                 f'because the request appeared in DONE status already (#{req.request_id})')
+    else:
+        save_request_metadata(req)
+        deliver_results(req.request_callback_info, req.to_request_status())
 
 
 def deliver_results(req: RequestCallbackInfo, req_status: RequestStatus):

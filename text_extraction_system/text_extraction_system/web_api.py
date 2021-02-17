@@ -10,6 +10,8 @@ from zipfile import ZipFile
 import pandas
 from fastapi import FastAPI, File, UploadFile, Form, Response
 from webdav3.exceptions import RemoteResourceNotFound
+from fastapi.exceptions import HTTPException
+from starlette.status import HTTP_404_NOT_FOUND
 
 from text_extraction_system import version
 from text_extraction_system.celery_log import HumanReadableTraceBackException
@@ -77,6 +79,11 @@ async def post_text_extraction_task(file: UploadFile = File(...),
 
     return req.request_id
 
+def load_request_metadata_or_raise(request_id: str) -> RequestMetadata:
+    req = load_request_metadata(request_id)
+    if not req:
+        raise HTTPException(HTTP_404_NOT_FOUND, 'No such data extraction request.')
+
 
 @app.delete('/api/v1/data_extraction_tasks/{request_id}/', response_model=TaskCancelResult)
 async def purge_text_extraction_task(request_id: str):
@@ -104,19 +111,21 @@ async def purge_text_extraction_task(request_id: str):
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/status.json', response_model=RequestStatus)
 async def get_request_status(request_id: str):
-    req = load_request_metadata(request_id)
-    return req.to_request_status().to_dict()
+    return load_request_metadata_or_raise(request_id).to_dict()
 
 
 def _proxy_request(webdav_client, request_id: str, fn: str, headers: Dict[str, str] = None):
-    resp: WebDavClient = webdav_client.execute_request('download', f'/{request_id}/{fn}')
-    return Response(content=resp.content, status_code=resp.status_code, headers=headers)
+    try:
+        resp: WebDavClient = webdav_client.execute_request('download', f'/{request_id}/{fn}')
+        return Response(content=resp.content, status_code=resp.status_code, headers=headers)
+    except RemoteResourceNotFound:
+        raise HTTPException(HTTP_404_NOT_FOUND, f'No such request if or there is no {fn} in the request results')
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.json',
          response_model=TableList)
 async def get_extracted_tables_in_json(request_id: str):
-    return _proxy_request(get_webdav_client(), request_id, load_request_metadata(request_id).tables_json_file)
+    return _proxy_request(get_webdav_client(), request_id, load_request_metadata_or_raise(request_id).tables_json_file)
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.pickle',
@@ -127,31 +136,38 @@ async def get_extracted_tables_in_json(request_id: str):
              }
          })
 async def get_extracted_tables_as_pickled_dataframe_table_list(request_id: str):
-    return _proxy_request(get_webdav_client(), request_id, load_request_metadata(request_id).tables_df_file)
+    return _proxy_request(get_webdav_client(), request_id, load_request_metadata_or_raise(request_id).tables_df_file)
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_plain_text.txt', response_model=AnyStr)
 async def get_extracted_plain_text(request_id: str):
     return _proxy_request(get_webdav_client(),
                           request_id,
-                          load_request_metadata(request_id).plain_text_file,
+                          load_request_metadata_or_raise(request_id).plain_text_file,
                           headers={'Content-Type': 'text/plain; charset=utf-8'})
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/plain_text_structure.json',
          response_model=PlainTextStructure)
 async def get_extracted_plain_text_structure(request_id: str):
-    return _proxy_request(get_webdav_client(), request_id, load_request_metadata(request_id).plain_text_structure_file)
+    return _proxy_request(get_webdav_client(),
+                          request_id,
+                          load_request_metadata_or_raise(request_id).plain_text_structure_file)
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/searchable_pdf.pdf')
 async def get_searchable_pdf(request_id: str):
-    return _proxy_request(get_webdav_client(), request_id, load_request_metadata(request_id).pdf_file)
+    return _proxy_request(get_webdav_client(),
+                          request_id,
+                          load_request_metadata_or_raise(request_id).pdf_file)
 
 
 @app.delete('/api/v1/data_extraction_tasks/{request_id}/results/')
 async def delete_request_files(request_id: str):
-    get_webdav_client().clean(f'{request_id}/')
+    try:
+        get_webdav_client().clean(f'{request_id}/')
+    except RemoteResourceNotFound:
+        raise HTTPException(HTTP_404_NOT_FOUND, 'No such data extraction request')
 
 
 @app.get('/api/v1/system_info.json', response_model=SystemInfo)
