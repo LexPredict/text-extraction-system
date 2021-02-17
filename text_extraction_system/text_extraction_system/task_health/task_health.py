@@ -114,7 +114,9 @@ def re_schedule_unknown_pending_tasks(log: Logger, app) -> List[Tuple[str, str]]
                                  retry=task_info['retry_policy'] is not None,
                                  retry_policy=task_info['retry_policy'])
                 restarted_tasks.append((task_id, task_name))
-
+        except RemoteResourceNotFound:
+            log.warning(f'Unable to restart lost pending task '
+                        f'because it has been completed already: #{task_id} - {task_name}')
         except Exception as ex:
             failed_to_restart_tasks.append((task_id, task_name))
             log.error(f'Unable to restart lost pending task: #{task_id} - {task_name}', exc_info=ex)
