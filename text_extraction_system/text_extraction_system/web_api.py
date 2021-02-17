@@ -91,7 +91,6 @@ async def purge_text_extraction_task(request_id: str):
             problems[task_id] = HumanReadableTraceBackException \
                 .from_exception(ex) \
                 .human_readable_format()
-    get_webdav_client().clean(f'{request_id}/')
     try:
         get_webdav_client().clean(f'{request_id}/')
     except RemoteResourceNotFound:
