@@ -9,9 +9,9 @@ from zipfile import ZipFile
 
 import pandas
 from fastapi import FastAPI, File, UploadFile, Form, Response
-from webdav3.exceptions import RemoteResourceNotFound
 from fastapi.exceptions import HTTPException
 from starlette.status import HTTP_404_NOT_FOUND
+from webdav3.exceptions import RemoteResourceNotFound
 
 from text_extraction_system import version
 from text_extraction_system.celery_log import HumanReadableTraceBackException
@@ -79,10 +79,12 @@ async def post_text_extraction_task(file: UploadFile = File(...),
 
     return req.request_id
 
+
 def load_request_metadata_or_raise(request_id: str) -> RequestMetadata:
     req = load_request_metadata(request_id)
     if not req:
         raise HTTPException(HTTP_404_NOT_FOUND, 'No such data extraction request.')
+    return req
 
 
 @app.delete('/api/v1/data_extraction_tasks/{request_id}/', response_model=TaskCancelResult)
