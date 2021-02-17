@@ -408,8 +408,12 @@ def extract_data_and_finish(req: RequestMetadata,
 
     req.status = STATUS_DONE
 
+    # This final check is a workaround when exactly this task was restarted by
+    # the task health monitor. In case it delivers the results twice the process can crash.
+    # Actually it is not thread/process/parallel safe because another copy of the task
+    # can store DONE status after this check is done but the case is quite rare and
+    # we don't have a better way to check it.
     final_check_req = load_request_metadata(req.request_id)
-
     if not final_check_req:
         log.info(f'{req.original_file_name} | Canceling results delivery '
                  f'because the request files are already removed (#{req.request_id})')
