@@ -15,7 +15,7 @@ public class TestPDF2Text extends TestCase {
     public void test1() throws Exception {
         try (InputStream stream = TestPDF2Text.class.getResourceAsStream("/structured_text.pdf")) {
             try (PDDocument document = PDDocument.load(stream)) {
-                PDFPlainText res = PDFToTextWithCoordinates.process(document);
+                PDFPlainText res = PDFToTextWithCoordinates.process(document, false);
                 System.out.println(res.text);
                 System.out.println("======================================");
                 ObjectMapper om = new ObjectMapper();
@@ -37,7 +37,7 @@ public class TestPDF2Text extends TestCase {
         try (InputStream stream = TestPDF2Text.class
                 .getResourceAsStream("/RESO_20120828-01_Building_Remodel__1.pdf")) {
             try (PDDocument document = PDDocument.load(stream)) {
-                PDFPlainText res = PDFToTextWithCoordinates.process(document);
+                PDFPlainText res = PDFToTextWithCoordinates.process(document, false);
                 System.out.println(res.text);
 
                 assertEquals("Test document contains 7 paragraphs starting with 'WHEREAS'.",
@@ -54,7 +54,7 @@ public class TestPDF2Text extends TestCase {
         try (InputStream stream = TestPDF2Text.class
                 .getResourceAsStream("/RESO_20120828-01_Building_Remodel__54.pdf")) {
             try (PDDocument document = PDDocument.load(stream)) {
-                PDFPlainText res = PDFToTextWithCoordinates.process(document);
+                PDFPlainText res = PDFToTextWithCoordinates.process(document, false);
                 System.out.println(res.text);
 
             }

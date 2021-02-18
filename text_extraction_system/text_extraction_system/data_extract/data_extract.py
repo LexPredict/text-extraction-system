@@ -37,7 +37,10 @@ log = getLogger(__name__)
 PAGE_SEPARATOR = '\n\n\f'
 
 
-def extract_text_and_structure(pdf_fn: str, pdf_password: str = None, timeout_sec: int = 3600) \
+def extract_text_and_structure(pdf_fn: str,
+                               pdf_password: str = None,
+                               timeout_sec: int = 3600,
+                               glyph_enhancing: bool = False) \
         -> Tuple[str, PlainTextStructure]:
     java_modules_path = get_settings().java_modules_path
 
@@ -48,10 +51,15 @@ def extract_text_and_structure(pdf_fn: str, pdf_password: str = None, timeout_se
                 'com.lexpredict.textextraction.GetTextFromPDF',
                 pdf_fn,
                 out_fn,
-                'pages_msgpack']
+                '-f', 'pages_msgpack']
 
         if pdf_password:
+            args.append('-p')
             args.append(pdf_password)
+
+        if glyph_enhancing:
+            args.append('-ge')
+            args.append('true')
 
         completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=timeout_sec,
                                                              universal_newlines=True, stderr=PIPE, stdout=PIPE)
