@@ -33,7 +33,8 @@ class TextExtractionSystemWebClient:
                                       ocr_enable: bool = True,
                                       call_back_celery_version: int = 4,
                                       request_id: str = None,
-                                      log_extra: Dict[str, str] = None) -> str:
+                                      log_extra: Dict[str, str] = None,
+                                      glyph_enhancing: bool = False) -> str:
         resp = requests.post(f'{self.base_url}/api/v1/data_extraction_tasks/',
                              files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
                              data=dict(call_back_url=call_back_url,
@@ -50,7 +51,8 @@ class TextExtractionSystemWebClient:
                                        doc_language=doc_language,
                                        ocr_enable=ocr_enable,
                                        request_id=request_id,
-                                       log_extra_json_key_value=json.dumps(log_extra) if log_extra else None))
+                                       log_extra_json_key_value=json.dumps(log_extra) if log_extra else None,
+                                       glyph_enhancing=glyph_enhancing))
         if resp.status_code not in {200, 201}:
             resp.raise_for_status()
         return json.loads(resp.content)

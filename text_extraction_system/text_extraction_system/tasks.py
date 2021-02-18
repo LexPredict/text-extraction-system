@@ -193,7 +193,10 @@ def handle_errors(request_id: str, request_callback_info: RequestCallbackInfo):
 
 
 @celery_app.task(acks_late=True, bind=True)
-def process_document(task, request_id: str, request_callback_info: RequestCallbackInfo) -> bool:
+def process_document(task,
+                     request_id: str,
+                     request_callback_info: RequestCallbackInfo,
+                     glyph_enhancing: bool) -> bool:
     with handle_errors(request_id, request_callback_info):
         webdav_client: WebDavClient = get_webdav_client()
         req: RequestMetadata = load_request_metadata(request_id)
@@ -206,7 +209,7 @@ def process_document(task, request_id: str, request_callback_info: RequestCallba
         with webdav_client.get_as_local_fn(f'{request_id}/{req.original_document}') as (fn, _remote_path):
             ext = os.path.splitext(fn)[1]
             if ext and ext.lower() == '.pdf':
-                process_pdf(fn, req, webdav_client)
+                process_pdf(fn, req, webdav_client, glyph_enhancing)
             else:
                 log.info(f'{req.original_file_name} | Converting to PDF...')
                 with convert_to_pdf(fn, timeout_sec=req.convert_to_pdf_timeout_sec) \
@@ -215,13 +218,14 @@ def process_document(task, request_id: str, request_callback_info: RequestCallba
                     webdav_client.upload_file(remote_path=f'{request_id}/{req.converted_to_pdf}',
                                               local_path=local_converted_pdf_fn)
                     save_request_metadata(req)
-                    process_pdf(local_converted_pdf_fn, req, webdav_client)
+                    process_pdf(local_converted_pdf_fn, req, webdav_client, glyph_enhancing)
         return True
 
 
 def process_pdf(pdf_fn: str,
                 req: RequestMetadata,
-                webdav_client: WebDavClient):
+                webdav_client: WebDavClient,
+                glyph_enhancing: bool):
     log.info(f'{req.original_file_name} | Pre-processing PDF document')
     log.info(f'{req.original_file_name} | Splitting to pages to parallelize processing...')
     with split_pdf_to_page_blocks(pdf_fn, pages_per_block=1) as pdf_page_fns:
@@ -252,7 +256,8 @@ def process_pdf(pdf_fn: str,
 
         log.info(f'{req.original_file_name} | Scheduling {len(task_signatures)} sub-tasks...')
         c = chord(task_signatures)(finish_pdf_processing
-                                   .s(req.request_id, req.original_file_name, req.request_callback_info)
+                                   .s(req.request_id, req.original_file_name,
+                                      req.request_callback_info, glyph_enhancing)
                                    .set(link_error=[ocr_error_callback.s(req.request_id,
                                                                          req.request_callback_info)]))
         register_task_id(webdav_client, req.request_id, c.id)
@@ -321,7 +326,8 @@ def finish_pdf_processing(task,
                           _ocred_page_nums: List[int],
                           request_id: str,
                           original_file_name: str,
-                          req_callback_info: RequestCallbackInfo):
+                          req_callback_info: RequestCallbackInfo,
+                          glyph_enhancing: bool):
     with handle_errors(request_id, req_callback_info):
         req: RequestMetadata = load_request_metadata(request_id)
         if not req:
@@ -362,11 +368,15 @@ def finish_pdf_processing(task,
                 with merge_pdf_pages(local_orig_pdf_fn, repl_page_num_to_fn) as local_merged_pdf_fn:
                     req.ocred_pdf = os.path.splitext(original_pdf_in_storage)[0] + '.ocred.pdf'
                     webdav_client.upload_file(f'{req.request_id}/{req.ocred_pdf}', local_merged_pdf_fn)
-                    extract_data_and_finish(req, webdav_client, local_merged_pdf_fn, camelot_tables_total)
+                    extract_data_and_finish(req, webdav_client,
+                                            local_merged_pdf_fn, camelot_tables_total,
+                                            glyph_enhancing)
             else:
                 remote_fn = req.converted_to_pdf or req.original_document
                 with webdav_client.get_as_local_fn(f'{req.request_id}/{remote_fn}') as (local_pdf_fn, _remote_path):
-                    extract_data_and_finish(req, webdav_client, local_pdf_fn, camelot_tables_total)
+                    extract_data_and_finish(req, webdav_client,
+                                            local_pdf_fn, camelot_tables_total,
+                                            glyph_enhancing)
 
         finally:
             shutil.rmtree(temp_dir)
@@ -375,11 +385,13 @@ def finish_pdf_processing(task,
 def extract_data_and_finish(req: RequestMetadata,
                             webdav_client: WebDavClient,
                             local_pdf_fn: str,
-                            camelot_tables: List[CamelotTable]):
+                            camelot_tables: List[CamelotTable],
+                            glyph_enhancing: bool):
     req.pdf_file = req.ocred_pdf or req.converted_to_pdf or req.original_document
     pdf_fn_in_storage_base = os.path.splitext(req.original_document)[0]
 
-    text, plain_text_structure = extract_text_and_structure(local_pdf_fn)
+    text, plain_text_structure = extract_text_and_structure(
+        local_pdf_fn, glyph_enhancing=glyph_enhancing)
     req.plain_text_file = pdf_fn_in_storage_base + '.plain.txt'
     webdav_client.upload_to(text.encode('utf-8'), f'{req.request_id}/{req.plain_text_file}')
 

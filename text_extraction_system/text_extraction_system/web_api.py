@@ -43,7 +43,8 @@ async def post_text_extraction_task(file: UploadFile = File(...),
                                     request_id: str = Form(default=None),
                                     log_extra_json_key_value: str = Form(default=None),
                                     convert_to_pdf_timeout_sec: int = Form(default=1800),
-                                    pdf_to_images_timeout_sec: int = Form(default=1800)):
+                                    pdf_to_images_timeout_sec: int = Form(default=1800),
+                                    glyph_enhancing: bool = Form(default=False)):
     webdav_client = get_webdav_client()
     request_id = get_valid_fn(request_id) if request_id else str(uuid4())
     log_extra = json.loads(log_extra_json_key_value) if log_extra_json_key_value else None
@@ -72,7 +73,8 @@ async def post_text_extraction_task(file: UploadFile = File(...),
 
     save_request_metadata(req)
     webdav_client.upload_to(file.file, f'{req.request_id}/{req.original_document}')
-    async_task = process_document.apply_async((req.request_id, req.request_callback_info))
+    async_task = process_document.apply_async(
+        (req.request_id, req.request_callback_info, glyph_enhancing))
 
     webdav_client.mkdir(f'{req.request_id}/{task_ids}')
     register_task_id(webdav_client, req.request_id, async_task.id)
