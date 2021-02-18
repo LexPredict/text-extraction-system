@@ -63,9 +63,17 @@ def extract_text_and_structure(pdf_fn: str, pdf_password: str = None, timeout_se
             # see object structure in com.lexpredict.textextraction.dto.PDFPlainText
             pdfbox_res: Dict[str, Any] = msgpack.unpack(pages_f, raw=False)
 
-        pages = list()
-
         text = pdfbox_res['text']
+        if len(text) == 0:
+            return text, PlainTextStructure(title='',
+                                            language='en',  # FastText returns English for empty strings
+                                            pages=[],
+                                            sentences=[],
+                                            paragraphs=[],
+                                            sections=[],
+                                            char_bboxes_with_page_nums=pdfbox_res['charBBoxesWithPageNums'])
+
+        pages = []
         num: int = 0
         for p in pdfbox_res['pages']:
             p_res = PlainTextPage(number=num, start=p['location'][0], end=p['location'][1], bbox=p['bbox'])
@@ -78,15 +86,15 @@ def extract_text_and_structure(pdf_fn: str, pdf_password: str = None, timeout_se
 
         sentences = [PlainTextSentence(start=start,
                                        end=end,
-                                       language=lang.predict_lang(text))
-                     for start, end, text in sentence_spans]
+                                       language=lang.predict_lang(segment))
+                     for start, end, segment in sentence_spans]
 
         # There was a try-except in Contraxsuite catching some lexnlp exception.
         # Not putting it here because it should be solved on lexnlp side.
         paragraphs = [PlainTextParagraph(start=start,
                                          end=end,
-                                         language=lang.predict_lang(text))
-                      for text, start, end in get_paragraphs(text, return_spans=True)]
+                                         language=lang.predict_lang(segment))
+                      for segment, start, end in get_paragraphs(text, return_spans=True)]
 
         sections = [PlainTextSection(title=sect.title,
                                      start=sect.start,
