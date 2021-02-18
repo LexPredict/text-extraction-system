@@ -3,6 +3,7 @@ package com.lexpredict.textextraction;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lexpredict.textextraction.dto.PDFPlainText;
 import com.lexpredict.textextraction.dto.PDFPlainTextPage;
+import org.apache.commons.cli.*;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.msgpack.jackson.dataformat.MessagePackFactory;
 
@@ -58,15 +59,15 @@ public class GetTextFromPDF {
 
         String pdf = args[0];
         String outFn = args[1];
-        String format = PLAIN_TEXT;
-        if (args.length > 2) format = args[2];
+        CommandLine cmd = parseCliArgs(args);
 
-        String password = null;
-        if (args.length > 3) password = args[3];
+        String format = cmd.getOptionValue("f", PLAIN_TEXT);
+        String password = cmd.getOptionValue("p", "");
+        String glyphEnhancing = cmd.getOptionValue("ge", "false");
+        boolean glyphEnch = glyphEnhancing.equalsIgnoreCase("true");
 
         try (PDDocument document = PDDocument.load(new File(pdf), password)) {
-            PDFPlainText res = PDFToTextWithCoordinates.process(document);
-
+            PDFPlainText res = PDFToTextWithCoordinates.process(document, glyphEnch);
             try (OutputStream os = new FileOutputStream(outFn)) {
                 if (PLAIN_TEXT.equals(format)) {
                     try (Writer w = new OutputStreamWriter(os)) {
@@ -83,5 +84,34 @@ public class GetTextFromPDF {
         }
     }
 
+    protected static CommandLine parseCliArgs(String[] args) {
+        Options options = new Options();
+
+        Option input = new Option("f", "format", true,
+                "output format, default = \"plain_text\"");
+        input.setRequired(false);
+        options.addOption(input);
+
+        Option output = new Option("ge", "glyph_enhancing", true,
+                "glyph box detection enhancing on (true) / off (false)");
+        output.setRequired(false);
+        options.addOption(output);
+
+        Option pwrd = new Option("p", "password", true,
+                "PDF file password");
+        pwrd.setRequired(false);
+        options.addOption(pwrd);
+
+        CommandLineParser parser = new DefaultParser();
+        HelpFormatter formatter = new HelpFormatter();
+        try {
+            return parser.parse(options, args);
+        } catch (ParseException e) {
+            System.out.println(e.getMessage());
+            formatter.printHelp("utility-name", options);
+            System.exit(1);
+        }
+        return null;
+    }
 }
 
