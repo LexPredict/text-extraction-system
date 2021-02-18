@@ -25,7 +25,7 @@ from text_extraction_system_api.dto import TableList, PlainTextStructure, Reques
 app = FastAPI()
 
 
-@app.post('/api/v1/data_extraction_tasks/', response_model=str)
+@app.post('/api/v1/data_extraction_tasks/', response_model=str, tags=["Asynchronous Data Extraction"])
 async def post_text_extraction_task(file: UploadFile = File(...),
                                     call_back_url: str = Form(default=None),
                                     call_back_celery_broker: str = Form(default=None),
@@ -78,7 +78,8 @@ async def post_text_extraction_task(file: UploadFile = File(...),
     return req.request_id
 
 
-@app.delete('/api/v1/data_extraction_tasks/{request_id}/', response_model=TaskCancelResult)
+@app.delete('/api/v1/data_extraction_tasks/{request_id}/', response_model=TaskCancelResult,
+            tags=["Asynchronous Data Extraction"])
 async def purge_text_extraction_task(request_id: str):
     problems = dict()
     success = list()
@@ -103,7 +104,8 @@ async def purge_text_extraction_task(request_id: str):
                             problems=problems).to_dict()
 
 
-@app.get('/api/v1/data_extraction_tasks/{request_id}/status.json', response_model=RequestStatus)
+@app.get('/api/v1/data_extraction_tasks/{request_id}/status.json', response_model=RequestStatus,
+         tags=["Asynchronous Data Extraction"])
 async def get_request_status(request_id: str):
     req = load_request_metadata(request_id)
     return req.to_request_status().to_dict()
@@ -115,7 +117,7 @@ def _proxy_request(webdav_client, request_id: str, fn: str, headers: Dict[str, s
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.json',
-         response_model=TableList)
+         response_model=TableList, tags=["Asynchronous Data Extraction"])
 async def get_extracted_tables_in_json(request_id: str):
     return _proxy_request(get_webdav_client(), request_id, load_request_metadata(request_id).tables_json_file)
 
@@ -126,12 +128,13 @@ async def get_extracted_tables_in_json(request_id: str):
                  'description': 'Pickled DataFrameTableList object.',
                  'content': {'application/octet-stream': {}},
              }
-         })
+         }, tags=["Asynchronous Data Extraction"])
 async def get_extracted_tables_as_pickled_dataframe_table_list(request_id: str):
     return _proxy_request(get_webdav_client(), request_id, load_request_metadata(request_id).tables_df_file)
 
 
-@app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_plain_text.txt', response_model=AnyStr)
+@app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_plain_text.txt', response_model=AnyStr,
+         tags=["Asynchronous Data Extraction"])
 async def get_extracted_plain_text(request_id: str):
     return _proxy_request(get_webdav_client(),
                           request_id,
@@ -140,22 +143,62 @@ async def get_extracted_plain_text(request_id: str):
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/plain_text_structure.json',
-         response_model=PlainTextStructure)
+         response_model=PlainTextStructure, tags=["Asynchronous Data Extraction"])
 async def get_extracted_plain_text_structure(request_id: str):
     return _proxy_request(get_webdav_client(), request_id, load_request_metadata(request_id).plain_text_structure_file)
 
 
-@app.get('/api/v1/data_extraction_tasks/{request_id}/results/searchable_pdf.pdf')
+@app.get('/api/v1/data_extraction_tasks/{request_id}/results/searchable_pdf.pdf', tags=["Asynchronous Data Extraction"])
 async def get_searchable_pdf(request_id: str):
     return _proxy_request(get_webdav_client(), request_id, load_request_metadata(request_id).pdf_file)
 
 
-@app.delete('/api/v1/data_extraction_tasks/{request_id}/results/')
+@app.delete('/api/v1/data_extraction_tasks/{request_id}/results/', tags=["Asynchronous Data Extraction"])
 async def delete_request_files(request_id: str):
     get_webdav_client().clean(f'{request_id}/')
 
 
-@app.get('/api/v1/system_info.json', response_model=SystemInfo)
+@app.post('/api/v1/data_extraction/', tags=["Synchronous Data Extraction"])
+async def extract_all_data_from_document(
+        file: UploadFile = File(...),
+        doc_language: str = Form(default='en'),
+        ocr_enable: bool = Form(default=True),
+        request_id: str = Form(default=None),
+        log_extra_json_key_value: str = Form(default=None),
+        convert_to_pdf_timeout_sec: int = Form(default=1800),
+        pdf_to_images_timeout_sec: int = Form(default=1800)
+):
+    webdav_client = get_webdav_client()
+    return None
+
+
+@app.post('/api/v1/data_extraction/plain_text/', response_model=AnyStr, tags=["Synchronous Data Extraction"])
+async def extract_plain_text_from_document(
+        file: UploadFile = File(...),
+        doc_language: str = Form(default='en'),
+        ocr_enable: bool = Form(default=True),
+        log_extra_json_key_value: str = Form(default=None),
+        convert_to_pdf_timeout_sec: int = Form(default=1800),
+        pdf_to_images_timeout_sec: int = Form(default=1800)
+):
+    return None
+
+
+@app.post('/api/v1/data_extraction/text_based_pdf/', tags=["Synchronous Data Extraction"])
+async def extract_text_from_document_and_generate_text_based_pdf(
+        file: UploadFile = File(...),
+        doc_language: str = Form(default='en'),
+        ocr_enable: bool = Form(default=True),
+        request_id: str = Form(default=None),
+        log_extra_json_key_value: str = Form(default=None),
+        convert_to_pdf_timeout_sec: int = Form(default=1800),
+        pdf_to_images_timeout_sec: int = Form(default=1800)
+):
+    webdav_client = get_webdav_client()
+    return None
+
+
+@app.get('/api/v1/system_info.json', response_model=SystemInfo, tags=["Others"])
 async def get_system_info():
     return SystemInfo(version_number=version.VERSION_NUMBER,
                       git_branch=version.GIT_BRANCH,
@@ -167,7 +210,7 @@ async def get_system_info():
                       pandas_version=pandas.__version__).to_dict()
 
 
-@app.get('/api/v1/download_python_api_client')
+@app.get('/api/v1/download_python_api_client', tags=["Others"])
 async def download_python_api_client_and_dtos():
     folder_exclude = {'lexpredict_text_extraction_system_api.egg-info', '__pycache__'}
     file_exclude = {'.gitignore'}
