@@ -33,6 +33,8 @@ class RequestStatus:
     pdf_pages_ocred: Optional[List[int]] = None
     plain_text_extracted: bool = False
     plain_text_structure_extracted: bool = False
+    markup_json_file_extracted: bool = None
+    markup_msgpack_file_extracted: bool = None
     tables_extracted: bool = False
     additional_info: Optional[str] = None
 
@@ -97,7 +99,21 @@ class PlainTextStructure:
     sentences: List[PlainTextSentence]
     paragraphs: List[PlainTextParagraph]
     sections: List[PlainTextSection]
+
+
+@pydantic_dataclass
+@dataclass_json
+@dataclass
+class MarkupPerSymbol:
     char_bboxes_with_page_nums: List[List[float]]
+
+
+@pydantic_dataclass
+@dataclass_json
+@dataclass
+class TextPlusMarkup:
+    structure: PlainTextStructure
+    markup: MarkupPerSymbol
 
 
 @pydantic_dataclass

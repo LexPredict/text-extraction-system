@@ -35,7 +35,7 @@ def test_basic_api_call_back():
             with pikepdf.open(tfn) as pdf:
                 assert len(pdf.pages) == 22
 
-        text_struct: PlainTextStructure = client.get_plain_text_structure(rs.request_id)
+        text_struct: PlainTextStructure = client.get_text_structure(rs.request_id)
         assert text_struct.language == 'en'
         assert len(text_struct.pages) == 22
         assert len(text_struct.paragraphs) > 1
@@ -205,7 +205,7 @@ def test_proper_page_merge_in():
         assert rs.additional_info == 'hello world'
 
         text = client.get_plain_text(rs.request_id)
-        text_struct: PlainTextStructure = client.get_plain_text_structure(rs.request_id)
+        text_struct: PlainTextStructure = client.get_text_structure(rs.request_id)
         assert len(text_struct.pages) == 4
         assert 'REPRODUCTION, AND DISTRIBUTION' in text  # page 1
         assert 'subsequently incorporated' in text  # page 2
