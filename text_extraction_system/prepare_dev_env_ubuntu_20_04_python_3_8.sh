@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sudo apt-get install virtualenv libpq-dev python3-dev img2pdf libreoffice maven tesseract-ocr libtesseract-dev
+sudo apt-get install virtualenv python3-dev libreoffice maven tesseract-ocr tesseract-ocr-eng tesseract-ocr-ita tesseract-ocr-fra tesseract-ocr-spa tesseract-ocr-deu tesseract-ocr-rus
 
 
 # ensure this is the expected Python executable
@@ -18,7 +18,11 @@ pip install --no-deps -e ../../lexpredict-contraxsuite-core/
 
 pip install -e ../text_extraction_system_api
 
+# NLTK should be installed within lexpredict-contraxsuite-core
+# The following downloads its models
+python3 -m nltk.downloader averaged_perceptron_tagger punkt stopwords words maxent_ne_chunker wordnet
 
+# Downloading model for language detection
 mkdir models
 wget https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin -O ./models/lid.176.bin
 
