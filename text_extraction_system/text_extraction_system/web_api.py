@@ -11,6 +11,7 @@ import pandas
 from fastapi import FastAPI, File, UploadFile, Form, Response
 from fastapi.exceptions import HTTPException
 from starlette.status import HTTP_404_NOT_FOUND
+from text_extraction_system_api.client import Constants
 from webdav3.exceptions import RemoteResourceNotFound
 
 from text_extraction_system import version
@@ -22,7 +23,8 @@ from text_extraction_system.request_metadata import RequestMetadata, RequestCall
     load_request_metadata
 from text_extraction_system.tasks import process_document, celery_app, register_task_id, get_request_task_ids
 from text_extraction_system_api import dto
-from text_extraction_system_api.dto import TableList, PlainTextStructure, RequestStatus, SystemInfo, TaskCancelResult
+from text_extraction_system_api.dto import TableList, PlainTextStructure, RequestStatus, SystemInfo, TaskCancelResult, \
+    MarkupPerSymbol
 
 app = FastAPI()
 
@@ -44,7 +46,8 @@ async def post_text_extraction_task(file: UploadFile = File(...),
                                     log_extra_json_key_value: str = Form(default=None),
                                     convert_to_pdf_timeout_sec: int = Form(default=1800),
                                     pdf_to_images_timeout_sec: int = Form(default=1800),
-                                    glyph_enhancing: bool = Form(default=False)):
+                                    glyph_enhancing: bool = Form(default=False),
+                                    output_formats: str = Form(default=Constants.output_format_msgpack)):
     webdav_client = get_webdav_client()
     request_id = get_valid_fn(request_id) if request_id else str(uuid4())
     log_extra = json.loads(log_extra_json_key_value) if log_extra_json_key_value else None
@@ -54,6 +57,7 @@ async def post_text_extraction_task(file: UploadFile = File(...),
                           request_date=datetime.now(),
                           doc_language=doc_language,
                           ocr_enable=ocr_enable,
+                          output_formats=output_formats,
                           convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
                           pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
                           request_callback_info=RequestCallbackInfo(
@@ -151,12 +155,28 @@ async def get_extracted_plain_text(request_id: str):
                           headers={'Content-Type': 'text/plain; charset=utf-8'})
 
 
-@app.get('/api/v1/data_extraction_tasks/{request_id}/results/plain_text_structure.json',
+@app.get('/api/v1/data_extraction_tasks/{request_id}/results/document_structure.json',
          response_model=PlainTextStructure)
 async def get_extracted_plain_text_structure(request_id: str):
     return _proxy_request(get_webdav_client(),
                           request_id,
                           load_request_metadata_or_raise(request_id).plain_text_structure_file)
+
+
+@app.get('/api/v1/data_extraction_tasks/{request_id}/results/document_markup.json',
+         response_model=MarkupPerSymbol)
+async def get_extracted_msgpack_structure(request_id: str):
+    return _proxy_request(get_webdav_client(),
+                          request_id,
+                          load_request_metadata_or_raise(request_id).markup_json_file)
+
+
+@app.get('/api/v1/data_extraction_tasks/{request_id}/results/document_markup.msgpack',
+         response_model=MarkupPerSymbol)
+async def get_extracted_msgpack_structure(request_id: str):
+    return _proxy_request(get_webdav_client(),
+                          request_id,
+                          load_request_metadata_or_raise(request_id).markup_msgpack_file)
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/searchable_pdf.pdf')
