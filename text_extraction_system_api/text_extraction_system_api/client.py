@@ -107,8 +107,14 @@ class TextExtractionSystemWebClient:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/document_markup.msgpack'
         resp = requests.get(url)
         resp.raise_for_status()
-        data = msgpack.unpackb(resp.content, raw=False, use_single_float=True)
+        data = msgpack.unpackb(resp.content, raw=False)
         return MarkupPerSymbol(**data)
+
+    def get_text_markup_msgpack_raw(self, request_id: str) -> Optional[bytes]:
+        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/document_markup.msgpack'
+        resp = requests.get(url)
+        resp.raise_for_status()
+        return resp.content
 
     def get_tables_json(self, request_id: str) -> TableList:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.json'
