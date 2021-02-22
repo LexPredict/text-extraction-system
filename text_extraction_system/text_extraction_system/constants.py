@@ -8,4 +8,3 @@ task_ids = 'task_ids'
 
 tasks_pending = 'tasks_pending'
 queue_celery_beat = 'beat'
-
