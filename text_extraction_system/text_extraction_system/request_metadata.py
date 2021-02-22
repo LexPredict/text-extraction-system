@@ -6,7 +6,7 @@ import dateutil.parser
 
 from dataclasses_json import dataclass_json, config
 from marshmallow import fields
-from text_extraction_system_api.client import Constants
+from text_extraction_system_api.dto import OutputFormat
 from webdav3.exceptions import RemoteResourceNotFound, RemoteParentNotFound
 
 from text_extraction_system.constants import metadata_fn
@@ -51,14 +51,13 @@ class RequestMetadata:
 
     status: str = STATUS_PENDING
 
-    output_format: str = Constants.output_format_msgpack
+    output_format: OutputFormat = OutputFormat.msgpack
     converted_to_pdf: Optional[str] = None
     ocred_pdf: Optional[str] = None
     pdf_file: Optional[str] = None
-    tika_xhtml_file: Optional[str] = None
     plain_text_file: Optional[str] = None
     text_structure_file: Optional[str] = None
-    markup_file: Optional[str] = None
+    pdf_coordinates_file: Optional[str] = None
     tables_file: Optional[str] = None
     doc_language: Optional[str] = None
     pages_for_ocr: Optional[Dict[int, str]] = None
@@ -88,7 +87,7 @@ class RequestMetadata:
             tables_extracted=self.tables_file is not None,
             plain_text_extracted=self.plain_text_file is not None,
             text_structure_extracted=self.text_structure_file is not None,
-            pdf_coordinates_extracted=self.markup_file is not None,
+            pdf_coordinates_extracted=self.pdf_coordinates_file is not None,
             additional_info=self.request_callback_info.call_back_additional_info,
             output_format=self.output_format
         )

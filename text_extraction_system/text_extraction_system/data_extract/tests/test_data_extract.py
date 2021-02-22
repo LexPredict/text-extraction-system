@@ -10,7 +10,7 @@ data_dir = os.path.join(os.path.dirname(__file__), 'data')
 def test_text_structure_extraction():
     fn = os.path.join(data_dir, 'structured_text.pdf')
     text, full_struct = data_extract.extract_text_and_structure(fn)
-    struct = full_struct.structure
+    struct = full_struct.text_structure
     assert 'idea if it is really' in text
     assert 'etect the sections' in text
     assert len(struct.pages) == 2
@@ -27,7 +27,7 @@ def test_recursion1():
     increase_recursion_limit()
     fn = os.path.join(data_dir, 'recursion1.pdf')
     text, struct = data_extract.extract_text_and_structure(fn)
-    assert len(struct.structure.pages) > 2
+    assert len(struct.text_structure.pages) > 2
 
 
 @with_default_settings
@@ -39,7 +39,7 @@ def test_recursion3():
     with ocr_page_to_pdf(fn) as pdf_fn:
         text, struct = data_extract.extract_text_and_structure(pdf_fn)
 
-    for num, page in enumerate(struct.structure.pages):
+    for num, page in enumerate(struct.text_structure.pages):
         assert num == page.number
 
-    assert len(struct.structure.pages) == 7
+    assert len(struct.text_structure.pages) == 7
