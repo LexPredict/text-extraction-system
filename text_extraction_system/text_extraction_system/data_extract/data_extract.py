@@ -80,10 +80,7 @@ def extract_text_and_structure(pdf_fn: str,
                                              sentences=[],
                                              paragraphs=[],
                                              sections=[])
-            return text, TextAndPDFCoordinates(
-                text_structure=text_struct,
-                pdf_coordinates=pdf_coordinates
-            )
+            return text, TextAndPDFCoordinates(text_structure=text_struct, pdf_coordinates=pdf_coordinates)
 
         pages = []
         num: int = 0
