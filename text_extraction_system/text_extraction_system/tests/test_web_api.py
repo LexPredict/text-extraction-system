@@ -44,7 +44,8 @@ async def test_webapi_calls_process_document(setup):
                                                 ocr_enable=True,
                                                 log_extra_json_key_value='null',
                                                 convert_to_pdf_timeout_sec=None,
-                                                pdf_to_images_timeout_sec=None
+                                                pdf_to_images_timeout_sec=None,
+                                                output_formats='json'
                                                 )
                 mkdir_method.assert_called()
                 upload_to_method.assert_called()
