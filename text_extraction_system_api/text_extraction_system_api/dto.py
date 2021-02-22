@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import List, Optional, Dict
+from enum import Enum
 
 from dataclasses_json import dataclass_json
 from pandas import DataFrame
@@ -8,6 +9,11 @@ from pydantic.dataclasses import dataclass as pydantic_dataclass
 STATUS_PENDING = 'PENDING'
 STATUS_DONE = 'DONE'
 STATUS_FAILURE = 'FAILURE'
+
+
+class OutputFormat(str, Enum):
+    msgpack = 'msgpack'
+    json = 'json'
 
 
 @pydantic_dataclass
@@ -27,7 +33,7 @@ class RequestStatus:
     request_id: str
     original_file_name: str
     status: str
-    output_format: str
+    output_format: OutputFormat
     error_message: Optional[str] = None
     converted_cleaned_pdf: bool = False
     searchable_pdf_created: bool = False
@@ -37,6 +43,13 @@ class RequestStatus:
     pdf_coordinates_extracted: bool = False
     tables_extracted: bool = False
     additional_info: Optional[str] = None
+
+
+@pydantic_dataclass
+@dataclass_json
+@dataclass
+class RequestStatuses:
+    request_status_by_id: Dict[str, RequestStatus]
 
 
 @pydantic_dataclass
@@ -104,16 +117,16 @@ class PlainTextStructure:
 @pydantic_dataclass
 @dataclass_json
 @dataclass
-class MarkupPerSymbol:
+class PDFCoordinates:
     char_bboxes_with_page_nums: List[List[float]]
 
 
 @pydantic_dataclass
 @dataclass_json
 @dataclass
-class TextPlusMarkup:
-    structure: PlainTextStructure
-    markup: MarkupPerSymbol
+class TextAndPDFCoordinates:
+    text_structure: PlainTextStructure
+    pdf_coordinates: PDFCoordinates
 
 
 @pydantic_dataclass
@@ -147,11 +160,6 @@ class DataFrameTable:
     coordinates: Rectangle
     df: DataFrame
     page: Optional[int] = None
-
-
-@dataclass
-class DataFrameTableList:
-    tables: List[DataFrameTable]
 
 
 @pydantic_dataclass
