@@ -1,21 +1,15 @@
 import json
 import os
-import pickle
 import tempfile
 from contextlib import contextmanager
-from typing import Generator, Optional, Dict
+from typing import Generator, Optional, Dict, List
 
 import msgpack
 import requests
 
-from text_extraction_system_api.dto import PlainTextStructure, MarkupPerSymbol, TextPlusMarkup, \
-    TableList, DataFrameTableList, RequestStatus, TaskCancelResult, \
-    PlainTextPage, PlainTextSentence, PlainTextParagraph, PlainTextSection, Table
-
-
-class Constants:
-    output_format_msgpack = 'msgpack'
-    output_format_json = 'json'
+from text_extraction_system_api.dto import PlainTextStructure, PDFCoordinates, TableList, RequestStatus, \
+    TaskCancelResult, \
+    PlainTextPage, PlainTextSentence, PlainTextParagraph, PlainTextSection, Table, OutputFormat
 
 
 class TextExtractionSystemWebClient:
@@ -42,7 +36,7 @@ class TextExtractionSystemWebClient:
                                       request_id: str = None,
                                       log_extra: Dict[str, str] = None,
                                       glyph_enhancing: bool = False,
-                                      output_format: str = Constants.output_format_msgpack) -> str:
+                                      output_format: OutputFormat = OutputFormat.json) -> str:
         resp = requests.post(f'{self.base_url}/api/v1/data_extraction_tasks/',
                              files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
                              data=dict(call_back_url=call_back_url,
@@ -61,7 +55,7 @@ class TextExtractionSystemWebClient:
                                        request_id=request_id,
                                        log_extra_json_key_value=json.dumps(log_extra) if log_extra else None,
                                        glyph_enhancing=glyph_enhancing,
-                                       output_format=output_format))
+                                       output_format=output_format.value))
         if resp.status_code not in {200, 201}:
             resp.raise_for_status()
         return json.loads(resp.content)
@@ -92,59 +86,61 @@ class TextExtractionSystemWebClient:
         resp.raise_for_status()
         return resp.text
 
-    def get_text_structure_json(self, request_id: str) -> PlainTextStructure:
+    def get_extracted_text_structure_as_json(self, request_id: str) -> PlainTextStructure:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/document_structure.json'
         resp = requests.get(url)
         resp.raise_for_status()
         return PlainTextStructure.from_json(resp.content)
 
-    def get_text_structure_msgpack(self, request_id: str) -> PlainTextStructure:
+    def get_extracted_text_structure_as_msgpack(self, request_id: str) -> PlainTextStructure:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/document_structure.msgpack'
         resp = requests.get(url)
         resp.raise_for_status()
         return self._unpack_msgpack_text_structure(resp.content)
 
-    def get_text_markup_json(self, request_id: str) -> MarkupPerSymbol:
-        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/document_markup.json'
+    def get_extracted_pdf_coordinates_as_json(self, request_id: str) -> PDFCoordinates:
+        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/pdf_coordinates.json'
         resp = requests.get(url)
         resp.raise_for_status()
-        return MarkupPerSymbol.from_json(resp.content)
+        return PDFCoordinates.from_json(resp.content)
 
-    def get_text_markup_msgpack(self, request_id: str) -> MarkupPerSymbol:
-        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/document_markup.msgpack'
+    def get_extracted_pdf_coordinates_as_msgpack(self, request_id: str) \
+            -> PDFCoordinates:
+        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/pdf_coordinates.msgpack'
         resp = requests.get(url)
         resp.raise_for_status()
         data = msgpack.unpackb(resp.content, raw=False)
-        return MarkupPerSymbol(**data)
+        return PDFCoordinates(**data)
 
-    def get_text_markup_msgpack_raw(self, request_id: str) -> Optional[bytes]:
-        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/document_markup.msgpack'
+    def get_extracted_pdf_coordinates_as_msgpack_raw(self, request_id: str) \
+            -> Optional[bytes]:
+        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/pdf_coordinates.msgpack'
         resp = requests.get(url)
         resp.raise_for_status()
         return resp.content
 
-    def get_tables_json(self, request_id: str) -> TableList:
+    def get_extracted_tables_as_json(self, request_id: str) -> TableList:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.json'
         resp = requests.get(url)
         resp.raise_for_status()
         return TableList.from_json(resp.content)
 
-    def get_tables_msgpack(self, request_id: str) -> TableList:
-        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.pickle'
+    def get_extracted_tables_as_msgpack(self, request_id: str) -> TableList:
+        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.msgpack'
         resp = requests.get(url)
         resp.raise_for_status()
         data = msgpack.unpackb(resp.content, raw=False)
-        tab_lst = TableList(tables=[])
-        for table in data:
-            tab_lst.tables.append(Table(**table))
-        return tab_list
+        tab_list: List[Table] = list()
+        for table in data['tables']:
+            tab_list.append(Table(**table))
+        return TableList(tables=tab_list)
 
     def delete_data_extraction_task_files(self, request_id: str):
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/'
         resp = requests.delete(url)
         resp.raise_for_status()
 
-    def cancel_data_extraction_task(self, request_id: str) -> TaskCancelResult:
+    def purge_data_extraction_task(self, request_id: str) -> TaskCancelResult:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/'
         resp = requests.delete(url)
         resp.raise_for_status()

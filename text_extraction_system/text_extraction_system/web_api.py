@@ -11,8 +11,7 @@ import pandas
 from fastapi import FastAPI, File, UploadFile, Form, Response
 from fastapi.exceptions import HTTPException
 from starlette.responses import StreamingResponse
-from starlette.status import HTTP_404_NOT_FOUND
-from text_extraction_system_api.client import Constants
+from starlette.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
 from webdav3.exceptions import RemoteResourceNotFound
 
 from text_extraction_system import version
@@ -24,14 +23,15 @@ from text_extraction_system.request_metadata import RequestMetadata, RequestCall
     load_request_metadata
 from text_extraction_system.tasks import process_document, celery_app, register_task_id, get_request_task_ids
 from text_extraction_system_api import dto
-from text_extraction_system_api.dto import TableList, PlainTextStructure, RequestStatus, SystemInfo, TaskCancelResult, \
-    MarkupPerSymbol
+from text_extraction_system_api.dto import OutputFormat, TableList, PlainTextStructure, RequestStatus, RequestStatuses, SystemInfo, \
+    TaskCancelResult, \
+    PDFCoordinates
 
 app = FastAPI()
 
 
 @app.post('/api/v1/data_extraction_tasks/', response_model=str)
-async def post_text_extraction_task(file: UploadFile = File(...),
+async def post_data_extraction_task(file: UploadFile = File(...),
                                     call_back_url: str = Form(default=None),
                                     call_back_celery_broker: str = Form(default=None),
                                     call_back_celery_task_name: str = Form(default=None),
@@ -48,7 +48,7 @@ async def post_text_extraction_task(file: UploadFile = File(...),
                                     convert_to_pdf_timeout_sec: int = Form(default=1800),
                                     pdf_to_images_timeout_sec: int = Form(default=1800),
                                     glyph_enhancing: bool = Form(default=False),
-                                    output_format: str = Form(default=Constants.output_format_msgpack)):
+                                    output_format: OutputFormat = Form(default=OutputFormat.json)):
     webdav_client = get_webdav_client()
     request_id = get_valid_fn(request_id) if request_id else str(uuid4())
     log_extra = json.loads(log_extra_json_key_value) if log_extra_json_key_value else None
@@ -95,7 +95,7 @@ def load_request_metadata_or_raise(request_id: str) -> RequestMetadata:
 
 
 @app.delete('/api/v1/data_extraction_tasks/{request_id}/', response_model=TaskCancelResult)
-async def purge_text_extraction_task(request_id: str):
+async def purge_data_extraction_task(request_id: str):
     problems = dict()
     success = list()
     celery_task_ids: List[str] = get_request_task_ids(get_webdav_client(), request_id)
@@ -123,20 +123,22 @@ async def get_request_status(request_id: str):
     return load_request_metadata_or_raise(request_id).to_request_status().to_dict()
 
 
-@app.post('/api/v1/data_extraction_tasks/{request_id}/statuses', response_model=Dict[str, RequestStatus])
-async def get_request_statuses(request_ids: List[str]):
+@app.post('/api/v1/data_extraction_tasks/query_request_statuses')
+async def get_multiple_request_statuses(request_ids: List[str]) -> RequestStatuses:
+    if not request_ids:
+        raise HTTPException(HTTP_400_BAD_REQUEST, 'Request ids must be specified.')
     statuses = {}
     for request_id in request_ids:
         req = load_request_metadata(request_id)
-        statuses[request_id] = req.to_dict() if req else None
-    return statuses
+        statuses[request_id] = req.to_request_status() if req else None
+    return RequestStatuses(request_status_by_id=statuses)
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/packed_data.zip')
-async def get_packed_data(request_id: str):
+async def get_all_extracted_data_in_zip_archive(request_id: str):
     req: RequestMetadata = load_request_metadata_or_raise(request_id)
     files = [f'/{request_id}/{f}' for f in [req.plain_text_file, req.text_structure_file,
-             req.tables_file, req.markup_file] if f]
+                                            req.tables_file, req.pdf_coordinates_file] if f]
     mem_stream = get_webdav_client().download_packed_files(files)
     mem_stream.seek(0)
     response = StreamingResponse(mem_stream, media_type='application/x-zip-compressed')
@@ -146,18 +148,18 @@ async def get_packed_data(request_id: str):
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.json',
          response_model=TableList)
-async def get_extracted_tables_in_json(request_id: str):
+async def get_extracted_tables_as_json(request_id: str):
     return _proxy_request(get_webdav_client(), request_id, load_request_metadata_or_raise(request_id).tables_file)
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.msgpack',
          responses={
              200: {
-                 'description': 'Packed DataFrameTableList object.',
+                 'description': 'TableList object in msgpack format.',
                  'content': {'application/octet-stream': {}},
              }
          })
-async def get_extracted_tables_as_pickled_dataframe_table_list(request_id: str):
+async def get_extracted_tables_as_msgpack(request_id: str):
     return _proxy_request(get_webdav_client(), request_id, load_request_metadata_or_raise(request_id).tables_file)
 
 
@@ -171,7 +173,7 @@ async def get_extracted_plain_text(request_id: str):
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/document_structure.json',
          response_model=PlainTextStructure)
-async def get_extracted_text_structure_json(request_id: str):
+async def get_extracted_text_structure_as_json(request_id: str):
     return _proxy_request(get_webdav_client(),
                           request_id,
                           load_request_metadata_or_raise(request_id).text_structure_file)
@@ -180,35 +182,35 @@ async def get_extracted_text_structure_json(request_id: str):
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/document_structure.msgpack',
          responses={
              200: {
-                 'description': 'Packed PlainTextStructure object.',
+                 'description': 'PlainTextStructure object in msgpack format.',
                  'content': {'application/octet-stream': {}},
              }
          })
-async def get_extracted_text_structure_msgpack(request_id: str):
+async def get_extracted_text_structure_as_msgpack(request_id: str):
     return _proxy_request(get_webdav_client(),
                           request_id,
                           load_request_metadata_or_raise(request_id).text_structure_file)
 
 
-@app.get('/api/v1/data_extraction_tasks/{request_id}/results/document_markup.json',
-         response_model=MarkupPerSymbol)
-async def get_extracted_msgpack_structure(request_id: str):
+@app.get('/api/v1/data_extraction_tasks/{request_id}/results/pdf_coordinates.json',
+         response_model=PDFCoordinates)
+async def get_pdf_coordinates_of_each_character_in_extracted_plain_text_as_json(request_id: str):
     return _proxy_request(get_webdav_client(),
                           request_id,
-                          load_request_metadata_or_raise(request_id).markup_file)
+                          load_request_metadata_or_raise(request_id).pdf_coordinates_file)
 
 
-@app.get('/api/v1/data_extraction_tasks/{request_id}/results/document_markup.msgpack',
+@app.get('/api/v1/data_extraction_tasks/{request_id}/results/pdf_coordinates.msgpack',
          responses={
              200: {
-                 'description': 'Packed DataFrameTableList object.',
+                 'description': 'PDFCoordinates object in msgpack format.',
                  'content': {'application/octet-stream': {}},
              }
          })
-async def get_extracted_msgpack_structure(request_id: str):
+async def get_pdf_coordinates_of_each_character_in_extracted_plain_text_as_msgpack(request_id: str):
     return _proxy_request(get_webdav_client(),
                           request_id,
-                          load_request_metadata_or_raise(request_id).markup_file)
+                          load_request_metadata_or_raise(request_id).pdf_coordinates_file)
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/searchable_pdf.pdf')
