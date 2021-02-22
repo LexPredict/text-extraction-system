@@ -73,13 +73,17 @@ def extract_text_and_structure(pdf_fn: str,
 
         text = pdfbox_res['text']
         if len(text) == 0:
-            return text, PlainTextStructure(title='',
-                                            language='en',  # FastText returns English for empty strings
-                                            pages=[],
-                                            sentences=[],
-                                            paragraphs=[],
-                                            sections=[],
-                                            char_bboxes_with_page_nums=pdfbox_res['charBBoxesWithPageNums'])
+            pdf_coordinates = PDFCoordinates(char_bboxes_with_page_nums=pdfbox_res['charBBoxesWithPageNums'])
+            text_struct = PlainTextStructure(title='',
+                                             language='en',  # FastText returns English for empty strings
+                                             pages=[],
+                                             sentences=[],
+                                             paragraphs=[],
+                                             sections=[])
+            return text, TextAndPDFCoordinates(
+                text_structure=text_struct,
+                pdf_coordinates=pdf_coordinates
+            )
 
         pages = []
         num: int = 0
