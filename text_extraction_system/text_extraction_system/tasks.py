@@ -5,14 +5,16 @@ import pickle
 import shutil
 import tempfile
 from contextlib import contextmanager
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 
+import msgpack
 import pycountry
 import requests
 from camelot.core import Table as CamelotTable
 from celery import Celery, chord
 from celery.signals import after_setup_logger, worker_process_init, before_task_publish, task_success, task_failure, \
     task_revoked
+from text_extraction_system_api.client import Constants
 from webdav3.exceptions import RemoteResourceNotFound
 
 from text_extraction_system.celery_log import JSONFormatter, set_log_extra
@@ -31,7 +33,7 @@ from text_extraction_system.request_metadata import RequestCallbackInfo, Request
 from text_extraction_system.result_delivery.celery_client import send_task
 from text_extraction_system.task_health.task_health import store_pending_task_info_in_webdav, \
     remove_pending_task_info_from_webdav, re_schedule_unknown_pending_tasks, init_task_tracking
-from text_extraction_system_api.dto import RequestStatus, STATUS_FAILURE, STATUS_PENDING, STATUS_DONE
+from text_extraction_system_api.dto import RequestStatus, STATUS_FAILURE, STATUS_PENDING, STATUS_DONE, TextPlusMarkup
 
 settings = get_settings()
 
@@ -157,6 +159,7 @@ def deliver_error(request_id: str,
                   request_callback_info: RequestCallbackInfo,
                   problem: Optional[str] = None,
                   exc: Optional[Exception] = None):
+    req: Optional[RequestMetadata] = None
     try:
         req = load_request_metadata(request_id)
         if not req:
@@ -177,7 +180,8 @@ def deliver_error(request_id: str,
     req_status = RequestStatus(request_id=request_id,
                                original_file_name=request_callback_info.original_file_name,
                                status=STATUS_FAILURE,
-                               additional_info=request_callback_info.call_back_additional_info)
+                               additional_info=request_callback_info.call_back_additional_info,
+                               output_format=req.output_format)
     deliver_results(request_callback_info, req_status)
 
 
@@ -390,23 +394,44 @@ def extract_data_and_finish(req: RequestMetadata,
     req.pdf_file = req.ocred_pdf or req.converted_to_pdf or req.original_document
     pdf_fn_in_storage_base = os.path.splitext(req.original_document)[0]
 
-    text, plain_text_structure = extract_text_and_structure(
+    text_markup: Tuple[str, TextPlusMarkup] = extract_text_and_structure(
         local_pdf_fn, glyph_enhancing=glyph_enhancing)
+    text, text_structure = text_markup
     req.plain_text_file = pdf_fn_in_storage_base + '.plain.txt'
     webdav_client.upload_to(text.encode('utf-8'), f'{req.request_id}/{req.plain_text_file}')
 
-    req.plain_text_structure_file = pdf_fn_in_storage_base + '.plain_struct.json'
-    plain_text_structure = json.dumps(plain_text_structure.to_dict(), indent=2)
-    webdav_client.upload_to(plain_text_structure.encode('utf-8'), f'{req.request_id}/{req.plain_text_structure_file}')
+    # save common structure information: title, language
+    if req.output_format == Constants.output_format_json:
+        req.markup_file = pdf_fn_in_storage_base + '.document_markup.json'
+        jsn = json.dumps(text_structure.markup.to_dict(), indent=2)
+        webdav_client.upload_to(jsn.encode('utf-8'), f'{req.request_id}/{req.markup_file}')
+
+        req.text_structure_file = pdf_fn_in_storage_base + '.document_structure.json'
+        plain_text_structure = json.dumps(text_structure.structure.to_dict(), indent=2)
+        webdav_client.upload_to(plain_text_structure.encode('utf-8'),
+                                f'{req.request_id}/{req.text_structure_file}')
+
+    if req.output_format == Constants.output_format_msgpack:
+        req.markup_file = pdf_fn_in_storage_base + '.document_markup.msgpack'
+        packed = msgpack.packb(text_structure.markup.__dict__, use_bin_type=True, use_single_float=True)
+        webdav_client.upload_to(packed, f'{req.request_id}/{req.markup_file}')
+
+        req.text_structure_file = pdf_fn_in_storage_base + '.document_structure.msgpack'
+        packed = msgpack.packb(text_structure.structure.to_dict(), use_bin_type=True, use_single_float=True)
+        webdav_client.upload_to(packed,
+                                f'{req.request_id}/{req.text_structure_file}')
 
     tables, df_tables = get_table_dtos_from_camelot_output(camelot_tables)
     if tables and tables.tables or df_tables and df_tables.tables:
-        req.tables_json_file = pdf_fn_in_storage_base + '.tables.json'
-        webdav_client.upload_to(json.dumps(tables.to_dict(), indent=2).encode('utf-8'),
-                                f'{req.request_id}/{req.tables_json_file}')
+        if req.output_format == Constants.output_format_json:
+            req.tables_file = pdf_fn_in_storage_base + '.tables.json'
+            webdav_client.upload_to(json.dumps(tables.to_dict(), indent=2).encode('utf-8'),
+                                    f'{req.request_id}/{req.tables_file}')
 
-        req.tables_df_file = pdf_fn_in_storage_base + '.tables.pickle'
-        webdav_client.upload_to(pickle.dumps(df_tables), f'{req.request_id}/{req.tables_df_file}')
+        if req.output_formats == Constants.output_format_msgpack:
+            req.tables_file = pdf_fn_in_storage_base + '.tables.msgpack'
+            packed = msgpack.packb(tables.to_dict(), use_bin_type=True, use_single_float=True)
+            webdav_client.upload_to(packed, f'{req.request_id}/{req.tables_file}')
 
     if settings.delete_temp_files_on_request_finish:
         if req.converted_to_pdf and req.converted_to_pdf != req.pdf_file:

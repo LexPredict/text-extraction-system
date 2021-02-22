@@ -179,10 +179,10 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         super.writeString(text, textPositions);
         if (textPositions != null) {
             for (TextPosition pos : textPositions) {
-                double[] glyphBox;
+                double[] glyphBox = null;
                 if (this.enhancedSizeDetection)
                     glyphBox = this.getEnhancedGlyphBox(pos);
-                else
+                if (glyphBox == null)
                     glyphBox = new double[]{ getCurrentPageNo(), r(pos.getX()),
                             r(pos.getY()), r(pos.getWidth()), r(pos.getHeight())};
 
@@ -192,11 +192,14 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     }
 
     protected double[] getEnhancedGlyphBox(TextPosition pos) throws IOException {
-        PDTrueTypeFont font = (PDTrueTypeFont) pos.getFont();
-        float fullHtAbs = (font.getFontDescriptor().getCapHeight()) / 1000 * pos.getFontSize();
+        PDFont font = pos.getFont();
+        if (font == null)
+            return null;
+
+        PDFontDescriptor descr = font.getFontDescriptor();
+        float fullHtAbs = (descr.getCapHeight()) / 1000 * pos.getFontSize();
         BoundingBox bbox = font.getBoundingBox();
         float fullHtRel = bbox.getHeight();
-        PDFontDescriptor descr = font.getFontDescriptor();
         float ascRel = descr.getAscent();
         float ascAbs = ascRel * fullHtAbs / fullHtRel;
         float capHtRel = descr.getCapHeight();
@@ -368,5 +371,4 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         res.charBBoxesWithPageNums = pdf2text.charBBoxesWithPageNums;
         return res;
     }
-
 }
