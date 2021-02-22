@@ -31,7 +31,7 @@ from text_extraction_system.ocr.ocr import ocr_page_to_pdf
 from text_extraction_system.pdf.pdf import page_requires_ocr, extract_page_images, raise_from_pdfbox_error_messages
 from text_extraction_system.processes import raise_from_process
 from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, PlainTextStructure, \
-    PlainTextSentence
+    PlainTextSentence, TextPlusMarkup, MarkupPerSymbol
 
 log = getLogger(__name__)
 PAGE_SEPARATOR = '\n\n\f'
@@ -41,7 +41,7 @@ def extract_text_and_structure(pdf_fn: str,
                                pdf_password: str = None,
                                timeout_sec: int = 3600,
                                glyph_enhancing: bool = False) \
-        -> Tuple[str, PlainTextStructure]:
+        -> Tuple[str, TextPlusMarkup]:
     java_modules_path = get_settings().java_modules_path
 
     temp_dir = mkdtemp(prefix='pdf_text_')
@@ -120,13 +120,17 @@ def extract_text_and_structure(pdf_fn: str,
 
         doc_lang = get_lang_detector().predict_lang(text)
 
-        return text, PlainTextStructure(title=title,
-                                        language=doc_lang,
-                                        pages=pages,
-                                        sentences=sentences,
-                                        paragraphs=paragraphs,
-                                        sections=sections,
-                                        char_bboxes_with_page_nums=pdfbox_res['charBBoxesWithPageNums'])
+        text_struct = PlainTextStructure(
+            title=title,
+            language=doc_lang,
+            pages=pages,
+            sentences=sentences,
+            paragraphs=paragraphs,
+            sections=sections)
+
+        char_bboxes_with_page_nums = pdfbox_res['charBBoxesWithPageNums']
+        text_markup = MarkupPerSymbol(char_bboxes_with_page_nums=char_bboxes_with_page_nums)
+        return text, TextPlusMarkup(structure=text_struct, markup=text_markup)
 
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)

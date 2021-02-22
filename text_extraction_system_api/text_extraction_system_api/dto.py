@@ -27,12 +27,14 @@ class RequestStatus:
     request_id: str
     original_file_name: str
     status: str
+    output_format: str
     error_message: Optional[str] = None
     converted_cleaned_pdf: bool = False
     searchable_pdf_created: bool = False
     pdf_pages_ocred: Optional[List[int]] = None
     plain_text_extracted: bool = False
-    plain_text_structure_extracted: bool = False
+    text_structure_extracted: bool = False
+    pdf_coordinates_extracted: bool = False
     tables_extracted: bool = False
     additional_info: Optional[str] = None
 
@@ -97,7 +99,21 @@ class PlainTextStructure:
     sentences: List[PlainTextSentence]
     paragraphs: List[PlainTextParagraph]
     sections: List[PlainTextSection]
+
+
+@pydantic_dataclass
+@dataclass_json
+@dataclass
+class MarkupPerSymbol:
     char_bboxes_with_page_nums: List[List[float]]
+
+
+@pydantic_dataclass
+@dataclass_json
+@dataclass
+class TextPlusMarkup:
+    structure: PlainTextStructure
+    markup: MarkupPerSymbol
 
 
 @pydantic_dataclass

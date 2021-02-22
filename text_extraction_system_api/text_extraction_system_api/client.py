@@ -5,10 +5,17 @@ import tempfile
 from contextlib import contextmanager
 from typing import Generator, Optional, Dict
 
+import msgpack
 import requests
 
-from text_extraction_system_api.dto import PlainTextStructure, TableList, DataFrameTableList, RequestStatus, \
-    TaskCancelResult
+from text_extraction_system_api.dto import PlainTextStructure, MarkupPerSymbol, TextPlusMarkup, \
+    TableList, DataFrameTableList, RequestStatus, TaskCancelResult, \
+    PlainTextPage, PlainTextSentence, PlainTextParagraph, PlainTextSection, Table
+
+
+class Constants:
+    output_format_msgpack = 'msgpack'
+    output_format_json = 'json'
 
 
 class TextExtractionSystemWebClient:
@@ -34,7 +41,8 @@ class TextExtractionSystemWebClient:
                                       call_back_celery_version: int = 4,
                                       request_id: str = None,
                                       log_extra: Dict[str, str] = None,
-                                      glyph_enhancing: bool = False) -> str:
+                                      glyph_enhancing: bool = False,
+                                      output_format: str = Constants.output_format_msgpack) -> str:
         resp = requests.post(f'{self.base_url}/api/v1/data_extraction_tasks/',
                              files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
                              data=dict(call_back_url=call_back_url,
@@ -52,7 +60,8 @@ class TextExtractionSystemWebClient:
                                        ocr_enable=ocr_enable,
                                        request_id=request_id,
                                        log_extra_json_key_value=json.dumps(log_extra) if log_extra else None,
-                                       glyph_enhancing=glyph_enhancing))
+                                       glyph_enhancing=glyph_enhancing,
+                                       output_format=output_format))
         if resp.status_code not in {200, 201}:
             resp.raise_for_status()
         return json.loads(resp.content)
@@ -83,11 +92,36 @@ class TextExtractionSystemWebClient:
         resp.raise_for_status()
         return resp.text
 
-    def get_plain_text_structure(self, request_id: str) -> PlainTextStructure:
-        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/plain_text_structure.json'
+    def get_text_structure_json(self, request_id: str) -> PlainTextStructure:
+        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/document_structure.json'
         resp = requests.get(url)
         resp.raise_for_status()
         return PlainTextStructure.from_json(resp.content)
+
+    def get_text_structure_msgpack(self, request_id: str) -> PlainTextStructure:
+        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/document_structure.msgpack'
+        resp = requests.get(url)
+        resp.raise_for_status()
+        return self._unpack_msgpack_text_structure(resp.content)
+
+    def get_text_markup_json(self, request_id: str) -> MarkupPerSymbol:
+        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/document_markup.json'
+        resp = requests.get(url)
+        resp.raise_for_status()
+        return MarkupPerSymbol.from_json(resp.content)
+
+    def get_text_markup_msgpack(self, request_id: str) -> MarkupPerSymbol:
+        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/document_markup.msgpack'
+        resp = requests.get(url)
+        resp.raise_for_status()
+        data = msgpack.unpackb(resp.content, raw=False)
+        return MarkupPerSymbol(**data)
+
+    def get_text_markup_msgpack_raw(self, request_id: str) -> Optional[bytes]:
+        url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/document_markup.msgpack'
+        resp = requests.get(url)
+        resp.raise_for_status()
+        return resp.content
 
     def get_tables_json(self, request_id: str) -> TableList:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.json'
@@ -95,11 +129,15 @@ class TextExtractionSystemWebClient:
         resp.raise_for_status()
         return TableList.from_json(resp.content)
 
-    def get_tables_df(self, request_id: str) -> DataFrameTableList:
+    def get_tables_msgpack(self, request_id: str) -> TableList:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.pickle'
         resp = requests.get(url)
         resp.raise_for_status()
-        return pickle.loads(resp.content)
+        data = msgpack.unpackb(resp.content, raw=False)
+        tab_lst = TableList(tables=[])
+        for table in data:
+            tab_lst.tables.append(Table(**table))
+        return tab_list
 
     def delete_data_extraction_task_files(self, request_id: str):
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/'
@@ -111,3 +149,17 @@ class TextExtractionSystemWebClient:
         resp = requests.delete(url)
         resp.raise_for_status()
         return TaskCancelResult.from_json(resp.content)
+
+    @classmethod
+    def _unpack_msgpack_text_structure(cls, data: Optional[bytes]) -> Optional[PlainTextStructure]:
+        if not data:
+            return None
+        shallow_structure = msgpack.unpackb(data, raw=False)
+        ps = PlainTextStructure(title=shallow_structure.get('title'),
+                                language=shallow_structure.get('language'),
+                                pages=[], sentences=[], paragraphs=[], sections=[])
+        ps.pages = [PlainTextPage(**p) for p in shallow_structure.get('pages', [])]
+        ps.sentences = [PlainTextSentence(**p) for p in shallow_structure.get('sentences', [])]
+        ps.paragraphs = [PlainTextParagraph(**p) for p in shallow_structure.get('paragraphs', [])]
+        ps.sections = [PlainTextSection(**p) for p in shallow_structure.get('sections', [])]
+        return ps
