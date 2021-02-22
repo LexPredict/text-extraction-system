@@ -51,17 +51,15 @@ class RequestMetadata:
 
     status: str = STATUS_PENDING
 
-    output_formats: str = Constants.output_format_msgpack
+    output_format: str = Constants.output_format_msgpack
     converted_to_pdf: Optional[str] = None
     ocred_pdf: Optional[str] = None
     pdf_file: Optional[str] = None
     tika_xhtml_file: Optional[str] = None
     plain_text_file: Optional[str] = None
-    plain_text_structure_file: Optional[str] = None
-    markup_json_file: Optional[str] = None
-    markup_msgpack_file: Optional[str] = None
-    tables_json_file: Optional[str] = None
-    tables_df_file: Optional[str] = None
+    text_structure_file: Optional[str] = None
+    markup_file: Optional[str] = None
+    tables_file: Optional[str] = None
     doc_language: Optional[str] = None
     pages_for_ocr: Optional[Dict[int, str]] = None
     error_message: Optional[str] = None
@@ -87,12 +85,12 @@ class RequestMetadata:
             converted_cleaned_pdf=self.converted_to_pdf is not None,
             searchable_pdf_created=self.ocred_pdf is not None,
             pdf_pages_ocred=sorted(list(self.pages_for_ocr.keys())) if self.pages_for_ocr else None,
-            tables_extracted=self.tables_json_file is not None,
+            tables_extracted=self.tables_file is not None,
             plain_text_extracted=self.plain_text_file is not None,
-            plain_text_structure_extracted=self.plain_text_structure_file is not None,
-            markup_json_file_extracted=self.markup_json_file is not None,
-            markup_msgpack_file_extracted=self.markup_msgpack_file is not None,
-            additional_info=self.request_callback_info.call_back_additional_info
+            text_structure_extracted=self.text_structure_file is not None,
+            markup_file_extracted=self.markup_file is not None,
+            additional_info=self.request_callback_info.call_back_additional_info,
+            output_format=self.output_format
         )
 
 
