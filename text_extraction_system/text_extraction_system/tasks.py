@@ -159,6 +159,7 @@ def deliver_error(request_id: str,
                   request_callback_info: RequestCallbackInfo,
                   problem: Optional[str] = None,
                   exc: Optional[Exception] = None):
+    req: Optional[RequestMetadata] = None
     try:
         req = load_request_metadata(request_id)
         if not req:
@@ -179,7 +180,8 @@ def deliver_error(request_id: str,
     req_status = RequestStatus(request_id=request_id,
                                original_file_name=request_callback_info.original_file_name,
                                status=STATUS_FAILURE,
-                               additional_info=request_callback_info.call_back_additional_info)
+                               additional_info=request_callback_info.call_back_additional_info,
+                               output_format=req.output_format)
     deliver_results(request_callback_info, req_status)
 
 
@@ -399,28 +401,37 @@ def extract_data_and_finish(req: RequestMetadata,
     webdav_client.upload_to(text.encode('utf-8'), f'{req.request_id}/{req.plain_text_file}')
 
     # save common structure information: title, language
-    req.plain_text_structure_file = pdf_fn_in_storage_base + '.document_structure.json'
-    plain_text_structure = json.dumps(text_structure.structure.to_dict(), indent=2)
-    webdav_client.upload_to(plain_text_structure.encode('utf-8'), f'{req.request_id}/{req.plain_text_structure_file}')
-
-    if Constants.output_format_json in req.output_formats:
-        req.markup_json_file = pdf_fn_in_storage_base + '.document_markup.json'
+    if req.output_format == Constants.output_format_json:
+        req.markup_file = pdf_fn_in_storage_base + '.document_markup.json'
         jsn = json.dumps(text_structure.markup.to_dict(), indent=2)
-        webdav_client.upload_to(jsn.encode('utf-8'), f'{req.request_id}/{req.markup_json_file}')
+        webdav_client.upload_to(jsn.encode('utf-8'), f'{req.request_id}/{req.markup_file}')
 
-    if Constants.output_format_msgpack in req.output_formats:
-        req.markup_msgpack_file = pdf_fn_in_storage_base + '.document_markup.msgpack'
+        req.text_structure_file = pdf_fn_in_storage_base + '.document_structure.json'
+        plain_text_structure = json.dumps(text_structure.structure.to_dict(), indent=2)
+        webdav_client.upload_to(plain_text_structure.encode('utf-8'),
+                                f'{req.request_id}/{req.text_structure_file}')
+
+    if req.output_format == Constants.output_format_msgpack:
+        req.markup_file = pdf_fn_in_storage_base + '.document_markup.msgpack'
         packed = msgpack.packb(text_structure.markup.__dict__, use_bin_type=True, use_single_float=True)
-        webdav_client.upload_to(packed, f'{req.request_id}/{req.markup_msgpack_file}')
+        webdav_client.upload_to(packed, f'{req.request_id}/{req.markup_file}')
+
+        req.text_structure_file = pdf_fn_in_storage_base + '.document_structure.msgpack'
+        packed = msgpack.packb(text_structure.structure.to_dict(), use_bin_type=True, use_single_float=True)
+        webdav_client.upload_to(packed,
+                                f'{req.request_id}/{req.text_structure_file}')
 
     tables, df_tables = get_table_dtos_from_camelot_output(camelot_tables)
     if tables and tables.tables or df_tables and df_tables.tables:
-        req.tables_json_file = pdf_fn_in_storage_base + '.tables.json'
-        webdav_client.upload_to(json.dumps(tables.to_dict(), indent=2).encode('utf-8'),
-                                f'{req.request_id}/{req.tables_json_file}')
+        if req.output_format == Constants.output_format_json:
+            req.tables_file = pdf_fn_in_storage_base + '.tables.json'
+            webdav_client.upload_to(json.dumps(tables.to_dict(), indent=2).encode('utf-8'),
+                                    f'{req.request_id}/{req.tables_file}')
 
-        req.tables_df_file = pdf_fn_in_storage_base + '.tables.pickle'
-        webdav_client.upload_to(pickle.dumps(df_tables), f'{req.request_id}/{req.tables_df_file}')
+        if req.output_formats == Constants.output_format_msgpack:
+            req.tables_file = pdf_fn_in_storage_base + '.tables.msgpack'
+            packed = msgpack.packb(tables.to_dict(), use_bin_type=True, use_single_float=True)
+            webdav_client.upload_to(packed, f'{req.request_id}/{req.tables_file}')
 
     if settings.delete_temp_files_on_request_finish:
         if req.converted_to_pdf and req.converted_to_pdf != req.pdf_file:
