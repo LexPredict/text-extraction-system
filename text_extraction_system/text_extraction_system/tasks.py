@@ -14,7 +14,7 @@ from camelot.core import Table as CamelotTable
 from celery import Celery, chord
 from celery.signals import after_setup_logger, worker_process_init, before_task_publish, task_success, task_failure, \
     task_revoked
-from text_extraction_system_api.client import Constants
+from text_extraction_system_api.dto import OutputFormat
 from webdav3.exceptions import RemoteResourceNotFound
 
 from text_extraction_system.celery_log import JSONFormatter, set_log_extra
@@ -33,7 +33,7 @@ from text_extraction_system.request_metadata import RequestCallbackInfo, Request
 from text_extraction_system.result_delivery.celery_client import send_task
 from text_extraction_system.task_health.task_health import store_pending_task_info_in_webdav, \
     remove_pending_task_info_from_webdav, re_schedule_unknown_pending_tasks, init_task_tracking
-from text_extraction_system_api.dto import RequestStatus, STATUS_FAILURE, STATUS_PENDING, STATUS_DONE, TextPlusMarkup
+from text_extraction_system_api.dto import RequestStatus, STATUS_FAILURE, STATUS_PENDING, STATUS_DONE, TextAndPDFCoordinates
 
 settings = get_settings()
 
@@ -394,41 +394,38 @@ def extract_data_and_finish(req: RequestMetadata,
     req.pdf_file = req.ocred_pdf or req.converted_to_pdf or req.original_document
     pdf_fn_in_storage_base = os.path.splitext(req.original_document)[0]
 
-    text_markup: Tuple[str, TextPlusMarkup] = extract_text_and_structure(
-        local_pdf_fn, glyph_enhancing=glyph_enhancing)
-    text, text_structure = text_markup
+    text, text_structure = extract_text_and_structure(local_pdf_fn, glyph_enhancing=glyph_enhancing)
     req.plain_text_file = pdf_fn_in_storage_base + '.plain.txt'
     webdav_client.upload_to(text.encode('utf-8'), f'{req.request_id}/{req.plain_text_file}')
 
-    # save common structure information: title, language
-    if req.output_format == Constants.output_format_json:
-        req.markup_file = pdf_fn_in_storage_base + '.document_markup.json'
-        jsn = json.dumps(text_structure.markup.to_dict(), indent=2)
-        webdav_client.upload_to(jsn.encode('utf-8'), f'{req.request_id}/{req.markup_file}')
+    if req.output_format == OutputFormat.json:
+        req.pdf_coordinates_file = pdf_fn_in_storage_base + '.pdf_coordinates.json'
+        jsn = json.dumps(text_structure.pdf_coordinates.to_dict(), indent=2)
+        webdav_client.upload_to(jsn.encode('utf-8'), f'{req.request_id}/{req.pdf_coordinates_file}')
 
         req.text_structure_file = pdf_fn_in_storage_base + '.document_structure.json'
-        plain_text_structure = json.dumps(text_structure.structure.to_dict(), indent=2)
+        plain_text_structure = json.dumps(text_structure.text_structure.to_dict(), indent=2)
         webdav_client.upload_to(plain_text_structure.encode('utf-8'),
                                 f'{req.request_id}/{req.text_structure_file}')
 
-    if req.output_format == Constants.output_format_msgpack:
-        req.markup_file = pdf_fn_in_storage_base + '.document_markup.msgpack'
-        packed = msgpack.packb(text_structure.markup.__dict__, use_bin_type=True, use_single_float=True)
-        webdav_client.upload_to(packed, f'{req.request_id}/{req.markup_file}')
+    if req.output_format == OutputFormat.msgpack:
+        req.pdf_coordinates_file = pdf_fn_in_storage_base + '.pdf_coordinates.msgpack'
+        packed = msgpack.packb(text_structure.pdf_coordinates.__dict__, use_bin_type=True, use_single_float=True)
+        webdav_client.upload_to(packed, f'{req.request_id}/{req.pdf_coordinates_file}')
 
         req.text_structure_file = pdf_fn_in_storage_base + '.document_structure.msgpack'
-        packed = msgpack.packb(text_structure.structure.to_dict(), use_bin_type=True, use_single_float=True)
+        packed = msgpack.packb(text_structure.text_structure.to_dict(), use_bin_type=True, use_single_float=True)
         webdav_client.upload_to(packed,
                                 f'{req.request_id}/{req.text_structure_file}')
 
-    tables, df_tables = get_table_dtos_from_camelot_output(camelot_tables)
-    if tables and tables.tables or df_tables and df_tables.tables:
-        if req.output_format == Constants.output_format_json:
+    tables = get_table_dtos_from_camelot_output(camelot_tables)
+    if tables and tables.tables:
+        if req.output_format == OutputFormat.json:
             req.tables_file = pdf_fn_in_storage_base + '.tables.json'
             webdav_client.upload_to(json.dumps(tables.to_dict(), indent=2).encode('utf-8'),
                                     f'{req.request_id}/{req.tables_file}')
 
-        if req.output_formats == Constants.output_format_msgpack:
+        if req.output_format == OutputFormat.msgpack:
             req.tables_file = pdf_fn_in_storage_base + '.tables.msgpack'
             packed = msgpack.packb(tables.to_dict(), use_bin_type=True, use_single_float=True)
             webdav_client.upload_to(packed, f'{req.request_id}/{req.tables_file}')
