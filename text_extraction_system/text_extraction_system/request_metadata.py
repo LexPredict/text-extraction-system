@@ -88,7 +88,7 @@ class RequestMetadata:
             tables_extracted=self.tables_file is not None,
             plain_text_extracted=self.plain_text_file is not None,
             text_structure_extracted=self.text_structure_file is not None,
-            markup_file_extracted=self.markup_file is not None,
+            pdf_coordinates_extracted=self.markup_file is not None,
             additional_info=self.request_callback_info.call_back_additional_info,
             output_format=self.output_format
         )
