@@ -3,13 +3,14 @@ import os
 import sys
 from datetime import datetime
 from io import BytesIO
-from typing import AnyStr, List, Dict
+from typing import AnyStr, List, Dict, Any, Callable, Optional
 from uuid import uuid4
 from zipfile import ZipFile
 
 import pandas
 from fastapi import FastAPI, File, UploadFile, Form, Response
 from fastapi.exceptions import HTTPException
+from starlette.responses import StreamingResponse
 from starlette.status import HTTP_404_NOT_FOUND
 from text_extraction_system_api.client import Constants
 from webdav3.exceptions import RemoteResourceNotFound
@@ -47,7 +48,7 @@ async def post_text_extraction_task(file: UploadFile = File(...),
                                     convert_to_pdf_timeout_sec: int = Form(default=1800),
                                     pdf_to_images_timeout_sec: int = Form(default=1800),
                                     glyph_enhancing: bool = Form(default=False),
-                                    output_formats: str = Form(default=Constants.output_format_msgpack)):
+                                    output_format: str = Form(default=Constants.output_format_msgpack)):
     webdav_client = get_webdav_client()
     request_id = get_valid_fn(request_id) if request_id else str(uuid4())
     log_extra = json.loads(log_extra_json_key_value) if log_extra_json_key_value else None
@@ -57,7 +58,7 @@ async def post_text_extraction_task(file: UploadFile = File(...),
                           request_date=datetime.now(),
                           doc_language=doc_language,
                           ocr_enable=ocr_enable,
-                          output_formats=output_formats,
+                          output_format=output_format,
                           convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
                           pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
                           request_callback_info=RequestCallbackInfo(
@@ -119,32 +120,45 @@ async def purge_text_extraction_task(request_id: str):
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/status.json', response_model=RequestStatus)
 async def get_request_status(request_id: str):
-    return load_request_metadata_or_raise(request_id).to_dict()
+    return load_request_metadata_or_raise(request_id).to_request_status().to_dict()
 
 
-def _proxy_request(webdav_client, request_id: str, fn: str, headers: Dict[str, str] = None):
-    try:
-        resp: WebDavClient = webdav_client.execute_request('download', f'/{request_id}/{fn}')
-        return Response(content=resp.content, status_code=resp.status_code, headers=headers)
-    except RemoteResourceNotFound:
-        raise HTTPException(HTTP_404_NOT_FOUND, f'No such request if or there is no {fn} in the request results')
+@app.post('/api/v1/data_extraction_tasks/{request_id}/statuses', response_model=Dict[str, RequestStatus])
+async def get_request_statuses(request_ids: List[str]):
+    statuses = {}
+    for request_id in request_ids:
+        req = load_request_metadata(request_id)
+        statuses[request_id] = req.to_dict() if req else None
+    return statuses
+
+
+@app.get('/api/v1/data_extraction_tasks/{request_id}/results/packed_data.zip')
+async def get_packed_data(request_id: str):
+    req: RequestMetadata = load_request_metadata_or_raise(request_id)
+    files = [f'/{request_id}/{f}' for f in [req.plain_text_file, req.text_structure_file,
+             req.tables_file, req.markup_file] if f]
+    mem_stream = get_webdav_client().download_packed_files(files)
+    mem_stream.seek(0)
+    response = StreamingResponse(mem_stream, media_type='application/x-zip-compressed')
+    response.headers['Content-Disposition'] = 'attachment; filename=packed_data.zip'
+    return response
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.json',
          response_model=TableList)
 async def get_extracted_tables_in_json(request_id: str):
-    return _proxy_request(get_webdav_client(), request_id, load_request_metadata_or_raise(request_id).tables_json_file)
+    return _proxy_request(get_webdav_client(), request_id, load_request_metadata_or_raise(request_id).tables_file)
 
 
-@app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.pickle',
+@app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.msgpack',
          responses={
              200: {
-                 'description': 'Pickled DataFrameTableList object.',
+                 'description': 'Packed DataFrameTableList object.',
                  'content': {'application/octet-stream': {}},
              }
          })
 async def get_extracted_tables_as_pickled_dataframe_table_list(request_id: str):
-    return _proxy_request(get_webdav_client(), request_id, load_request_metadata_or_raise(request_id).tables_df_file)
+    return _proxy_request(get_webdav_client(), request_id, load_request_metadata_or_raise(request_id).tables_file)
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_plain_text.txt', response_model=AnyStr)
@@ -157,10 +171,23 @@ async def get_extracted_plain_text(request_id: str):
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/document_structure.json',
          response_model=PlainTextStructure)
-async def get_extracted_plain_text_structure(request_id: str):
+async def get_extracted_text_structure_json(request_id: str):
     return _proxy_request(get_webdav_client(),
                           request_id,
-                          load_request_metadata_or_raise(request_id).plain_text_structure_file)
+                          load_request_metadata_or_raise(request_id).text_structure_file)
+
+
+@app.get('/api/v1/data_extraction_tasks/{request_id}/results/document_structure.msgpack',
+         responses={
+             200: {
+                 'description': 'Packed PlainTextStructure object.',
+                 'content': {'application/octet-stream': {}},
+             }
+         })
+async def get_extracted_text_structure_msgpack(request_id: str):
+    return _proxy_request(get_webdav_client(),
+                          request_id,
+                          load_request_metadata_or_raise(request_id).text_structure_file)
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/document_markup.json',
@@ -168,15 +195,20 @@ async def get_extracted_plain_text_structure(request_id: str):
 async def get_extracted_msgpack_structure(request_id: str):
     return _proxy_request(get_webdav_client(),
                           request_id,
-                          load_request_metadata_or_raise(request_id).markup_json_file)
+                          load_request_metadata_or_raise(request_id).markup_file)
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/document_markup.msgpack',
-         response_model=MarkupPerSymbol)
+         responses={
+             200: {
+                 'description': 'Packed DataFrameTableList object.',
+                 'content': {'application/octet-stream': {}},
+             }
+         })
 async def get_extracted_msgpack_structure(request_id: str):
     return _proxy_request(get_webdav_client(),
                           request_id,
-                          load_request_metadata_or_raise(request_id).markup_msgpack_file)
+                          load_request_metadata_or_raise(request_id).markup_file)
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/searchable_pdf.pdf')
@@ -228,3 +260,18 @@ async def download_python_api_client_and_dtos():
     return Response(b.getvalue(), status_code=200, media_type='application/x-zip-compressed', headers={
         'Content-Disposition': f'attachment; filename={fn}'
     })
+
+
+def _proxy_request(webdav_client,
+                   request_id: str,
+                   fn: str,
+                   headers: Dict[str, str] = None,
+                   type_conversion: Optional[Callable[[Any], Any]] = None):
+    try:
+        resp: WebDavClient = webdav_client.execute_request('download', f'/{request_id}/{fn}')
+        content = resp.content
+        if content is not None and type_conversion:
+            content = type_conversion(content)
+        return Response(content=content, status_code=resp.status_code, headers=headers)
+    except RemoteResourceNotFound:
+        raise HTTPException(HTTP_404_NOT_FOUND, f'No such request if or there is no {fn} in the request results')
