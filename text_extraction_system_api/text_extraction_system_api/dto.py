@@ -34,7 +34,7 @@ class RequestStatus:
     pdf_pages_ocred: Optional[List[int]] = None
     plain_text_extracted: bool = False
     text_structure_extracted: bool = False
-    markup_file_extracted: bool = None
+    pdf_coordinates_extracted: bool = False
     tables_extracted: bool = False
     additional_info: Optional[str] = None
 
