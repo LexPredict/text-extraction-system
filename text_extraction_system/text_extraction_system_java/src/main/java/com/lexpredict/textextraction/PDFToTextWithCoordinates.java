@@ -2,6 +2,7 @@ package com.lexpredict.textextraction;
 
 import com.lexpredict.textextraction.dto.PDFPlainText;
 import com.lexpredict.textextraction.dto.PDFPlainTextPage;
+import org.apache.fontbox.util.BoundingBox;
 import org.apache.pdfbox.cos.COSArray;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -10,6 +11,9 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.PDPageTree;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.font.PDFontDescriptor;
+import org.apache.pdfbox.pdmodel.font.PDTrueTypeFont;
+import org.apache.pdfbox.pdmodel.font.PDType3Font;
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDDocumentOutline;
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineItem;
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineNode;
@@ -43,6 +47,8 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     protected List<double[]> charBBoxesWithPageNums;
 
     protected int curPageStartOffset;
+
+    protected boolean enhancedSizeDetection = false;
 
     protected double r(double d) {
         BigDecimal bd = BigDecimal.valueOf(d);
@@ -173,12 +179,38 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         super.writeString(text, textPositions);
         if (textPositions != null) {
             for (TextPosition pos : textPositions) {
-                this.charBBoxesWithPageNums.add(new double[]{
-                        getCurrentPageNo(),
-                        r(pos.getX()), r(pos.getY()),
-                        r(pos.getWidth()), r(pos.getHeight())});
+                double[] glyphBox = null;
+                if (this.enhancedSizeDetection)
+                    glyphBox = this.getEnhancedGlyphBox(pos);
+                if (glyphBox == null)
+                    glyphBox = new double[]{ getCurrentPageNo(), r(pos.getX()),
+                            r(pos.getY()), r(pos.getWidth()), r(pos.getHeight())};
+
+                this.charBBoxesWithPageNums.add(glyphBox);
             }
         }
+    }
+
+    protected double[] getEnhancedGlyphBox(TextPosition pos) throws IOException {
+        PDFont font = pos.getFont();
+        if (font == null)
+            return null;
+
+        PDFontDescriptor descr = font.getFontDescriptor();
+        float fullHtAbs = (descr.getCapHeight()) / 1000 * pos.getFontSize();
+        BoundingBox bbox = font.getBoundingBox();
+        float fullHtRel = bbox.getHeight();
+        float ascRel = descr.getAscent();
+        float ascAbs = ascRel * fullHtAbs / fullHtRel;
+        float capHtRel = descr.getCapHeight();
+        float capHtAbs = capHtRel * fullHtAbs / fullHtRel;
+        float y = pos.getY();
+        y -= ascAbs;
+
+        return new double[]{
+                getCurrentPageNo(),
+                r(pos.getX()), r(y),
+                r(pos.getWidth()), r(capHtAbs)};
     }
 
     protected void addNonPrintableCharBoxes(String nonPrintableText) {
@@ -236,7 +268,6 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         super.startArticle(isLTR);
         this.addNonPrintableCharBoxes(getArticleStart());
     }
-
 
 
     static class AngleCollector extends PDFTextStripper {
@@ -299,11 +330,15 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         }
     }
 
-    public static PDFPlainText process(PDDocument document) throws Exception {
-        return process(document, -1, Integer.MAX_VALUE);
+    public static PDFPlainText process(PDDocument document,
+                                       boolean enhancedSizeDetection) throws Exception {
+        return process(document, -1, Integer.MAX_VALUE, enhancedSizeDetection);
     }
 
-    public static PDFPlainText process(PDDocument document, int startPage, int endPage) throws Exception {
+    public static PDFPlainText process(PDDocument document,
+                                       int startPage,
+                                       int endPage,
+                                       boolean enhancedSizeDetection) throws Exception {
         PDFToTextWithCoordinates pdf2text = new PDFToTextWithCoordinates();
         pdf2text.document = document;
         pdf2text.output = new StringWriter();
@@ -316,6 +351,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         pdf2text.setPageEnd("\n\f");
         pdf2text.setSortByPosition(true);
         pdf2text.setShouldSeparateByBeads(true);
+        pdf2text.enhancedSizeDetection = enhancedSizeDetection;
 
         // This prevents false-matches in paragraph detection
         // See TestPDF2Text.test_paragraphs()
@@ -335,5 +371,4 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         res.charBBoxesWithPageNums = pdf2text.charBBoxesWithPageNums;
         return res;
     }
-
 }

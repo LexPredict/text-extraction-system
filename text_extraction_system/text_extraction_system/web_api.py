@@ -4,12 +4,15 @@ import sys
 import time
 from datetime import datetime
 from io import BytesIO
-from typing import AnyStr, List, Dict
+from typing import AnyStr, List, Dict, Any, Callable, Optional
 from uuid import uuid4
 from zipfile import ZipFile
 
 import pandas
 from fastapi import FastAPI, File, UploadFile, Form, Response
+from fastapi.exceptions import HTTPException
+from starlette.responses import StreamingResponse
+from starlette.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
 from webdav3.exceptions import RemoteResourceNotFound
 
 from text_extraction_system import version
@@ -21,14 +24,14 @@ from text_extraction_system.request_metadata import RequestMetadata, RequestCall
     load_request_metadata
 from text_extraction_system.tasks import process_document, celery_app, register_task_id, get_request_task_ids
 from text_extraction_system_api import dto
-from text_extraction_system_api.dto import TableList, PlainTextStructure, RequestStatus, SystemInfo, \
-    TaskCancelResult, STATUS_DONE, STATUS_FAILURE
+from text_extraction_system_api.dto import OutputFormat, TableList, PlainTextStructure, RequestStatus, \
+    RequestStatuses, SystemInfo, TaskCancelResult, PDFCoordinates, STATUS_DONE, STATUS_FAILURE
 
 app = FastAPI()
 
 
 @app.post('/api/v1/data_extraction_tasks/', response_model=str, tags=["Asynchronous Data Extraction"])
-async def post_text_extraction_task(file: UploadFile = File(...),
+async def post_data_extraction_task(file: UploadFile = File(...),
                                     call_back_url: str = Form(default=None),
                                     call_back_celery_broker: str = Form(default=None),
                                     call_back_celery_task_name: str = Form(default=None),
@@ -43,7 +46,9 @@ async def post_text_extraction_task(file: UploadFile = File(...),
                                     request_id: str = Form(default=None),
                                     log_extra_json_key_value: str = Form(default=None),
                                     convert_to_pdf_timeout_sec: int = Form(default=1800),
-                                    pdf_to_images_timeout_sec: int = Form(default=1800)):
+                                    pdf_to_images_timeout_sec: int = Form(default=1800),
+                                    glyph_enhancing: bool = Form(default=False),
+                                    output_format: OutputFormat = Form(default=OutputFormat.json)):
     webdav_client = get_webdav_client()
     request_id = get_valid_fn(request_id) if request_id else str(uuid4())
     log_extra = json.loads(log_extra_json_key_value) if log_extra_json_key_value else None
@@ -53,6 +58,7 @@ async def post_text_extraction_task(file: UploadFile = File(...),
                           request_date=datetime.now(),
                           doc_language=doc_language,
                           ocr_enable=ocr_enable,
+                          output_format=output_format,
                           convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
                           pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
                           request_callback_info=RequestCallbackInfo(
@@ -72,7 +78,8 @@ async def post_text_extraction_task(file: UploadFile = File(...),
 
     save_request_metadata(req)
     webdav_client.upload_to(file.file, f'{req.request_id}/{req.original_document}')
-    async_task = process_document.apply_async((req.request_id, req.request_callback_info))
+    async_task = process_document.apply_async(
+        (req.request_id, req.request_callback_info, glyph_enhancing))
 
     webdav_client.mkdir(f'{req.request_id}/{task_ids}')
     register_task_id(webdav_client, req.request_id, async_task.id)
@@ -80,9 +87,16 @@ async def post_text_extraction_task(file: UploadFile = File(...),
     return req.request_id
 
 
+def load_request_metadata_or_raise(request_id: str) -> RequestMetadata:
+    req = load_request_metadata(request_id)
+    if not req:
+        raise HTTPException(HTTP_404_NOT_FOUND, 'No such data extraction request.')
+    return req
+
+
 @app.delete('/api/v1/data_extraction_tasks/{request_id}/', response_model=TaskCancelResult,
             tags=["Asynchronous Data Extraction"])
-async def purge_text_extraction_task(request_id: str):
+async def purge_data_extraction_task(request_id: str):
     problems = dict()
     success = list()
     celery_task_ids: List[str] = get_request_task_ids(get_webdav_client(), request_id)
@@ -94,7 +108,6 @@ async def purge_text_extraction_task(request_id: str):
             problems[task_id] = HumanReadableTraceBackException \
                 .from_exception(ex) \
                 .human_readable_format()
-    get_webdav_client().clean(f'{request_id}/')
     try:
         get_webdav_client().clean(f'{request_id}/')
     except RemoteResourceNotFound:
@@ -109,30 +122,47 @@ async def purge_text_extraction_task(request_id: str):
 @app.get('/api/v1/data_extraction_tasks/{request_id}/status.json', response_model=RequestStatus,
          tags=["Asynchronous Data Extraction"])
 async def get_request_status(request_id: str):
-    req = load_request_metadata(request_id)
-    return req.to_request_status().to_dict()
+    return load_request_metadata_or_raise(request_id).to_request_status().to_dict()
 
 
-def _proxy_request(webdav_client, request_id: str, fn: str, headers: Dict[str, str] = None):
-    resp: WebDavClient = webdav_client.execute_request('download', f'/{request_id}/{fn}')
-    return Response(content=resp.content, status_code=resp.status_code, headers=headers)
+@app.post('/api/v1/data_extraction_tasks/query_request_statuses', tags=["Asynchronous Data Extraction"])
+async def get_multiple_request_statuses(request_ids: List[str]) -> RequestStatuses:
+    if not request_ids:
+        raise HTTPException(HTTP_400_BAD_REQUEST, 'Request ids must be specified.')
+    statuses = {}
+    for request_id in request_ids:
+        req = load_request_metadata(request_id)
+        statuses[request_id] = req.to_request_status() if req else None
+    return RequestStatuses(request_status_by_id=statuses)
+
+
+@app.get('/api/v1/data_extraction_tasks/{request_id}/results/packed_data.zip', tags=["Asynchronous Data Extraction"])
+async def get_all_extracted_data_in_zip_archive(request_id: str):
+    req: RequestMetadata = load_request_metadata_or_raise(request_id)
+    files = [f'/{request_id}/{f}' for f in [req.plain_text_file, req.text_structure_file,
+                                            req.tables_file, req.pdf_coordinates_file] if f]
+    mem_stream = get_webdav_client().download_packed_files(files)
+    mem_stream.seek(0)
+    response = StreamingResponse(mem_stream, media_type='application/x-zip-compressed')
+    response.headers['Content-Disposition'] = 'attachment; filename=packed_data.zip'
+    return response
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.json',
          response_model=TableList, tags=["Asynchronous Data Extraction"])
-async def get_extracted_tables_in_json(request_id: str):
-    return _proxy_request(get_webdav_client(), request_id, load_request_metadata(request_id).tables_json_file)
+async def get_extracted_tables_as_json(request_id: str):
+    return _proxy_request(get_webdav_client(), request_id, load_request_metadata_or_raise(request_id).tables_file)
 
 
-@app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.pickle',
+@app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.msgpack',
          responses={
              200: {
-                 'description': 'Pickled DataFrameTableList object.',
+                 'description': 'TableList object in msgpack format.',
                  'content': {'application/octet-stream': {}},
              }
          }, tags=["Asynchronous Data Extraction"])
-async def get_extracted_tables_as_pickled_dataframe_table_list(request_id: str):
-    return _proxy_request(get_webdav_client(), request_id, load_request_metadata(request_id).tables_df_file)
+async def get_extracted_tables_as_msgpack(request_id: str):
+    return _proxy_request(get_webdav_client(), request_id, load_request_metadata_or_raise(request_id).tables_file)
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_plain_text.txt', response_model=AnyStr,
@@ -140,24 +170,65 @@ async def get_extracted_tables_as_pickled_dataframe_table_list(request_id: str):
 async def get_extracted_plain_text(request_id: str):
     return _proxy_request(get_webdav_client(),
                           request_id,
-                          load_request_metadata(request_id).plain_text_file,
+                          load_request_metadata_or_raise(request_id).plain_text_file,
                           headers={'Content-Type': 'text/plain; charset=utf-8'})
 
 
-@app.get('/api/v1/data_extraction_tasks/{request_id}/results/plain_text_structure.json',
+@app.get('/api/v1/data_extraction_tasks/{request_id}/results/document_structure.json',
          response_model=PlainTextStructure, tags=["Asynchronous Data Extraction"])
-async def get_extracted_plain_text_structure(request_id: str):
-    return _proxy_request(get_webdav_client(), request_id, load_request_metadata(request_id).plain_text_structure_file)
+async def get_extracted_text_structure_as_json(request_id: str):
+    return _proxy_request(get_webdav_client(),
+                          request_id,
+                          load_request_metadata_or_raise(request_id).text_structure_file)
+
+
+@app.get('/api/v1/data_extraction_tasks/{request_id}/results/document_structure.msgpack',
+         responses={
+             200: {
+                 'description': 'PlainTextStructure object in msgpack format.',
+                 'content': {'application/octet-stream': {}},
+             }
+         }, tags=["Asynchronous Data Extraction"])
+async def get_extracted_text_structure_as_msgpack(request_id: str):
+    return _proxy_request(get_webdav_client(),
+                          request_id,
+                          load_request_metadata_or_raise(request_id).text_structure_file)
+
+
+@app.get('/api/v1/data_extraction_tasks/{request_id}/results/pdf_coordinates.json',
+         response_model=PDFCoordinates, tags=["Asynchronous Data Extraction"])
+async def get_pdf_coordinates_of_each_character_in_extracted_plain_text_as_json(request_id: str):
+    return _proxy_request(get_webdav_client(),
+                          request_id,
+                          load_request_metadata_or_raise(request_id).pdf_coordinates_file)
+
+
+@app.get('/api/v1/data_extraction_tasks/{request_id}/results/pdf_coordinates.msgpack',
+         responses={
+             200: {
+                 'description': 'PDFCoordinates object in msgpack format.',
+                 'content': {'application/octet-stream': {}},
+             }
+         }, tags=["Asynchronous Data Extraction"])
+async def get_pdf_coordinates_of_each_character_in_extracted_plain_text_as_msgpack(request_id: str):
+    return _proxy_request(get_webdav_client(),
+                          request_id,
+                          load_request_metadata_or_raise(request_id).pdf_coordinates_file)
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/searchable_pdf.pdf', tags=["Asynchronous Data Extraction"])
 async def get_searchable_pdf(request_id: str):
-    return _proxy_request(get_webdav_client(), request_id, load_request_metadata(request_id).pdf_file)
+    return _proxy_request(get_webdav_client(),
+                          request_id,
+                          load_request_metadata_or_raise(request_id).pdf_file)
 
 
 @app.delete('/api/v1/data_extraction_tasks/{request_id}/results/', tags=["Asynchronous Data Extraction"])
 async def delete_request_files(request_id: str):
-    get_webdav_client().clean(f'{request_id}/')
+    try:
+        get_webdav_client().clean(f'{request_id}/')
+    except RemoteResourceNotFound:
+        raise HTTPException(HTTP_404_NOT_FOUND, 'No such data extraction request')
 
 
 @app.post('/api/v1/data_extraction/', tags=["Synchronous Data Extraction"])
@@ -281,3 +352,18 @@ async def download_python_api_client_and_dtos():
     return Response(b.getvalue(), status_code=200, media_type='application/x-zip-compressed', headers={
         'Content-Disposition': f'attachment; filename={fn}'
     })
+
+
+def _proxy_request(webdav_client,
+                   request_id: str,
+                   fn: str,
+                   headers: Dict[str, str] = None,
+                   type_conversion: Optional[Callable[[Any], Any]] = None):
+    try:
+        resp: WebDavClient = webdav_client.execute_request('download', f'/{request_id}/{fn}')
+        content = resp.content
+        if content is not None and type_conversion:
+            content = type_conversion(content)
+        return Response(content=content, status_code=resp.status_code, headers=headers)
+    except RemoteResourceNotFound:
+        raise HTTPException(HTTP_404_NOT_FOUND, f'No such request if or there is no {fn} in the request results')

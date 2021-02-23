@@ -1,13 +1,12 @@
 import json
 from datetime import datetime
 from logging import Logger, getLogger
-from typing import List, Dict
-from typing import Set, Optional, Tuple
+from typing import List, Dict, Any, Set, Optional, Tuple
 
 from kombu import Connection
 from redis import Redis
 from webdav3.exceptions import RemoteResourceNotFound
-
+from celery.app.control import Inspect
 from text_extraction_system.config import get_settings
 from text_extraction_system.constants import tasks_pending, queue_celery_beat
 from text_extraction_system.file_storage import get_webdav_client
@@ -16,6 +15,25 @@ from text_extraction_system.file_storage import get_webdav_client
 def init_task_tracking(*args, **kwargs):
     get_webdav_client().mkdir(tasks_pending)
 
+
+def get_known_task_ids_from_celery_api(app) -> Set[str]:
+    task_ids = set()
+    i = Inspect(app=app)
+
+    def collect_task_ids(worker_tasks: Dict[str, List[Dict[str, Any]]]):
+        if worker_tasks:
+            for worker_name, worker_tasks in worker_tasks.items():
+                if not worker_tasks:
+                    continue
+                for t in worker_tasks:
+                    if not t:
+                        continue
+                    task_ids.add(t.get('id'))
+
+    collect_task_ids(i.active())
+    collect_task_ids(i.scheduled())
+    collect_task_ids(i.reserved())
+    return task_ids
 
 def store_pending_task_info_in_webdav(body,
                                       exchange,
@@ -60,14 +78,16 @@ def get_pending_tasks_from_webdav() -> Set[str]:
     return set(webdav.list(remote_path=tasks_pending, get_info=False))
 
 
-def get_unknown_pending_tasks() -> Set[str]:
+def get_unknown_pending_tasks(app) -> Set[str]:
     pending_from_webdav = get_pending_tasks_from_webdav()
     scheduled_from_redis = get_scheduled_tasks_from_redis()
+    known_from_celery_api = get_known_task_ids_from_celery_api(app)
     pending_from_webdav.difference_update(scheduled_from_redis)
+    pending_from_webdav.difference_update(known_from_celery_api)
     return pending_from_webdav
 
 
-def re_schedule_unknown_pending_tasks(log: Logger) -> List[Tuple[str, str]]:
+def re_schedule_unknown_pending_tasks(log: Logger, app) -> List[Tuple[str, str]]:
     conf = get_settings()
     webdav_client = get_webdav_client()
     broker_url = conf.celery_broker
@@ -76,7 +96,7 @@ def re_schedule_unknown_pending_tasks(log: Logger) -> List[Tuple[str, str]]:
     restarted_tasks: List[Tuple[str, str]] = list()
     failed_to_restart_tasks: List[Tuple[str, str]] = list()
     start_time = datetime.now()
-    unknown_pending_tasks = get_unknown_pending_tasks()
+    unknown_pending_tasks = get_unknown_pending_tasks(app)
     for task_id in unknown_pending_tasks:
         task_name: Optional[str] = 'unknown'
         try:
@@ -94,7 +114,9 @@ def re_schedule_unknown_pending_tasks(log: Logger) -> List[Tuple[str, str]]:
                                  retry=task_info['retry_policy'] is not None,
                                  retry_policy=task_info['retry_policy'])
                 restarted_tasks.append((task_id, task_name))
-
+        except RemoteResourceNotFound:
+            log.warning(f'Unable to restart lost pending task '
+                        f'because it has been completed already: #{task_id} - {task_name}')
         except Exception as ex:
             failed_to_restart_tasks.append((task_id, task_name))
             log.error(f'Unable to restart lost pending task: #{task_id} - {task_name}', exc_info=ex)
@@ -112,4 +134,5 @@ def re_schedule_unknown_pending_tasks(log: Logger) -> List[Tuple[str, str]]:
 
 
 if __name__ == '__main__':
-    print(re_schedule_unknown_pending_tasks(getLogger(__file__)))
+    from text_extraction_system.tasks import celery_app
+    print(re_schedule_unknown_pending_tasks(getLogger(__file__), celery_app))
