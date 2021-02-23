@@ -31,14 +31,17 @@ from text_extraction_system.ocr.ocr import ocr_page_to_pdf
 from text_extraction_system.pdf.pdf import page_requires_ocr, extract_page_images, raise_from_pdfbox_error_messages
 from text_extraction_system.processes import raise_from_process
 from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, PlainTextStructure, \
-    PlainTextSentence
+    PlainTextSentence, TextAndPDFCoordinates, PDFCoordinates
 
 log = getLogger(__name__)
 PAGE_SEPARATOR = '\n\n\f'
 
 
-def extract_text_and_structure(pdf_fn: str, pdf_password: str = None, timeout_sec: int = 3600) \
-        -> Tuple[str, PlainTextStructure]:
+def extract_text_and_structure(pdf_fn: str,
+                               pdf_password: str = None,
+                               timeout_sec: int = 3600,
+                               glyph_enhancing: bool = False) \
+        -> Tuple[str, TextAndPDFCoordinates]:
     java_modules_path = get_settings().java_modules_path
 
     temp_dir = mkdtemp(prefix='pdf_text_')
@@ -48,10 +51,15 @@ def extract_text_and_structure(pdf_fn: str, pdf_password: str = None, timeout_se
                 'com.lexpredict.textextraction.GetTextFromPDF',
                 pdf_fn,
                 out_fn,
-                'pages_msgpack']
+                '-f', 'pages_msgpack']
 
         if pdf_password:
+            args.append('-p')
             args.append(pdf_password)
+
+        if glyph_enhancing:
+            args.append('-ge')
+            args.append('true')
 
         completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=timeout_sec,
                                                              universal_newlines=True, stderr=PIPE, stdout=PIPE)
@@ -63,9 +71,18 @@ def extract_text_and_structure(pdf_fn: str, pdf_password: str = None, timeout_se
             # see object structure in com.lexpredict.textextraction.dto.PDFPlainText
             pdfbox_res: Dict[str, Any] = msgpack.unpack(pages_f, raw=False)
 
-        pages = list()
-
         text = pdfbox_res['text']
+        if len(text) == 0:
+            pdf_coordinates = PDFCoordinates(char_bboxes_with_page_nums=pdfbox_res['charBBoxesWithPageNums'])
+            text_struct = PlainTextStructure(title='',
+                                             language='en',  # FastText returns English for empty strings
+                                             pages=[],
+                                             sentences=[],
+                                             paragraphs=[],
+                                             sections=[])
+            return text, TextAndPDFCoordinates(text_structure=text_struct, pdf_coordinates=pdf_coordinates)
+
+        pages = []
         num: int = 0
         for p in pdfbox_res['pages']:
             p_res = PlainTextPage(number=num, start=p['location'][0], end=p['location'][1], bbox=p['bbox'])
@@ -78,15 +95,15 @@ def extract_text_and_structure(pdf_fn: str, pdf_password: str = None, timeout_se
 
         sentences = [PlainTextSentence(start=start,
                                        end=end,
-                                       language=lang.predict_lang(text))
-                     for start, end, text in sentence_spans]
+                                       language=lang.predict_lang(segment))
+                     for start, end, segment in sentence_spans]
 
         # There was a try-except in Contraxsuite catching some lexnlp exception.
         # Not putting it here because it should be solved on lexnlp side.
         paragraphs = [PlainTextParagraph(start=start,
                                          end=end,
-                                         language=lang.predict_lang(text))
-                      for text, start, end in get_paragraphs(text, return_spans=True)]
+                                         language=lang.predict_lang(segment))
+                      for segment, start, end in get_paragraphs(text, return_spans=True)]
 
         sections = [PlainTextSection(title=sect.title,
                                      start=sect.start,
@@ -104,13 +121,18 @@ def extract_text_and_structure(pdf_fn: str, pdf_password: str = None, timeout_se
 
         doc_lang = get_lang_detector().predict_lang(text)
 
-        return text, PlainTextStructure(title=title,
-                                        language=doc_lang,
-                                        pages=pages,
-                                        sentences=sentences,
-                                        paragraphs=paragraphs,
-                                        sections=sections,
-                                        char_bboxes_with_page_nums=pdfbox_res['charBBoxesWithPageNums'])
+        text_struct = PlainTextStructure(
+            title=title,
+            language=doc_lang,
+            pages=pages,
+            sentences=sentences,
+            paragraphs=paragraphs,
+            sections=sections)
+
+        char_bboxes_with_page_nums = pdfbox_res['charBBoxesWithPageNums']
+        pdf_coordinates = PDFCoordinates(char_bboxes_with_page_nums=char_bboxes_with_page_nums)
+        return text, TextAndPDFCoordinates(text_structure=text_struct,
+                                           pdf_coordinates=pdf_coordinates)
 
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
