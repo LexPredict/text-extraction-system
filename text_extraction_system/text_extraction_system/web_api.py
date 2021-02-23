@@ -238,13 +238,19 @@ async def extract_all_data_from_document(
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
         glyph_enhancing: bool = Form(default=False),
+        output_format: OutputFormat = Form(default=OutputFormat.json),
 ):
     webdav_client = get_webdav_client()
     request_id = str(uuid4())
     _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
-                             pdf_to_images_timeout_sec, glyph_enhancing)
+                             pdf_to_images_timeout_sec, glyph_enhancing, output_format)
+
+    # Wait until celery finishes extracting else return TimeoutError
     if not _wait_for_pdf_extraction_finish(request_id, convert_to_pdf_timeout_sec):
-        return purge_data_extraction_task(request_id)
+        await purge_data_extraction_task(request_id)
+        raise HTTPException(status_code=504, detail="Input file is too big")
+
+    # Get all extracted data in .zip file and clean temp data
     req: RequestMetadata = load_request_metadata_or_raise(request_id)
     files = [f'/{req.request_id}/{f}' for f in [req.plain_text_file, req.text_structure_file,
                                                 req.tables_file, req.pdf_coordinates_file] if f]
@@ -256,7 +262,7 @@ async def extract_all_data_from_document(
     return response
 
 
-@app.post('/api/v1/extract/plain_text/', response_model=AnyStr, tags=["Synchronous Data Extraction"])
+@app.post('/api/v1/extract/plain_text/', tags=["Synchronous Data Extraction"])
 async def extract_plain_text_from_document(
         file: UploadFile = File(...),
         doc_language: str = Form(default='en'),
@@ -270,8 +276,12 @@ async def extract_plain_text_from_document(
     _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
                              pdf_to_images_timeout_sec, glyph_enhancing, output_format)
 
+    # Wait until celery finishes extracting else return TimeoutError
     if not _wait_for_pdf_extraction_finish(request_id, convert_to_pdf_timeout_sec):
-        return purge_data_extraction_task(request_id)
+        await purge_data_extraction_task(request_id)
+        raise HTTPException(status_code=504, detail="Input file is too big")
+
+    # Get extracted plain text and clean temp data
     plain_text = _proxy_request(webdav_client, request_id,
                                 load_request_metadata(request_id).plain_text_file,
                                 headers={'Content-Type': 'text/plain; charset=utf-8'})
@@ -286,13 +296,19 @@ async def extract_text_from_document_and_generate_searchable_pdf(
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
         glyph_enhancing: bool = Form(default=False),
+        output_format: OutputFormat = Form(default=OutputFormat.json),
 ):
     webdav_client = get_webdav_client()
     request_id = str(uuid4())
     _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
-                             pdf_to_images_timeout_sec, glyph_enhancing)
+                             pdf_to_images_timeout_sec, glyph_enhancing, output_format)
+
+    # Wait until celery finishes extracting else return TimeoutError
     if not _wait_for_pdf_extraction_finish(request_id, convert_to_pdf_timeout_sec):
-        return purge_data_extraction_task(request_id)
+        await purge_data_extraction_task(request_id)
+        raise HTTPException(status_code=504, detail="Input file is too big")
+
+    # Get extracted text-based pdf file and clean temp data
     pdf_file = _proxy_request(webdav_client, request_id, load_request_metadata(request_id).pdf_file)
     webdav_client.clean(f'{request_id}/')
     return pdf_file
@@ -349,20 +365,32 @@ def _proxy_request(webdav_client,
         raise HTTPException(HTTP_404_NOT_FOUND, f'No such request if or there is no {fn} in the request results')
 
 
-def _wait_for_pdf_extraction_finish(request_id: str, convert_to_pdf_timeout_sec: int):
+def _wait_for_pdf_extraction_finish(request_id: str, convert_to_pdf_timeout_sec: int) -> bool:
+    """Wait until celery tasks finish
+    """
     waiting_time_seconds = 0
     no_errors = True
+
+    # Check finish_pdf_processing task status
     while load_request_metadata(request_id).status not in (STATUS_FAILURE, STATUS_DONE):
         time.sleep(1)
         waiting_time_seconds += 1
+        # Check if processing takes too much time
         if waiting_time_seconds > convert_to_pdf_timeout_sec:
             no_errors = False
             break
     return no_errors
 
 
-def _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
-                             pdf_to_images_timeout_sec, glyph_enhancing, output_format):
+def _run_sync_pdf_processing(webdav_client, request_id: str,
+                             file: UploadFile,
+                             doc_language: str,
+                             convert_to_pdf_timeout_sec: int,
+                             pdf_to_images_timeout_sec: int,
+                             glyph_enhancing: bool,
+                             output_format: OutputFormat):
+    """Run celery tasks to extract data from document
+    """
     req = RequestMetadata(original_file_name=file.filename,
                           original_document=get_valid_fn(file.filename),
                           request_id=request_id,
@@ -379,6 +407,5 @@ def _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, conv
     webdav_client.upload_to(file.file, f'{req.request_id}/{req.original_document}')
     async_task = process_document.apply_async(
         (req.request_id, req.request_callback_info, glyph_enhancing))
-
     webdav_client.mkdir(f'{req.request_id}/{task_ids}')
     register_task_id(webdav_client, req.request_id, async_task.id)

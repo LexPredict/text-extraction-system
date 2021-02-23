@@ -159,3 +159,47 @@ class TextExtractionSystemWebClient:
         ps.paragraphs = [PlainTextParagraph(**p) for p in shallow_structure.get('paragraphs', [])]
         ps.sections = [PlainTextSection(**p) for p in shallow_structure.get('sections', [])]
         return ps
+
+    def extract_plain_text_from_document(self,
+                                         fn: str,
+                                         doc_language: Optional[str] = None,
+                                         convert_to_pdf_timeout_sec: int = 1800,
+                                         pdf_to_images_timeout_sec: int = 1800,
+                                         glyph_enhancing: bool = False,
+                                         output_format: OutputFormat = OutputFormat.json) -> str:
+        resp = requests.post(f'{self.base_url}/api/v1/extract/plain_text/',
+                             files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
+                             data=dict(convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
+                                       pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
+                                       doc_language=doc_language,
+                                       glyph_enhancing=glyph_enhancing,
+                                       output_format=output_format.value))
+        if resp.status_code not in {200, 201}:
+            resp.raise_for_status()
+        return resp.text
+
+    @contextmanager
+    def extract_text_from_document_and_generate_searchable_pdf_as_local_file(
+            self, fn: str,
+            doc_language: Optional[str] = None,
+            convert_to_pdf_timeout_sec: int = 1800,
+            pdf_to_images_timeout_sec: int = 1800,
+            glyph_enhancing: bool = False,
+            output_format: OutputFormat = OutputFormat.json) -> Generator[str, None, None]:
+        _fd, local_filename = tempfile.mkstemp(suffix='.pdf')
+        try:
+            with requests.post(f'{self.base_url}/api/v1/extract/plain_text/',
+                               files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
+                               data=dict(convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
+                                         pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
+                                         doc_language=doc_language,
+                                         glyph_enhancing=glyph_enhancing,
+                                         output_format=output_format.value), stream=True) as r:
+                if r.status_code not in {200, 201}:
+                    r.raise_for_status()
+                with open(local_filename, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        f.write(chunk)
+            yield local_filename
+        finally:
+            os.remove(local_filename)
