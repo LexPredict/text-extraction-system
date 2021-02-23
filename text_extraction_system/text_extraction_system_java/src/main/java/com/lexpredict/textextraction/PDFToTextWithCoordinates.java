@@ -83,13 +83,6 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     @Override
     protected void endPage(PDPage page) throws IOException {
         super.endPage(page);
-        PDRectangle area = page.getMediaBox();
-        PDFPlainTextPage pp = new PDFPlainTextPage();
-        pp.bbox = new double[]{r(area.getLowerLeftX()), r(area.getLowerLeftY()),
-                r(area.getWidth()), r(area.getHeight())};
-        int curPageEndOffset = this.charBBoxesWithPageNums == null ? 0 : this.charBBoxesWithPageNums.size();
-        pp.location = new int[] {this.curPageStartOffset, curPageEndOffset};
-        this.pages.add(pp);
     }
 
     void extractBookmarkText() throws SAXException, IOException {
@@ -183,7 +176,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
                 if (this.enhancedSizeDetection)
                     glyphBox = this.getEnhancedGlyphBox(pos);
                 if (glyphBox == null)
-                    glyphBox = new double[]{ getCurrentPageNo(), r(pos.getX()),
+                    glyphBox = new double[]{ getCurrentPageNo() - 1, r(pos.getX()),
                             r(pos.getY()), r(pos.getWidth()), r(pos.getHeight())};
 
                 this.charBBoxesWithPageNums.add(glyphBox);
@@ -208,7 +201,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         y -= ascAbs;
 
         return new double[]{
-                getCurrentPageNo(),
+                getCurrentPageNo() - 1,
                 r(pos.getX()), r(y),
                 r(pos.getWidth()), r(capHtAbs)};
     }
@@ -318,6 +311,14 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             }
         }
         page.setRotation(rotation);
+
+        PDRectangle area = page.getMediaBox();
+        PDFPlainTextPage pp = new PDFPlainTextPage();
+        pp.bbox = new double[]{r(area.getLowerLeftX()), r(area.getLowerLeftY()),
+                r(area.getWidth()), r(area.getHeight())};
+        int curPageEndOffset = this.charBBoxesWithPageNums == null ? 0 : this.charBBoxesWithPageNums.size();
+        pp.location = new int[] {this.curPageStartOffset, curPageEndOffset};
+        this.pages.add(pp);
     }
 
     @Override
