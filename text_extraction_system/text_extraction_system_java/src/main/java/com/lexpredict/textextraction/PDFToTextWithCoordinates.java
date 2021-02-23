@@ -317,7 +317,8 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         pp.bbox = new double[]{r(area.getLowerLeftX()), r(area.getLowerLeftY()),
                 r(area.getWidth()), r(area.getHeight())};
         int curPageEndOffset = this.charBBoxesWithPageNums == null ? 0 : this.charBBoxesWithPageNums.size();
-        pp.location = new int[] {this.curPageStartOffset, curPageEndOffset};
+        int pageStart = this.pages.size() > 0 ? this.curPageStartOffset : 0;
+        pp.location = new int[] {pageStart, curPageEndOffset};
         this.pages.add(pp);
     }
 
