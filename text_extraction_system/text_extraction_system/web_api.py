@@ -231,90 +231,70 @@ async def delete_request_files(request_id: str):
         raise HTTPException(HTTP_404_NOT_FOUND, 'No such data extraction request')
 
 
-@app.post('/api/v1/data_extraction/', tags=["Synchronous Data Extraction"])
+@app.post('/api/v1/extract/text_and_structure/', tags=["Synchronous Data Extraction"])
 async def extract_all_data_from_document(
         file: UploadFile = File(...),
         doc_language: str = Form(default='en'),
-        ocr_enable: bool = Form(default=True),
-        request_id: str = Form(default=None),
-        log_extra_json_key_value: str = Form(default=None),
         convert_to_pdf_timeout_sec: int = Form(default=1800),
-        pdf_to_images_timeout_sec: int = Form(default=1800)
+        pdf_to_images_timeout_sec: int = Form(default=1800),
+        glyph_enhancing: bool = Form(default=False),
 ):
     webdav_client = get_webdav_client()
-    return None
+    request_id = str(uuid4())
+    _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
+                             pdf_to_images_timeout_sec, glyph_enhancing)
+    if not _wait_for_pdf_extraction_finish(request_id, convert_to_pdf_timeout_sec):
+        return purge_data_extraction_task(request_id)
+    req: RequestMetadata = load_request_metadata_or_raise(request_id)
+    files = [f'/{req.request_id}/{f}' for f in [req.plain_text_file, req.text_structure_file,
+                                                req.tables_file, req.pdf_coordinates_file] if f]
+    mem_stream = get_webdav_client().download_packed_files(files)
+    mem_stream.seek(0)
+    response = StreamingResponse(mem_stream, media_type='application/x-zip-compressed')
+    response.headers['Content-Disposition'] = 'attachment; filename=packed_data.zip'
+    webdav_client.clean(f'{req.request_id}/')
+    return response
 
 
-@app.post('/api/v1/data_extraction/plain_text/', response_model=AnyStr, tags=["Synchronous Data Extraction"])
+@app.post('/api/v1/extract/plain_text/', response_model=AnyStr, tags=["Synchronous Data Extraction"])
 async def extract_plain_text_from_document(
         file: UploadFile = File(...),
         doc_language: str = Form(default='en'),
         convert_to_pdf_timeout_sec: int = Form(default=1800),
-        pdf_to_images_timeout_sec: int = Form(default=1800)
+        pdf_to_images_timeout_sec: int = Form(default=1800),
+        glyph_enhancing: bool = Form(default=False),
+        output_format: OutputFormat = Form(default=OutputFormat.json),
 ):
     webdav_client = get_webdav_client()
     request_id = str(uuid4())
-    req = RequestMetadata(original_file_name=file.filename,
-                          original_document=get_valid_fn(file.filename),
-                          request_id=request_id,
-                          request_date=datetime.now(),
-                          doc_language=doc_language,
-                          convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
-                          pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
-                          request_callback_info=RequestCallbackInfo(
-                              request_id=request_id,
-                              original_file_name=file.filename))
-    webdav_client.mkdir(f'/{req.request_id}')
-    save_request_metadata(req)
-    webdav_client.upload_to(file.file, f'{req.request_id}/{req.original_document}')
-    async_task = process_document.apply_async((req.request_id, req.request_callback_info))
+    _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
+                             pdf_to_images_timeout_sec, glyph_enhancing, output_format)
 
-    webdav_client.mkdir(f'{req.request_id}/{task_ids}')
-    register_task_id(webdav_client, req.request_id, async_task.id)
-
-    while load_request_metadata(request_id).status not in (STATUS_FAILURE, STATUS_DONE):
-        time.sleep(1)
-
-    plain_text = _proxy_request(webdav_client,
-                                request_id,
+    if not _wait_for_pdf_extraction_finish(request_id, convert_to_pdf_timeout_sec):
+        return purge_data_extraction_task(request_id)
+    plain_text = _proxy_request(webdav_client, request_id,
                                 load_request_metadata(request_id).plain_text_file,
                                 headers={'Content-Type': 'text/plain; charset=utf-8'})
-    webdav_client.clean(f'{req.request_id}/')
+    webdav_client.clean(f'{request_id}/')
     return plain_text
 
 
-@app.post('/api/v1/data_extraction/searchable_pdf/', tags=["Synchronous Data Extraction"])
+@app.post('/api/v1/extract/searchable_pdf/', tags=["Synchronous Data Extraction"])
 async def extract_text_from_document_and_generate_searchable_pdf(
         file: UploadFile = File(...),
         doc_language: str = Form(default='en'),
         convert_to_pdf_timeout_sec: int = Form(default=1800),
-        pdf_to_images_timeout_sec: int = Form(default=1800)
+        pdf_to_images_timeout_sec: int = Form(default=1800),
+        glyph_enhancing: bool = Form(default=False),
 ):
     webdav_client = get_webdav_client()
     request_id = str(uuid4())
-    req = RequestMetadata(original_file_name=file.filename,
-                          original_document=get_valid_fn(file.filename),
-                          request_id=request_id,
-                          request_date=datetime.now(),
-                          doc_language=doc_language,
-                          convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
-                          pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
-                          request_callback_info=RequestCallbackInfo(
-                              request_id=request_id,
-                              original_file_name=file.filename))
-    webdav_client.mkdir(f'/{req.request_id}')
-    save_request_metadata(req)
-    webdav_client.upload_to(file.file, f'{req.request_id}/{req.original_document}')
-    async_task = process_document.apply_async((req.request_id, req.request_callback_info))
-
-    webdav_client.mkdir(f'{req.request_id}/{task_ids}')
-    register_task_id(webdav_client, req.request_id, async_task.id)
-
-    while load_request_metadata(request_id).status not in (STATUS_FAILURE, STATUS_DONE):
-        time.sleep(1)
-
+    _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
+                             pdf_to_images_timeout_sec, glyph_enhancing)
+    if not _wait_for_pdf_extraction_finish(request_id, convert_to_pdf_timeout_sec):
+        return purge_data_extraction_task(request_id)
     pdf_file = _proxy_request(webdav_client, request_id, load_request_metadata(request_id).pdf_file)
-    webdav_client.clean(f'{req.request_id}/')
+    webdav_client.clean(f'{request_id}/')
     return pdf_file
 
 
@@ -367,3 +347,38 @@ def _proxy_request(webdav_client,
         return Response(content=content, status_code=resp.status_code, headers=headers)
     except RemoteResourceNotFound:
         raise HTTPException(HTTP_404_NOT_FOUND, f'No such request if or there is no {fn} in the request results')
+
+
+def _wait_for_pdf_extraction_finish(request_id: str, convert_to_pdf_timeout_sec: int):
+    waiting_time_seconds = 0
+    no_errors = True
+    while load_request_metadata(request_id).status not in (STATUS_FAILURE, STATUS_DONE):
+        time.sleep(1)
+        waiting_time_seconds += 1
+        if waiting_time_seconds > convert_to_pdf_timeout_sec:
+            no_errors = False
+            break
+    return no_errors
+
+
+def _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
+                             pdf_to_images_timeout_sec, glyph_enhancing, output_format):
+    req = RequestMetadata(original_file_name=file.filename,
+                          original_document=get_valid_fn(file.filename),
+                          request_id=request_id,
+                          request_date=datetime.now(),
+                          doc_language=doc_language,
+                          output_format=output_format,
+                          convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
+                          pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
+                          request_callback_info=RequestCallbackInfo(
+                              request_id=request_id,
+                              original_file_name=file.filename))
+    webdav_client.mkdir(f'/{req.request_id}')
+    save_request_metadata(req)
+    webdav_client.upload_to(file.file, f'{req.request_id}/{req.original_document}')
+    async_task = process_document.apply_async(
+        (req.request_id, req.request_callback_info, glyph_enhancing))
+
+    webdav_client.mkdir(f'{req.request_id}/{task_ids}')
+    register_task_id(webdav_client, req.request_id, async_task.id)
