@@ -237,6 +237,7 @@ async def extract_all_data_from_document(
         doc_language: str = Form(default='en'),
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
+        full_extract_timeout_sec: int = Form(default=300),
         glyph_enhancing: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
 ):
@@ -246,7 +247,7 @@ async def extract_all_data_from_document(
                              pdf_to_images_timeout_sec, glyph_enhancing, output_format)
 
     # Wait until celery finishes extracting else return TimeoutError
-    if not _wait_for_pdf_extraction_finish(request_id, convert_to_pdf_timeout_sec):
+    if not _wait_for_pdf_extraction_finish(request_id, full_extract_timeout_sec):
         await purge_data_extraction_task(request_id)
         raise HTTPException(status_code=504, detail="Input file is too big")
 
@@ -268,6 +269,7 @@ async def extract_plain_text_from_document(
         doc_language: str = Form(default='en'),
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
+        full_extract_timeout_sec: int = Form(default=300),
         glyph_enhancing: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
 ):
@@ -277,7 +279,7 @@ async def extract_plain_text_from_document(
                              pdf_to_images_timeout_sec, glyph_enhancing, output_format)
 
     # Wait until celery finishes extracting else return TimeoutError
-    if not _wait_for_pdf_extraction_finish(request_id, convert_to_pdf_timeout_sec):
+    if not _wait_for_pdf_extraction_finish(request_id, full_extract_timeout_sec):
         await purge_data_extraction_task(request_id)
         raise HTTPException(status_code=504, detail="Input file is too big")
 
@@ -295,6 +297,7 @@ async def extract_text_from_document_and_generate_searchable_pdf(
         doc_language: str = Form(default='en'),
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
+        full_extract_timeout_sec: int = Form(default=300),
         glyph_enhancing: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
 ):
@@ -304,7 +307,7 @@ async def extract_text_from_document_and_generate_searchable_pdf(
                              pdf_to_images_timeout_sec, glyph_enhancing, output_format)
 
     # Wait until celery finishes extracting else return TimeoutError
-    if not _wait_for_pdf_extraction_finish(request_id, convert_to_pdf_timeout_sec):
+    if not _wait_for_pdf_extraction_finish(request_id, full_extract_timeout_sec):
         await purge_data_extraction_task(request_id)
         raise HTTPException(status_code=504, detail="Input file is too big")
 
@@ -365,18 +368,19 @@ def _proxy_request(webdav_client,
         raise HTTPException(HTTP_404_NOT_FOUND, f'No such request if or there is no {fn} in the request results')
 
 
-def _wait_for_pdf_extraction_finish(request_id: str, convert_to_pdf_timeout_sec: int) -> bool:
+def _wait_for_pdf_extraction_finish(request_id: str, timeout_sec: int) -> bool:
     """Wait until celery tasks finish
     """
     waiting_time_seconds = 0
     no_errors = True
+    time_delay_sec = 5
 
     # Check finish_pdf_processing task status
     while load_request_metadata(request_id).status not in (STATUS_FAILURE, STATUS_DONE):
-        time.sleep(1)
-        waiting_time_seconds += 1
+        time.sleep(time_delay_sec)
+        waiting_time_seconds += time_delay_sec
         # Check if processing takes too much time
-        if waiting_time_seconds > convert_to_pdf_timeout_sec:
+        if waiting_time_seconds > timeout_sec:
             no_errors = False
             break
     return no_errors
