@@ -188,7 +188,33 @@ class TextExtractionSystemWebClient:
             output_format: OutputFormat = OutputFormat.json) -> Generator[str, None, None]:
         _fd, local_filename = tempfile.mkstemp(suffix='.pdf')
         try:
-            with requests.post(f'{self.base_url}/api/v1/extract/plain_text/',
+            with requests.post(f'{self.base_url}/api/v1/extract/searchable_pdf/',
+                               files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
+                               data=dict(convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
+                                         pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
+                                         doc_language=doc_language,
+                                         glyph_enhancing=glyph_enhancing,
+                                         output_format=output_format.value), stream=True) as r:
+                if r.status_code not in {200, 201}:
+                    r.raise_for_status()
+                with open(local_filename, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        f.write(chunk)
+            yield local_filename
+        finally:
+            os.remove(local_filename)
+
+    @contextmanager
+    def extract_all_data_from_document(
+            self, fn: str,
+            doc_language: Optional[str] = None,
+            convert_to_pdf_timeout_sec: int = 1800,
+            pdf_to_images_timeout_sec: int = 1800,
+            glyph_enhancing: bool = False,
+            output_format: OutputFormat = OutputFormat.json) -> Generator[str, None, None]:
+        _fd, local_filename = tempfile.mkstemp(suffix='.zip')
+        try:
+            with requests.post(f'{self.base_url}/api/v1/extract/text_and_structure/',
                                files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
                                data=dict(convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
                                          pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
