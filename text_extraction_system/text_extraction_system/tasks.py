@@ -139,9 +139,9 @@ def on_task_failure(sender, *args, **kwargs):
 
 
 @task_revoked.connect
-def task_post_run(task_id: str, task: str, *args, **kwargs):
+def on_task_revoked(sender, request, *args, **kwargs):
     # log.info(f'Unregistering on task_revoked: #{task_id} - {task}')
-    remove_pending_task_info_from_webdav(task_id, task)
+    remove_pending_task_info_from_webdav(request.id, request.task)
 
 
 def register_task_id(webdav_client: WebDavClient, request_id: str, task_id: str):
