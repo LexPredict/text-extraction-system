@@ -237,7 +237,7 @@ async def extract_all_data_from_document(
         doc_language: str = Form(default='en'),
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
-        full_extract_timeout_sec: int = Form(default=300),
+        full_extract_timeout_sec: int = Form(default=3600),
         glyph_enhancing: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
 ):
@@ -269,7 +269,7 @@ async def extract_plain_text_from_document(
         doc_language: str = Form(default='en'),
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
-        full_extract_timeout_sec: int = Form(default=300),
+        full_extract_timeout_sec: int = Form(default=3600),
         glyph_enhancing: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
 ):
@@ -297,7 +297,7 @@ async def extract_text_from_document_and_generate_searchable_pdf(
         doc_language: str = Form(default='en'),
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
-        full_extract_timeout_sec: int = Form(default=300),
+        full_extract_timeout_sec: int = Form(default=3600),
         glyph_enhancing: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
 ):
@@ -373,10 +373,18 @@ def _wait_for_pdf_extraction_finish(request_id: str, timeout_sec: int) -> bool:
     """
     waiting_time_seconds = 0
     no_errors = True
-    time_delay_sec = 5
 
     # Check finish_pdf_processing task status
     while load_request_metadata(request_id).status not in (STATUS_FAILURE, STATUS_DONE):
+        # Get dynamic time_delay_sec and wait
+        if waiting_time_seconds < 30:
+            time_delay_sec = 3
+        elif waiting_time_seconds < 5 * 60:
+            time_delay_sec = 5
+        elif waiting_time_seconds < 15 * 60:
+            time_delay_sec = 10
+        else:
+            time_delay_sec = 15
         time.sleep(time_delay_sec)
         waiting_time_seconds += time_delay_sec
         # Check if processing takes too much time
