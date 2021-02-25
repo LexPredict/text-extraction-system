@@ -8,10 +8,3 @@ task_ids = 'task_ids'
 
 tasks_pending = 'tasks_pending'
 queue_celery_beat = 'beat'
-
-synchronous_api_sleep_delays_sec = {
-    0: 3,
-    30: 5,
-    5*60: 10,
-    15*60: 15,
-}
