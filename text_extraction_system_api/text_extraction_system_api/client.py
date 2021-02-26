@@ -36,6 +36,7 @@ class TextExtractionSystemWebClient:
                                       request_id: str = None,
                                       log_extra: Dict[str, str] = None,
                                       glyph_enhancing: bool = False,
+                                      remove_non_printable: bool = False,
                                       output_format: OutputFormat = OutputFormat.json) -> str:
         resp = requests.post(f'{self.base_url}/api/v1/data_extraction_tasks/',
                              files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
@@ -55,6 +56,7 @@ class TextExtractionSystemWebClient:
                                        request_id=request_id,
                                        log_extra_json_key_value=json.dumps(log_extra) if log_extra else None,
                                        glyph_enhancing=glyph_enhancing,
+                                       remove_non_printable=remove_non_printable,
                                        output_format=output_format.value))
         if resp.status_code not in {200, 201}:
             resp.raise_for_status()

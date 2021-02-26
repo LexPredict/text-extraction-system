@@ -40,7 +40,8 @@ PAGE_SEPARATOR = '\n\n\f'
 def extract_text_and_structure(pdf_fn: str,
                                pdf_password: str = None,
                                timeout_sec: int = 3600,
-                               glyph_enhancing: bool = False) \
+                               glyph_enhancing: bool = False,
+                               remove_non_printable: bool = False) \
         -> Tuple[str, TextAndPDFCoordinates]:
     java_modules_path = get_settings().java_modules_path
 
@@ -59,6 +60,10 @@ def extract_text_and_structure(pdf_fn: str,
 
         if glyph_enhancing:
             args.append('-ge')
+            args.append('true')
+
+        if remove_non_printable:
+            args.append('-rn')
             args.append('true')
 
         completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=timeout_sec,

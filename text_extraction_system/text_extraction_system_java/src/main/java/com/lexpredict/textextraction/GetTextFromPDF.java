@@ -65,9 +65,11 @@ public class GetTextFromPDF {
         String password = cmd.getOptionValue("p", "");
         String glyphEnhancing = cmd.getOptionValue("ge", "false");
         boolean glyphEnch = glyphEnhancing.equalsIgnoreCase("true");
+        String remNonPrintStr = cmd.getOptionValue("rn", "false");
+        boolean remNonPrint = remNonPrintStr.equalsIgnoreCase("true");
 
         try (PDDocument document = PDDocument.load(new File(pdf), password)) {
-            PDFPlainText res = PDFToTextWithCoordinates.process(document, glyphEnch);
+            PDFPlainText res = PDFToTextWithCoordinates.process(document, glyphEnch, remNonPrint);
             try (OutputStream os = new FileOutputStream(outFn)) {
                 if (PLAIN_TEXT.equals(format)) {
                     try (Writer w = new OutputStreamWriter(os)) {
@@ -96,6 +98,11 @@ public class GetTextFromPDF {
                 "glyph box detection enhancing on (true) / off (false)");
         output.setRequired(false);
         options.addOption(output);
+
+        Option nonPrint = new Option("rn", "remove_non_printable", true,
+                "remove non printable symbols");
+        nonPrint.setRequired(false);
+        options.addOption(nonPrint);
 
         Option pwrd = new Option("p", "password", true,
                 "PDF file password");
