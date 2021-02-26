@@ -12,6 +12,7 @@ import pandas
 from fastapi import FastAPI, File, UploadFile, Form, Response
 from fastapi.exceptions import HTTPException
 from starlette.responses import StreamingResponse
+from starlette.staticfiles import StaticFiles
 from starlette.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
 from webdav3.exceptions import RemoteResourceNotFound
 
@@ -28,6 +29,8 @@ from text_extraction_system_api.dto import OutputFormat, TableList, PlainTextStr
     RequestStatuses, SystemInfo, TaskCancelResult, PDFCoordinates, STATUS_DONE, STATUS_FAILURE
 
 app = FastAPI()
+
+app.mount("/ui", StaticFiles(directory="../text_extraction_system_ui"), name="ui")
 
 
 @app.post('/api/v1/data_extraction_tasks/', response_model=str, tags=["Asynchronous Data Extraction"])

@@ -1,0 +1,13 @@
+{
+    "compilerOptions": {
+        "experimentalDecorators": true,
+        //...
+
+        // Can use to "react" if you aren't using `babel-loader` and `@babel/preset-react` to handle jsx        
+        "jsx": "react-jsx",
+
+        // Include these so the `react` imports work nicely:
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true
+    }
+}

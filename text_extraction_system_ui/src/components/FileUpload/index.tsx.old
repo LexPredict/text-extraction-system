@@ -1,0 +1,79 @@
+import { Component } from 'react';
+import Uppy from '@uppy/core';
+import Tus from '@uppy/tus';
+import axios from 'axios';
+
+import { Dashboard } from '@uppy/react';
+
+import '@uppy/core/dist/style.css';
+import '@uppy/dashboard/dist/style.css';
+import styles from './FileUpload.css'; 
+
+import Endpoints from "../../api/endpoints";
+
+export default class FileUpload extends Component {
+    // onRequestClose={this.handleClose}    
+    uppy: Uppy.Uppy;
+
+    state = { open: false }
+
+    constructor (props) {      
+      super(props);
+
+      if (false)
+        axios.get('/api/test', {
+          headers: {
+          },
+          }).then(function (response) {
+            console.log('response is : ' + response.data);
+          }).catch(function (error) {
+            if (error.response) {
+              console.log(error.response.headers);
+            } 
+            else if (error.request) {
+                console.log(error.request);
+            } 
+            else {
+              console.log(error.message);
+            }
+          console.log(error.config);
+        });  
+
+
+
+      console.log('Base URL is:');
+      console.log(Endpoints.uploadUrl);
+      this.uppy = Uppy({ id: 'uppy1', autoProceed: true, debug: true })
+        .use(Tus, { endpoint: 'api/v1/data_extraction_tasks/' });  
+        //.use(Tus, { endpoint: 'http://127.0.0.1:8000/api/v1/data_extraction_tasks/' });
+        //.use(Tus, { endpoint: Endpoints.uploadUrl });
+        //.use(GoogleDrive, { serverUrl: 'https://companion.uppy.io' })
+    }
+
+    componentWillUnmount () {
+      this.uppy.close();
+    }
+  
+    handleModalClick () {
+      this.setState({
+        open: !this.state.open
+      });
+    }
+  
+
+    render () {
+      return (
+        <>
+          <Dashboard
+              uppy={this.uppy}
+              plugins={['GoogleDrive']}
+              metaFields={[
+                { id: 'name', name: 'Name', placeholder: 'File name' }
+              ]}
+            />
+          <hr/>
+        </>
+      )
+    }
+    // ..snip..
+}
