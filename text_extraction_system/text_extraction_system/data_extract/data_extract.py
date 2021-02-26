@@ -76,7 +76,8 @@ def extract_text_and_structure(pdf_fn: str,
             # see object structure in com.lexpredict.textextraction.dto.PDFPlainText
             pdfbox_res: Dict[str, Any] = msgpack.unpack(pages_f, raw=False)
 
-        text = pdfbox_res['text']
+        # Remove Null characters because of incompatibility with PostgreSQL
+        text = pdfbox_res['text'].replace("\x00", "")
         if len(text) == 0:
             pdf_coordinates = PDFCoordinates(char_bboxes_with_page_nums=pdfbox_res['charBBoxesWithPageNums'])
             text_struct = PlainTextStructure(title='',
