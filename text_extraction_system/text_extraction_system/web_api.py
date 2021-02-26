@@ -48,6 +48,7 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                                     convert_to_pdf_timeout_sec: int = Form(default=1800),
                                     pdf_to_images_timeout_sec: int = Form(default=1800),
                                     glyph_enhancing: bool = Form(default=False),
+                                    remove_non_printable: bool = Form(default=False),
                                     output_format: OutputFormat = Form(default=OutputFormat.json)):
     webdav_client = get_webdav_client()
     request_id = get_valid_fn(request_id) if request_id else str(uuid4())
@@ -79,7 +80,7 @@ async def post_data_extraction_task(file: UploadFile = File(...),
     save_request_metadata(req)
     webdav_client.upload_to(file.file, f'{req.request_id}/{req.original_document}')
     async_task = process_document.apply_async(
-        (req.request_id, req.request_callback_info, glyph_enhancing))
+        (req.request_id, req.request_callback_info, glyph_enhancing, remove_non_printable))
 
     webdav_client.mkdir(f'{req.request_id}/{task_ids}')
     register_task_id(webdav_client, req.request_id, async_task.id)
@@ -239,12 +240,13 @@ async def extract_all_data_from_document(
         pdf_to_images_timeout_sec: int = Form(default=1800),
         full_extract_timeout_sec: int = Form(default=3600),
         glyph_enhancing: bool = Form(default=False),
+        remove_non_printable: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
 ):
     webdav_client = get_webdav_client()
     request_id = str(uuid4())
     _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
-                             pdf_to_images_timeout_sec, glyph_enhancing, output_format)
+                             pdf_to_images_timeout_sec, glyph_enhancing, remove_non_printable, output_format)
 
     # Wait until celery finishes extracting else return TimeoutError
     if not _wait_for_pdf_extraction_finish(request_id, full_extract_timeout_sec):
@@ -271,12 +273,13 @@ async def extract_plain_text_from_document(
         pdf_to_images_timeout_sec: int = Form(default=1800),
         full_extract_timeout_sec: int = Form(default=3600),
         glyph_enhancing: bool = Form(default=False),
+        remove_non_printable: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
 ):
     webdav_client = get_webdav_client()
     request_id = str(uuid4())
     _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
-                             pdf_to_images_timeout_sec, glyph_enhancing, output_format)
+                             pdf_to_images_timeout_sec, glyph_enhancing, remove_non_printable, output_format)
 
     # Wait until celery finishes extracting else return TimeoutError
     if not _wait_for_pdf_extraction_finish(request_id, full_extract_timeout_sec):
@@ -299,12 +302,13 @@ async def extract_text_from_document_and_generate_searchable_pdf(
         pdf_to_images_timeout_sec: int = Form(default=1800),
         full_extract_timeout_sec: int = Form(default=3600),
         glyph_enhancing: bool = Form(default=False),
+        remove_non_printable: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
 ):
     webdav_client = get_webdav_client()
     request_id = str(uuid4())
     _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
-                             pdf_to_images_timeout_sec, glyph_enhancing, output_format)
+                             pdf_to_images_timeout_sec, glyph_enhancing, remove_non_printable, output_format)
 
     # Wait until celery finishes extracting else return TimeoutError
     if not _wait_for_pdf_extraction_finish(request_id, full_extract_timeout_sec):
@@ -400,6 +404,7 @@ def _run_sync_pdf_processing(webdav_client, request_id: str,
                              convert_to_pdf_timeout_sec: int,
                              pdf_to_images_timeout_sec: int,
                              glyph_enhancing: bool,
+                             remove_non_printable: bool,
                              output_format: OutputFormat):
     """Run celery tasks to extract data from document
     """
@@ -418,6 +423,6 @@ def _run_sync_pdf_processing(webdav_client, request_id: str,
     save_request_metadata(req)
     webdav_client.upload_to(file.file, f'{req.request_id}/{req.original_document}')
     async_task = process_document.apply_async(
-        (req.request_id, req.request_callback_info, glyph_enhancing))
+        (req.request_id, req.request_callback_info, glyph_enhancing, remove_non_printable))
     webdav_client.mkdir(f'{req.request_id}/{task_ids}')
     register_task_id(webdav_client, req.request_id, async_task.id)

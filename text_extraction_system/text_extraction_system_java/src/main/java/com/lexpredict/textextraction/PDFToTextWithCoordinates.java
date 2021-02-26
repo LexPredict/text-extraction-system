@@ -50,6 +50,8 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
     protected boolean enhancedSizeDetection = false;
 
+    protected boolean removeNonPrintable = false;
+
     protected double r(double d) {
         BigDecimal bd = BigDecimal.valueOf(d);
         bd = bd.setScale(2, RoundingMode.HALF_UP);
@@ -169,9 +171,12 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
     @Override
     protected void writeString(String text, List<TextPosition> textPositions) throws IOException {
-        super.writeString(text, textPositions);
+        StringBuilder sb = new StringBuilder(text);
+        int deletedChars = 0;
+
         if (textPositions != null) {
-            for (TextPosition pos : textPositions) {
+            for (int i = 0; i < textPositions.size(); i++) {
+                TextPosition pos = textPositions.get(i);
                 double[] glyphBox = null;
                 if (this.enhancedSizeDetection)
                     glyphBox = this.getEnhancedGlyphBox(pos);
@@ -179,9 +184,18 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
                     glyphBox = new double[]{ getCurrentPageNo() - 1, r(pos.getX()),
                             r(pos.getY()), r(pos.getWidth()), r(pos.getHeight())};
 
-                this.charBBoxesWithPageNums.add(glyphBox);
+                if (removeNonPrintable && (glyphBox[3] == 0 || glyphBox[4] == 0)) {
+                    // don't store the glyph
+                    // and don't store the symbol
+                    sb.deleteCharAt(i - deletedChars);
+                    deletedChars++;
+                } else {
+                    this.charBBoxesWithPageNums.add(glyphBox);
+                }
             }
         }
+
+        super.writeString(sb.toString(), textPositions);
     }
 
     protected double[] getEnhancedGlyphBox(TextPosition pos) throws IOException {
@@ -333,14 +347,16 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     }
 
     public static PDFPlainText process(PDDocument document,
-                                       boolean enhancedSizeDetection) throws Exception {
-        return process(document, -1, Integer.MAX_VALUE, enhancedSizeDetection);
+                                       boolean enhancedSizeDetection,
+                                       boolean removeNonPrintable) throws Exception {
+        return process(document, -1, Integer.MAX_VALUE, enhancedSizeDetection, removeNonPrintable);
     }
 
     public static PDFPlainText process(PDDocument document,
                                        int startPage,
                                        int endPage,
-                                       boolean enhancedSizeDetection) throws Exception {
+                                       boolean enhancedSizeDetection,
+                                       boolean removeNonPrintable) throws Exception {
         PDFToTextWithCoordinates pdf2text = new PDFToTextWithCoordinates();
         pdf2text.document = document;
         pdf2text.output = new StringWriter();
@@ -354,6 +370,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         pdf2text.setSortByPosition(true);
         pdf2text.setShouldSeparateByBeads(true);
         pdf2text.enhancedSizeDetection = enhancedSizeDetection;
+        pdf2text.removeNonPrintable = removeNonPrintable;
 
         // This prevents false-matches in paragraph detection
         // See TestPDF2Text.test_paragraphs()
