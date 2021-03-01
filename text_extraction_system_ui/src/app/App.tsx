@@ -2,29 +2,64 @@ import './App.css';
 import { TopMenu, MenuItem } from '../pages/TopMenu';
 import { BrowserRouter, Switch, Route } from 'react-router-dom'
 import { PageParse } from '../pages/PageParse';
-import { PageLog } from '../pages/PageLog';
+import { PageTasks } from '../pages/PageTasks';
+import { useHistory } from 'react-router-dom';
+import { useEffect } from 'react';
+import { inject } from 'mobx-react';
+import { IStoreComponent, RootStore } from "../store";
+import { Component } from "react"
 
-function App() {
+
+@inject('stores') export class App extends Component {
+   
+    protected stores(): any {
+        return (this.props as IStoreComponent).stores;
+    }
+
+    render() {
+      return <>
+          <BrowserRouter>
+            <AppRouter 
+              locationChanged={() => {this.stores().navigation.processLocationChanged(location.pathname)}}
+              >
+            </AppRouter>
+          </BrowserRouter>
+      </>
+    }   
+}
+
+
+interface LocationChangedProps {
+  locationChanged: (newLocation: string) => void;
+}
+
+
+export const AppRouter: React.FC<LocationChangedProps> = (props: LocationChangedProps) => {
   const menuItems = [
     new MenuItem("Parse", "Upload and parse files", "/"),
-    new MenuItem("Log", "Completed parsing tasks", "/page-log"),
+    new MenuItem("Tasks", "Completed parsing tasks", "/page-tasks"),
   ];
+
+  const history = useHistory();
+  useEffect(() => {
+      return history.listen((location) => {
+        props.locationChanged(location.pathname);
+      }) 
+  },[history]);
 
   return (
       <div className="App">
-        <BrowserRouter>
-          <TopMenu rows={menuItems} />
-          <Switch>
-            <Route path="/page-log">
-              <PageLog />
-            </Route>
-            <Route path="/">
-              <PageParse />
-            </Route>
-          </Switch>
-        </BrowserRouter>
+        <TopMenu rows={menuItems} />
+        <Switch>
+          <Route path="/page-tasks">
+            <PageTasks />
+          </Route>
+          <Route path="/">
+            <PageParse />
+          </Route>
+        </Switch>
       </div>
   );
-}
+};
 
 export default App;

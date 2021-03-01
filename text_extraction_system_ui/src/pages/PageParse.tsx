@@ -21,7 +21,6 @@ type FileUploaderProps = {
         const newState = {...this.state};
         newState.file = file;
         this.setState(newState);
-        console.log('file selected');
     };
 
     public onUploadClicked = () => {

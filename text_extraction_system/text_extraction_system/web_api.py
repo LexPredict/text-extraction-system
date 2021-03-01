@@ -9,7 +9,7 @@ from uuid import uuid4
 from zipfile import ZipFile
 
 import pandas
-from fastapi import FastAPI, File, UploadFile, Form, Response
+from fastapi import FastAPI, File, UploadFile, Form, Response, APIRouter
 from fastapi.exceptions import HTTPException
 from starlette.responses import StreamingResponse
 from starlette.staticfiles import StaticFiles
@@ -30,7 +30,14 @@ from text_extraction_system_api.dto import OutputFormat, TableList, PlainTextStr
 
 app = FastAPI()
 
-app.mount("/ui", StaticFiles(directory="../text_extraction_system_ui"), name="ui")
+apiRouter = APIRouter()
+
+app.mount("/^api", StaticFiles(directory="../text_extraction_system_ui/build"), name="ui")
+
+app.include_router(
+    apiRouter,
+    prefix="/api",
+)
 
 
 @app.post('/api/v1/data_extraction_tasks/', response_model=str, tags=["Asynchronous Data Extraction"])
@@ -129,15 +136,18 @@ async def get_request_status(request_id: str):
     return load_request_metadata_or_raise(request_id).to_request_status().to_dict()
 
 
-@app.post('/api/v1/data_extraction_tasks/query_request_statuses', tags=["Asynchronous Data Extraction"])
-async def get_multiple_request_statuses(request_ids: List[str]) -> RequestStatuses:
+@app.post('/api/v1/data_extraction_tasks/query_request_statuses',
+          response_model=RequestStatuses,
+          tags=["Asynchronous Data Extraction"])
+async def query_multiple_request_statuses(request_ids: List[str]) -> RequestStatuses:
     if not request_ids:
         raise HTTPException(HTTP_400_BAD_REQUEST, 'Request ids must be specified.')
-    statuses = {}
+    statuses = []
     for request_id in request_ids:
         req = load_request_metadata(request_id)
-        statuses[request_id] = req.to_request_status() if req else None
-    return RequestStatuses(request_status_by_id=statuses)
+        if req:
+            statuses.append(req.to_request_status())
+    return RequestStatuses(request_statuses=statuses).to_dict()
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/packed_data.zip', tags=["Asynchronous Data Extraction"])

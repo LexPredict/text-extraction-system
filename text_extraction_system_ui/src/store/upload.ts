@@ -24,9 +24,6 @@ export default class {
                 this.rootStore.requests.storeRequest(requestId as string, file);
                 this.rootStore.notifications.notifyMessage(`file "${file.name}" is uploaded`, null);
             }
-            
-            console.log('response is : ' + response.data);
-
         }).catch((error) => {
             if (error.response) {
               console.log(error.response.headers);
