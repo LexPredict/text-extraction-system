@@ -49,7 +49,7 @@ class RequestStatus:
 @dataclass_json
 @dataclass
 class RequestStatuses:
-    request_status_by_id: Dict[str, RequestStatus]
+    request_statuses: List[RequestStatus]
 
 
 @pydantic_dataclass

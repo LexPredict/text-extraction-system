@@ -1,6 +1,7 @@
 import { Menu } from 'antd';
 import { Component } from 'react';
 import { Link } from 'react-router-dom';
+import React from 'react';
 
 export class MenuItem {
     name: string;
