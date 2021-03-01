@@ -57,3 +57,5 @@ docker/deploy/temp
 
 java_modules/*.jar
 models/*
+
+text_extraction_system/index.html
