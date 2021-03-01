@@ -6,7 +6,7 @@ import { PageTasks } from '../pages/PageTasks';
 import { useHistory } from 'react-router-dom';
 import { useEffect } from 'react';
 import { inject } from 'mobx-react';
-import { IStoreComponent, RootStore } from "../store";
+import { IStoreComponent } from "../store";
 import { Component } from "react"
 
 

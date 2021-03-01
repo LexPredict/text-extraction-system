@@ -11,9 +11,11 @@ from zipfile import ZipFile
 import pandas
 from fastapi import FastAPI, File, UploadFile, Form, Response, APIRouter
 from fastapi.exceptions import HTTPException
+from starlette.requests import Request
 from starlette.responses import StreamingResponse
 from starlette.staticfiles import StaticFiles
 from starlette.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
+from starlette.templating import Jinja2Templates
 from webdav3.exceptions import RemoteResourceNotFound
 
 from text_extraction_system import version
@@ -32,12 +34,19 @@ app = FastAPI()
 
 apiRouter = APIRouter()
 
-app.mount("/^api", StaticFiles(directory="../text_extraction_system_ui/build"), name="ui")
+app.mount("/static", StaticFiles(directory="../text_extraction_system_ui/build"), name="static")
 
 app.include_router(
     apiRouter,
     prefix="/api",
 )
+
+templates = Jinja2Templates(directory="text_extraction_system/templates")
+
+
+@app.get("/")
+async def serve_spa(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.post('/api/v1/data_extraction_tasks/', response_model=str, tags=["Asynchronous Data Extraction"])

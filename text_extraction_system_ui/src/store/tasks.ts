@@ -20,6 +20,13 @@ export default class {
 
     @action refresh(): void {
         const requests = this.rootStore.requests.getRequests();
+        if (!requests.length) {
+            runInAction(() => {
+                this.tasks.replace([]);
+            });
+            return;
+        }
+
         const reqIds = requests.map(r => r.id);
         const requestById = {};
         requests.forEach((r) => { requestById[r.id] = r; });
