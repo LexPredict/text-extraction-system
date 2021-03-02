@@ -1,31 +1,48 @@
 import { action, observable, runInAction } from 'mobx';
 import { RootStore } from '.';
 import axios from 'axios';
-import { UploadRequest } from './request';
-
-
-export class UploadTask extends UploadRequest {
-    status: string;
-}
+import { UploadRequest, UploadTask } from '../entity/models';
+import { SortDirection, UploadRequestSortField } from '../entity/enums';
 
 
 export default class {
     rootStore: RootStore;
 
     readonly tasks = observable<UploadTask>([]);
+
+    @observable page = 1;  // observable?
+
+    @observable itemsOnPage = 10;
+
+    @observable sortBy: UploadRequestSortField = UploadRequestSortField.started;
+
+    @observable sortDirection: SortDirection = SortDirection.desc;
+
     
     constructor(rootStore: RootStore){
         this.rootStore = rootStore;
+    }    
+
+    @action updatePage(page: number, itemsOnPage: number): void {
+        if (page == this.page && itemsOnPage == this.itemsOnPage)
+            return;
+        this.page = page;
+        this.itemsOnPage = itemsOnPage;
+        this.refresh();
     }
 
     @action refresh(): void {
-        const requests = this.rootStore.requests.getRequests();
+        let requests = this.rootStore.requests.getRequests();
+        console.log(`${requests.length} tasks totally`);
+        requests = this.sortAndFilterRequests(requests);
+        console.log(`refreshing ${requests.length} tasks. Page ${this.page}`);
+
         if (!requests.length) {
             runInAction(() => {
                 this.tasks.replace([]);
             });
             return;
-        }
+        }        
 
         const reqIds = requests.map(r => r.id);
         const requestById = {};
@@ -37,7 +54,7 @@ export default class {
                     'Content-Type': 'multipart/form-data'
                 }
         }).then((response) => {
-            const newTasks = [];
+            let newTasks = [];
             response.data.request_statuses.forEach((t) => {
                 const ut: UploadTask = {
                     id: t['request_id'], 
@@ -47,6 +64,8 @@ export default class {
                 };
                 newTasks.push(ut);
             });
+            newTasks = this.sortAndFilterRequests(newTasks);
+            console.log(newTasks);
             runInAction(() => {
                 this.tasks.replace(newTasks);
             });
@@ -62,5 +81,23 @@ export default class {
             }
             console.log(error.config);
         });
+    }
+
+    sortAndFilterRequests(requests: Array<UploadRequest>): Array<UploadRequest> {
+        // this can be done on server side if we want to sort requests by the fields
+        // whose values only the server knows (status, ...)
+        if (!requests.length)
+            return requests;
+        requests.sort((a: UploadRequest, b: UploadRequest) => {
+            const aVal = a[UploadRequestSortField[this.sortBy]];
+            const bVal = b[UploadRequestSortField[this.sortBy]];
+            const sign = aVal > bVal ? 1 : bVal > aVal ? -1 : 0;
+            return this.sortDirection == SortDirection.asc ? sign : -sign;
+        });
+        let end = this.itemsOnPage * this.page;
+        end = Math.min(end, requests.length);
+        let start = end - this.itemsOnPage;
+        start = Math.max(start, 0);
+        return requests.slice(start, end);
     }
 }

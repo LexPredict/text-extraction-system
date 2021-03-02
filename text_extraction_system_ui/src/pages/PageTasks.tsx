@@ -2,13 +2,29 @@ import { Component } from "react"
 import { inject, observer } from 'mobx-react';
 import { IStoreComponent } from "../store";
 import { Table, Pagination, Tag } from 'antd';
+import { formatDatetime } from "../entity/utils";
+
+
+type State = {
+}
+
+
+type EmptyProps = {
+};
 
 
 @inject('stores') 
-@observer export class PageTasks extends Component {
+@observer export class PageTasks extends Component<EmptyProps, State> {
+    constructor(props) {
+        super(props);
+    }
    
     protected stores(): any {
         return (this.props as IStoreComponent).stores;
+    }
+
+    onPaging(page: number, itemsOnPage: number): void {
+        this.stores().tasks.updatePage(page, itemsOnPage);
     }
 
     render() {
@@ -42,7 +58,7 @@ import { Table, Pagination, Tag } from 'antd';
                 dataIndex: 'started',
                 key: 'started',
                 render: started => {
-                    return <span>{this.formatDatetime(started)}</span>
+                    return <span>{formatDatetime(started)}</span>
                 }
             },
             {
@@ -56,17 +72,12 @@ import { Table, Pagination, Tag } from 'antd';
         ];
 
         return <>
-            <Table dataSource={tasks.slice()} columns={columns} key="id">
+            <Table dataSource={tasks.slice()} columns={columns} rowKey="id">
             </Table>
-            <Pagination onChange={(p, pSize) => {console.log(p + ': ' + pSize)}} total={requests.length}>
+            <Pagination 
+                onChange={(p, pSize) => this.onPaging(p, pSize)}
+                total={requests.length}>
             </Pagination>
         </> 
-    }
-
-    formatDatetime(m: Date): string  {
-        return m.getUTCFullYear() + "/" + 
-          (m.getUTCMonth()+1) + "/" + 
-          m.getUTCDate() + " " + 
-          m.getUTCHours() + ":" + m.getUTCMinutes() + ":" + m.getUTCSeconds();
     }
 }
