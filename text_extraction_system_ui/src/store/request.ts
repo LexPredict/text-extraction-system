@@ -1,12 +1,8 @@
 import { action } from 'mobx';
+import { UploadRequest } from '../entity/models';
 
 const requestPreffix = 'api_request_';
 
-export class UploadRequest {
-    id: string;
-    fileName: string;
-    started: Date;
-}
 
 export default class {
     rootStore: any;
