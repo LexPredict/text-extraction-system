@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import { FileUploaderPresentationalComponent } from '../UploadPresentationalComponent';
+import styles from './FileUpload.module.css'; 
 
 type State = {
     dragging: boolean;
@@ -104,7 +105,7 @@ export default class FileUploader extends Component<FileUploaderProps, State> {
             <input
                 ref={el => (this.fileUploaderInput = el)}
                 type="file"
-                className="file_uploader_input"
+                className={styles.file_uploader_input}
                 onChange={this.onFileChanged}
             />
         </FileUploaderPresentationalComponent>

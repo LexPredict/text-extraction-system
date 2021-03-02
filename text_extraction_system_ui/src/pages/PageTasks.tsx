@@ -1,8 +1,9 @@
-import { Component } from "react"
+import { Component } from 'react';
 import { inject, observer } from 'mobx-react';
 import { IStoreComponent } from "../store";
 import { Table, Pagination, Tag, Button } from 'antd';
 import { formatDatetime } from "../entity/utils";
+import { SortOrder } from 'antd/es/table/interface';
 
 
 type State = {
@@ -92,6 +93,7 @@ type EmptyProps = {
                 render: started => {
                     return <span>{formatDatetime(started)}</span>
                 },
+                defaultSortOrder: 'descend' as SortOrder,
                 sorter: (a, b) => a - b
             },
             {
@@ -102,7 +104,7 @@ type EmptyProps = {
                     if (record.status != 'DONE')
                         return <> - </>
                     return <>
-                        <a href={`/api/v1/data_extraction_tasks/{request_id}/results/extracted_plain_text.txt`}>.txt</a>
+                        <a href={`/api/v1/data_extraction_tasks/${record['id']}/results/extracted_plain_text.txt`}>.txt</a>
                         &nbsp;&nbsp;&nbsp;
                         <a href={`/api/v1/data_extraction_tasks/${record['id']}/results/packed_data.zip`}>.zip archive</a>
                     </>

@@ -1,4 +1,4 @@
-import styles from './UploadPresentationalComponent.css'; 
+import styles from './UploadPresentationalComponent.module.css'; 
 
 
 type PresentationalProps = {
@@ -22,6 +22,7 @@ export const FileUploaderPresentationalComponent: React.FunctionComponent<Presen
   }
 
   const fileName = props.file ? props.file.name : "No File Selected";
+  console.log(styles);
 
   return (
     <div

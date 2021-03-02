@@ -9,8 +9,8 @@ export default class {
     rootStore: RootStore;
 
     readonly tasks = observable<UploadTask>([]);
-
-    @observable page = 1;  // observable?
+    
+    @observable page = 1;
 
     @observable itemsOnPage = 10;
 
