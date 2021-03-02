@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     webdav_username: str
     webdav_password: str
     java_modules_path: str = os.path.join(project_root, 'java_modules')
+    text_extraction_system_ui_path: str = os.path.join(project_root, 'text_extraction_system_ui')
     fasttext_lang_model: str = os.path.join(project_root, 'models/lid.176.bin')
     delete_temp_files_on_request_finish: bool = True
     keep_failed_files: bool = False
