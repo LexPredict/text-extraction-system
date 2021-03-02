@@ -1,7 +1,7 @@
 import { Component } from "react"
 import { inject, observer } from 'mobx-react';
 import { IStoreComponent } from "../store";
-import { Table, Pagination, Tag } from 'antd';
+import { Table, Pagination, Tag, Button } from 'antd';
 import { formatDatetime } from "../entity/utils";
 
 
@@ -27,6 +27,22 @@ type EmptyProps = {
         this.stores().tasks.updatePage(page, itemsOnPage);
     }
 
+    toggleFullRequestId(sender: any) {
+        const senderSpan = sender.target.parentElement.parentElement;
+        const prefNode = senderSpan.childNodes[0];
+        const idNode = senderSpan.childNodes[1];
+        const spans = [prefNode, idNode];
+
+        spans.forEach((e) => {
+            if(e.style.display == 'inline') {
+                e.style.display = 'none';
+            }
+            else {
+                e.style.display = 'inline';
+            }
+        });
+    }
+
     render() {
         const tasks = this.stores().tasks.tasks;
         const requests = this.stores().requests.getRequests();
@@ -36,13 +52,23 @@ type EmptyProps = {
                 title: 'Request ID',
                 dataIndex: 'id',
                 key: 'id',
+                render: (text, record) => {
+                    const pref = text.substring(0, 8);
+                    return <span>
+                            <span style={{'display':'inline'}}>{pref}</span>
+                            <span style={{'display':'none'}}>{text}</span>
+                            <Button type="link" size="small" onClick={(s) => this.toggleFullRequestId(s)}>
+                              ...
+                            </Button>
+                        </span>
+                }
             },
             {
                 title: 'Status',
                 dataIndex: 'status',
                 key: 'status',
                 render: status => {
-                    const color = status == 'DONE' ? 'green' : 'red';
+                    const color = status == 'DONE' ? 'green' : status == 'PENDING' ? 'gray' : 'red';
                     return <Tag color={color} key={status}>
                             {status}
                       </Tag>
@@ -62,11 +88,17 @@ type EmptyProps = {
                 }
             },
             {
-                title: 'Archive',
+                title: 'Download',
                 key: 'id',
                 dataIndex: 'id',
                 render: (text, record) => {
-                    return <a href={`/api/v1/data_extraction_tasks/${record['id']}/results/packed_data.zip`}>.zip archive</a>
+                    if (record.status != 'DONE')
+                        return <> - </>
+                    return <>
+                        <a href={`/api/v1/data_extraction_tasks/{request_id}/results/extracted_plain_text.txt`}>.txt</a>
+                        &nbsp;&nbsp;&nbsp;
+                        <a href={`/api/v1/data_extraction_tasks/${record['id']}/results/packed_data.zip`}>.zip archive</a>
+                    </>
                 }
             }
         ];
