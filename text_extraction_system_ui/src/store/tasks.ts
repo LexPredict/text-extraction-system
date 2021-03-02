@@ -65,7 +65,6 @@ export default class {
                 newTasks.push(ut);
             });
             newTasks = this.sortAndFilterRequests(newTasks);
-            console.log(newTasks);
             runInAction(() => {
                 this.tasks.replace(newTasks);
             });
