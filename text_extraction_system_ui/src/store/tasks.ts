@@ -18,6 +18,11 @@ export default class {
 
     @observable sortDirection: SortDirection = SortDirection.desc;
 
+    defaultSortOrder = {
+        'started': SortDirection.desc,
+        'fileName': SortDirection.asc
+    }
+
     
     constructor(rootStore: RootStore){
         this.rootStore = rootStore;
@@ -28,6 +33,17 @@ export default class {
             return;
         this.page = page;
         this.itemsOnPage = itemsOnPage;
+        this.refresh();
+    }
+
+    @action updateSorting(field: string, order: string) {
+        const newOrder = order == 'ascend' ? SortDirection.asc : 
+            order == 'descend' ? SortDirection.desc : this.defaultSortOrder[field];
+        const newField = (<any>UploadRequestSortField)[field];
+        if (newField == this.sortBy && newOrder == this.sortDirection)
+            return;
+        this.sortBy = newField;
+        this.sortDirection = newOrder;
         this.refresh();
     }
 

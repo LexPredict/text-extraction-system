@@ -43,6 +43,11 @@ type EmptyProps = {
         });
     }
 
+    handleTableChange = (pagination, filters, sorter) => {
+        console.log(`${sorter.field}, ${sorter.order}`);
+        this.stores().tasks.updateSorting(sorter.field, sorter.order);
+    }
+
     render() {
         const tasks = this.stores().tasks.tasks;
         const requests = this.stores().requests.getRequests();
@@ -78,6 +83,7 @@ type EmptyProps = {
                 title: 'File',
                 dataIndex: 'fileName',
                 key: 'fileName',
+                sorter: (a, b) => a - b
             },
             {
                 title: 'Started',
@@ -85,7 +91,8 @@ type EmptyProps = {
                 key: 'started',
                 render: started => {
                     return <span>{formatDatetime(started)}</span>
-                }
+                },
+                sorter: (a, b) => a - b
             },
             {
                 title: 'Download',
@@ -104,7 +111,12 @@ type EmptyProps = {
         ];
 
         return <>
-            <Table dataSource={tasks.slice()} columns={columns} rowKey="id">
+            <Table 
+                dataSource={tasks.slice()} 
+                columns={columns} 
+                rowKey="id" 
+                pagination={false} 
+                onChange={(pagination, filters, sorter) => this.handleTableChange(pagination, filters, sorter)}>
             </Table>
             <Pagination 
                 onChange={(p, pSize) => this.onPaging(p, pSize)}
