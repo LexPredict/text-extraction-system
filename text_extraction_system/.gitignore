@@ -59,3 +59,4 @@ java_modules/*.jar
 models/*
 
 text_extraction_system/templates/index.html
+text_extraction_system/templates/bundle.js
