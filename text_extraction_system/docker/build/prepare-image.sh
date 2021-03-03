@@ -3,6 +3,9 @@ set -e
 
 source build_setenv.sh
 
+echo "Build SPA"
+source build_spa.sh
+
 echo "Image name: ${TEXT_EXTRACTION_SYSTEM_IMAGE}"
 export DOLLAR='$' # escape $ in envsubst
 
