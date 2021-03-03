@@ -64,7 +64,7 @@ export default class {
         const requestById = {};
         requests.forEach((r) => { requestById[r.id] = r; });
         
-        axios.post('/api/v1/data_extraction_tasks/query_request_statuses', 
+        axios.post('api/v1/data_extraction_tasks/query_request_statuses', 
             reqIds, {
                 headers: {
                     'Content-Type': 'multipart/form-data'

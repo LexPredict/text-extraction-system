@@ -2,7 +2,7 @@
 
 pushd .
 cd ../../text_extraction_system_ui
-sed -i "s/routerSubdir = ''/routerSubdir = 'text_extraction_system'/g" routing.ts
+sed -i "s/routerSubdir = ''/routerSubdir = 'TEXT_EXTRACTION_SPA_SUBDIRECTORY'/g" routing.ts
 npm install
 npm run build
 
