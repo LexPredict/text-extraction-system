@@ -76,7 +76,8 @@ elif [ "${DOLLAR}{ROLE}" == "web-api" ]; then
   startup
   pushd .
   cd text_extraction_system/templates
-  sed -i "s/TEXT_EXTRACTION_SPA_SUBDIRECTORY/${DOLLAR}{TEXT_EXTRACTION_SYSTEM_ROOT_PATH}/g" bundle.js
+  echo "New SPA subfolder is [${DOLLAR}{text_extraction_system_root_path}]"
+  sed -i "s/TEXT_EXTRACTION_SPA_SUBDIRECTORY/${DOLLAR}{text_extraction_system_root_path}/g" bundle.js
   popd
   exec uvicorn --host 0.0.0.0 --port 8000 --root-path ${DOLLAR}{text_extraction_system_root_path} text_extraction_system.web_api:app
 elif [ "${DOLLAR}{ROLE}" == "celery-worker" ]; then
