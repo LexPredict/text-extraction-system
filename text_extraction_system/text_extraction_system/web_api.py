@@ -34,7 +34,7 @@ app = FastAPI()
 
 apiRouter = APIRouter()
 
-app.mount("/static", StaticFiles(directory="text_extraction_system_ui/build"), name="static")
+app.mount("/static", StaticFiles(directory="text_extraction_system/templates"), name="static")
 
 app.include_router(
     apiRouter,

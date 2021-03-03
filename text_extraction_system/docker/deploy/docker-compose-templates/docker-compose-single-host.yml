@@ -140,6 +140,7 @@ services:
     command: ["web-api"]
     stop_signal: SIGTERM
     environment:
+      - "UI_SUB_DIR=text_extraction_system"
       - "text_extraction_system_celery_broker=redis://tasks.${DOCKER_REDIS_HOST_NAME}:6379/0"
       - "text_extraction_system_celery_backend=redis://tasks.${DOCKER_REDIS_HOST_NAME}:6379/0"
       - "text_extraction_system_webdav_url=http://${DOCKER_MASTER_NODE_IP}:${DOCKER_WEBDAV_PORT}"

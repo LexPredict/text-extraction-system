@@ -17,8 +17,10 @@ import { Component } from "react"
     }
 
     render() {
+      const subdir = process.env.UI_SUB_DIR || '';
+
       return <>
-          <BrowserRouter>
+          <BrowserRouter basename={subdir}>
             <AppRouter 
               locationChanged={() => {this.stores().navigation.processLocationChanged(location.pathname)}}
               >
