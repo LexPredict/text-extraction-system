@@ -127,7 +127,7 @@ This store's sole purpose is uploading a file to the server and storing the rece
 ... and `.env` - website environment variables. `API_HOST` and `API_PROTOCOL` are the obligatory variables for NodeJS server.
 
 **.eslintrc.json**
-The file Code checking rules for es linter. See webpack.config.js
+The file Code checking rules for es linter. See `webpack.config.js`:
 ```
 {
   test: /\.(js|jsx|ts|tsx)$/,
@@ -137,7 +137,7 @@ The file Code checking rules for es linter. See webpack.config.js
 ```    
 
 **declaration.d.ts**
-Presently this file is required for importing `*module.css` files as resorces. See `src/components/UploadPresentationalComponent`.
+Presently this file is required for importing `*module.css` files as resources. See `src/components/UploadPresentationalComponent`.
 
 **typings.d.ts**
 Allows referring to *.png files as resources.

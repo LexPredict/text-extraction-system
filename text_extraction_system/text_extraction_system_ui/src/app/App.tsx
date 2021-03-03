@@ -8,6 +8,7 @@ import { useEffect } from 'react';
 import { inject } from 'mobx-react';
 import { IStoreComponent } from "../store";
 import { Component } from "react"
+import { RoutingSettings } from '../../routing';
 
 
 @inject('stores') export class App extends Component {
@@ -17,8 +18,8 @@ import { Component } from "react"
     }
 
     render() {
-      const subdir = process.env.UI_SUB_DIR || '';
-
+      const subdir = RoutingSettings.routerSubdir;
+      // we might also read subdirectory from env. variables, like process.env.UI_SUB_DIR || '';
       return <>
           <BrowserRouter basename={subdir}>
             <AppRouter 
