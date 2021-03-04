@@ -74,6 +74,11 @@ elif [ "${DOLLAR}{ROLE}" == "signal-debug" ]; then
   exec python3 text_extraction_system/signal_debug.py
 elif [ "${DOLLAR}{ROLE}" == "web-api" ]; then
   startup
+  pushd .
+  cd text_extraction_system/templates
+  echo "New SPA subfolder is [${DOLLAR}{text_extraction_system_root_path:1}]"
+  sed -i "s/TEXT_EXTRACTION_SPA_SUBDIRECTORY/${DOLLAR}{text_extraction_system_root_path:1}/g" bundle.js
+  popd
   exec uvicorn --host 0.0.0.0 --port 8000 --root-path ${DOLLAR}{text_extraction_system_root_path} text_extraction_system.web_api:app
 elif [ "${DOLLAR}{ROLE}" == "celery-worker" ]; then
   startup
