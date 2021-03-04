@@ -43,3 +43,34 @@ def test_recursion3():
         assert num == page.number
 
     assert len(struct.text_structure.pages) == 7
+
+
+@with_default_settings
+def test_multicolumn_no_ocr():
+    fn = os.path.join(data_dir, 'table-based-text_noocr.pdf')
+
+    text, struct = data_extract.extract_text_and_structure(fn)
+
+    s = '''Warren E. Agin, as Trustee of the bankruptcy estate of Variety Plus Real Estate Group, LLC (the “Debtor”) in 
+Chapter 7 proceedings pending in the United States Bankruptcy Court for the District of Massachusetts (the 
+“Bankruptcy Court”) as Case No. 19-11598 (the “Chapter 7 Case”), having an address at 50 Milk Street,16th 
+Floor, Boston, MA 02109'''
+
+    assert s in text
+
+
+@with_default_settings
+def test_multicolumn_ocr():
+    fn = os.path.join(data_dir, 'table-based-text_scan.png')
+
+    from text_extraction_system.ocr.ocr import ocr_page_to_pdf
+
+    with ocr_page_to_pdf(fn) as pdf_fn:
+        text, struct = data_extract.extract_text_and_structure(pdf_fn)
+
+    # In fact for the OCR-ed multi-column text we extract the text wrong right now
+    # because the OCR lib has no info in which order the text blocks should go.
+
+    s = ''''''
+
+    # assert s in text

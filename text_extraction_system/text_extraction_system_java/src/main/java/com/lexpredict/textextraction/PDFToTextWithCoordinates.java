@@ -367,7 +367,11 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         pdf2text.setAddMoreFormatting(true);
         pdf2text.setParagraphEnd("\n");
         pdf2text.setPageEnd("\n\f");
-        pdf2text.setSortByPosition(true);
+
+        // Setting to true breaks multi-column layouts
+        // Setting to false breaks complicated diagrams
+        pdf2text.setSortByPosition(false);
+        
         pdf2text.setShouldSeparateByBeads(true);
         pdf2text.enhancedSizeDetection = enhancedSizeDetection;
         pdf2text.removeNonPrintable = removeNonPrintable;
