@@ -21,6 +21,13 @@ export class RootStore {
         this.navigation = new Navigation(this);
         this.tasks = new Task(this);
     }    
+
+    initialize(): Promise<void> {
+        return new Promise((resolve, reject) => {
+            this.tasks.refresh();                
+            resolve();            
+        });
+    }
 }
 
 export interface IStoreComponent {

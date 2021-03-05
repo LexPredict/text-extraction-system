@@ -1,6 +1,6 @@
 import './App.css';
 import { TopMenu, MenuItem } from '../pages/TopMenu';
-import { BrowserRouter, Switch, Route } from 'react-router-dom'
+import { BrowserRouter, Switch, Route, Redirect } from 'react-router-dom'
 import { PageParse } from '../pages/PageParse';
 import { PageTasks } from '../pages/PageTasks';
 import { useHistory } from 'react-router-dom';
@@ -39,7 +39,7 @@ interface LocationChangedProps {
 
 export const AppRouter: React.FC<LocationChangedProps> = (props: LocationChangedProps) => {
   const menuItems = [
-    new MenuItem("Parse", "Upload and parse files", "/"),
+    new MenuItem("Parse", "Upload and parse files", "/page-upload"),
     new MenuItem("Tasks", "Completed parsing tasks", "/page-tasks"),
   ];
 
@@ -54,12 +54,21 @@ export const AppRouter: React.FC<LocationChangedProps> = (props: LocationChanged
       <div className="App">
         <TopMenu rows={menuItems} />
         <Switch>
+          <Route path="/page-upload">
+            <PageParse />
+          </Route>
           <Route path="/page-tasks">
             <PageTasks />
           </Route>
-          <Route path="/">
-            <PageParse />
-          </Route>
+          <Route
+              exact
+              path="/"
+              render={() => {
+                  return (
+                    <Redirect to="/page-upload" />
+                  )
+              }}
+            />
         </Switch>
       </div>
   );
