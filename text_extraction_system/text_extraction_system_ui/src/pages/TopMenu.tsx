@@ -31,11 +31,17 @@ export class TopMenu extends Component<TopMenuProps> {
     }
   
     render() {
+        const path = window.location.pathname;
+        let pageIndex = 0;
+        this.props.rows.forEach((r, i) => {
+            if (path.indexOf(r.url) >= 0) pageIndex = i;
+        })
+
         return <>
             <Menu
                 theme="dark"
                 mode="horizontal"
-                defaultSelectedKeys={["1"]}
+                defaultSelectedKeys={[`${pageIndex + 1}`]}
                 style={{ lineHeight: '64px' }}
                 collapsedWidth="0">
                 {this.props.rows.map((item, i) =>
