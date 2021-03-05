@@ -49,6 +49,11 @@ async def serve_spa(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+@app.get("/page-{rest_of_path:path}")
+async def serve_spa(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
 @app.post('/api/v1/data_extraction_tasks/', response_model=str, tags=["Asynchronous Data Extraction"])
 async def post_data_extraction_task(file: UploadFile = File(...),
                                     call_back_url: str = Form(default=None),

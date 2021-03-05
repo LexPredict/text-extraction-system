@@ -51,8 +51,6 @@ export default class {
         let requests = this.rootStore.requests.getRequests();
         console.log(`${requests.length} tasks totally`);
         requests = this.sortAndFilterRequests(requests);
-        console.log(`refreshing ${requests.length} tasks. Page ${this.page}`);
-
         if (!requests.length) {
             runInAction(() => {
                 this.tasks.replace([]);
