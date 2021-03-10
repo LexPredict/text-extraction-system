@@ -56,9 +56,7 @@ export default class {
     }
 
     @action refresh(): void {
-        let requests = this.rootStore.requests.getRequests();
-        // console.log(`${requests.length} tasks totally`);
-        requests = this.sortAndFilterRequests(requests);
+        const requests = this.rootStore.requests.getRequests();
         if (!requests.length) {
             runInAction(() => {
                 this.tasks.replace([]);
@@ -67,16 +65,26 @@ export default class {
         }        
 
         const reqIds = requests.map(r => r.id);
+        const reqTimes = requests.map(r => r.started);
         const requestById = {};
         requests.forEach((r) => { requestById[r.id] = r; });
+        const requestData = {
+            request_ids: reqIds,
+            request_times: reqTimes,
+            sort_column: UploadRequestSortField[this.sortBy],
+            sort_order: SortDirection[this.sortDirection],
+            page_index: this.page,
+            records_on_page: this.itemsOnPage
+        };
         
-        axios.post('api/v1/data_extraction_tasks/query_request_statuses', 
-            reqIds, {
+        axios.post('api/v1/data_extraction_tasks/query_request_summary', 
+            requestData, 
+            {
                 headers: {
-                    'Content-Type': 'multipart/form-data'
-                }
+                    'Content-Type': 'multipart/form-data' // 'application/json' //'multipart/form-data'
+            }
         }).then((response) => {
-            let newTasks = [];
+            const newTasks = [];
             response.data.request_statuses.forEach((t) => {
                 const ut: UploadTask = {
                     id: t['request_id'], 
@@ -86,10 +94,9 @@ export default class {
                 };
                 newTasks.push(ut);
             });
-            newTasks = this.sortAndFilterRequests(newTasks);
             runInAction(() => {
                 this.tasks.replace(newTasks);
-                this.tasksPending = newTasks.reduce((acc, t) => acc + (t.status == 'PENDING' ? 1 : 0), 0);
+                this.tasksPending = response.data.tasks_pending;
             });
         }).catch((error) => {
             if (error.response) {
@@ -118,23 +125,5 @@ export default class {
                 return null;
             }
         return null;
-    }
-
-    sortAndFilterRequests(requests: Array<UploadRequest>): Array<UploadRequest> {
-        // this can be done on server side if we want to sort requests by the fields
-        // whose values only the server knows (status, ...)
-        if (!requests.length)
-            return requests;
-        requests.sort((a: UploadRequest, b: UploadRequest) => {
-            const aVal = a[UploadRequestSortField[this.sortBy]];
-            const bVal = b[UploadRequestSortField[this.sortBy]];
-            const sign = aVal > bVal ? 1 : bVal > aVal ? -1 : 0;
-            return this.sortDirection == SortDirection.asc ? sign : -sign;
-        });
-        let end = this.itemsOnPage * this.page;
-        end = Math.min(end, requests.length);
-        let start = end - this.itemsOnPage;
-        start = Math.max(start, 0);
-        return requests.slice(start, end);
     }
 }

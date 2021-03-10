@@ -45,13 +45,14 @@ type EmptyProps = {
     }
 
     handleTableChange = (pagination, filters, sorter) => {
-        console.log(`${sorter.field}, ${sorter.order}`);
+        // console.log(`${sorter.field}, ${sorter.order}`);
         this.stores().tasks.updateSorting(sorter.field, sorter.order);
     }
 
     render() {
         const tasks = this.stores().tasks.tasks;
         const requests = this.stores().requests.getRequests();
+        console.log('There are ' + requests.length + ' requests');
         
         const columns = [
             {
@@ -73,6 +74,8 @@ type EmptyProps = {
                 title: 'Status',
                 dataIndex: 'status',
                 key: 'status',
+                defaultSortOrder: 'status' as SortOrder,
+                sorter: (a, b) => a - b,
                 render: status => {
                     const color = status == 'DONE' ? 'green' : status == 'PENDING' ? 'gray' : 'red';
                     return <Tag color={color} key={status}>
