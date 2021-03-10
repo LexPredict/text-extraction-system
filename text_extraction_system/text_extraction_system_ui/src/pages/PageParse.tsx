@@ -224,6 +224,7 @@ type FileUploaderProps = {
                 onClick={() => this.onUploadClicked()}
                 disabled={this.state && this.state.file ? false : true}
                 >
+                Upload document
             </Button>
         </> 
     }   

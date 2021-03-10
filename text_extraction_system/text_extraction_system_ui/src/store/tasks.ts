@@ -28,12 +28,11 @@ export default class {
     
     constructor(rootStore: RootStore){
         this.rootStore = rootStore;
+        // request task statuses on server each N (3) seconds        
+        const refreshSecondsInterval = 3;
         setInterval(() => {
-            runInAction(() => {
-                this.tasksPending = Math.ceil(Math.random() * 10);
-                console.log(this.tasksPending);
-            });
-        }, 1000 * 3);
+            this.refresh();            
+        }, 1000 * refreshSecondsInterval);
         makeObservable(this);
     }    
 
@@ -58,7 +57,7 @@ export default class {
 
     @action refresh(): void {
         let requests = this.rootStore.requests.getRequests();
-        console.log(`${requests.length} tasks totally`);
+        // console.log(`${requests.length} tasks totally`);
         requests = this.sortAndFilterRequests(requests);
         if (!requests.length) {
             runInAction(() => {
@@ -90,6 +89,7 @@ export default class {
             newTasks = this.sortAndFilterRequests(newTasks);
             runInAction(() => {
                 this.tasks.replace(newTasks);
+                this.tasksPending = newTasks.reduce((acc, t) => acc + (t.status == 'PENDING' ? 1 : 0), 0);
             });
         }).catch((error) => {
             if (error.response) {
