@@ -96,6 +96,21 @@ export default class {
         });
     }
 
+    @action saveUploadTaskSettings(uploadSettings: any): void {
+        localStorage['uploadTaskSettings'] = JSON.stringify(uploadSettings);
+    }
+
+    restoreLastUploadTaskSettings(): any {
+        const setsStr = localStorage['uploadTaskSettings'];
+        if (setsStr && setsStr.length)
+            try {    
+                return JSON.parse(setsStr);
+            } catch {
+                return null;
+            }
+        return null;
+    }
+
     sortAndFilterRequests(requests: Array<UploadRequest>): Array<UploadRequest> {
         // this can be done on server side if we want to sort requests by the fields
         // whose values only the server knows (status, ...)
