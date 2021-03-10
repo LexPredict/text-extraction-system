@@ -1,5 +1,5 @@
 import { Component } from "react"
-import { inject} from 'mobx-react';
+import { inject } from 'mobx-react';
 import { Button, Collapse, Form, Input, Checkbox, Select } from 'antd';
 import FileUpload from "../components/FileUpload"
 import { IStoreComponent } from "../store";
@@ -224,7 +224,6 @@ type FileUploaderProps = {
                 onClick={() => this.onUploadClicked()}
                 disabled={this.state && this.state.file ? false : true}
                 >
-                Upload Document
             </Button>
         </> 
     }   
