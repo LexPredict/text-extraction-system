@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { action } from 'mobx';
 import { RootStore } from '.';
+import { UploadTaskSettings } from '../entity/models';
 
 
 export default class {
@@ -10,9 +11,12 @@ export default class {
         this.rootStore = rootStore;
     }
 
-    @action upload(file: File): void {
+    @action upload(file: File, settings: UploadTaskSettings): void {
         const formData = new FormData();
         formData.append('file', file);
+        for (const key in settings)
+            formData.append(key, settings[key]);
+
         axios.post('api/v1/data_extraction_tasks/', 
             formData, {
             headers: {

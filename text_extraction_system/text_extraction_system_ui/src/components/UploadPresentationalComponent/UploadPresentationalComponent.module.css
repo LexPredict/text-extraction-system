@@ -1,6 +1,7 @@
 .file_uploader {
     width: 300px;
     height: 180px;
+    margin-bottom: 60px;
     border: 2px solid steelblue;
     border-radius: 8px;
     padding: 10px;
