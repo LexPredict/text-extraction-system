@@ -1,4 +1,4 @@
-import { Component } from "react"
+import React, { Component } from "react"
 import { inject } from 'mobx-react';
 import { Button, Collapse, Form, Input, Checkbox, Select } from 'antd';
 import FileUpload from "../components/FileUpload"
@@ -20,17 +20,20 @@ type FileUploaderProps = {
 };
 
 @inject('stores') export class PageParse extends Component<FileUploaderProps, State> {
+    fileUploaderRef: any;
+
     protected stores(): any {
         return (this.props as IStoreComponent).stores;
     }
 
     constructor(props) {
         super(props);
+        this.fileUploaderRef = React.createRef();
         this.state = {
             file: null,
             uploadSettings: this.stores().tasks.restoreLastUploadTaskSettings() || new UploadTaskSettings()
         }
-      }
+    }
 
     protected modifyState(propName: string, value: any): void {
         const newSets = { ...this.state.uploadSettings };
@@ -50,13 +53,16 @@ type FileUploaderProps = {
     public onUploadClicked = () => {
         if (!this.state) return;
         this.stores().upload.upload(this.state.file, this.state.uploadSettings);
+        this.fileUploaderRef.current.resetFile();
     }
 
     render() {
         return <>
             <h2>Parse document(s)</h2>
             <form>
-                <FileUpload fileSelected={this.onFileSelected}></FileUpload>
+                <FileUpload 
+                  ref={this.fileUploaderRef}
+                  fileSelected={this.onFileSelected}></FileUpload>
             </form>
             <br/>
 
@@ -69,10 +75,10 @@ type FileUploaderProps = {
                                     label="Language"
                                     name="language"
                                     rules={[
-                                    {
-                                        required: false,
-                                        message: 'Select document language',
-                                    },
+                                        {
+                                            required: false,
+                                            message: 'Select document language',
+                                        },
                                     ]}
                                 >
                                     <Input 
@@ -86,10 +92,10 @@ type FileUploaderProps = {
                                     label="Enable OCR"
                                     name="ocr_enable"
                                     rules={[
-                                    {
-                                        required: false,
-                                        message: 'Enable / disable OCR',
-                                    },
+                                        {
+                                            required: false,
+                                            message: 'Enable / disable OCR',
+                                        },
                                     ]}
                                 >
                                     <Checkbox 
@@ -104,10 +110,10 @@ type FileUploaderProps = {
                                     label="Output format"
                                     name="output_format"
                                     rules={[
-                                    {
-                                        required: false,
-                                        message: 'Output format for text metadata',
-                                    },
+                                        {
+                                            required: false,
+                                            message: 'Output format for text metadata',
+                                        },
                                     ]}
                                 >
                                     <Select 
