@@ -1,4 +1,4 @@
-import { action, observable, runInAction } from 'mobx';
+import { action, observable, runInAction, makeObservable } from 'mobx';
 import { RootStore } from '.';
 import axios from 'axios';
 import { UploadRequest, UploadTask } from '../entity/models';
@@ -18,6 +18,8 @@ export default class {
 
     @observable sortDirection: SortDirection = SortDirection.desc;
 
+    @observable tasksPending = 0;
+
     defaultSortOrder = {
         'started': SortDirection.desc,
         'fileName': SortDirection.asc
@@ -26,6 +28,13 @@ export default class {
     
     constructor(rootStore: RootStore){
         this.rootStore = rootStore;
+        setInterval(() => {
+            runInAction(() => {
+                this.tasksPending = Math.ceil(Math.random() * 10);
+                console.log(this.tasksPending);
+            });
+        }, 1000 * 3);
+        makeObservable(this);
     }    
 
     @action updatePage(page: number, itemsOnPage: number): void {
