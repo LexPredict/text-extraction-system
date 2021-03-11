@@ -41,9 +41,12 @@ def extract_text_and_structure(pdf_fn: str,
                                pdf_password: str = None,
                                timeout_sec: int = 3600,
                                glyph_enhancing: bool = False,
-                               remove_non_printable: bool = False) \
+                               remove_non_printable: bool = False,
+                               language: str = "") \
         -> Tuple[str, TextAndPDFCoordinates]:
     java_modules_path = get_settings().java_modules_path
+    # Convert language to language code
+    language = language[:2]
 
     temp_dir = mkdtemp(prefix='pdf_text_')
     out_fn = os.path.join(temp_dir, os.path.splitext(os.path.basename(pdf_fn))[0] + '.msgpack')
@@ -81,7 +84,7 @@ def extract_text_and_structure(pdf_fn: str,
         if len(text) == 0:
             pdf_coordinates = PDFCoordinates(char_bboxes_with_page_nums=pdfbox_res['charBBoxesWithPageNums'])
             text_struct = PlainTextStructure(title='',
-                                             language='en',  # FastText returns English for empty strings
+                                             language=language or 'en',  # FastText returns English for empty strings
                                              pages=[],
                                              sentences=[],
                                              paragraphs=[],
@@ -101,14 +104,14 @@ def extract_text_and_structure(pdf_fn: str,
 
         sentences = [PlainTextSentence(start=start,
                                        end=end,
-                                       language=lang.predict_lang(segment))
+                                       language=language or lang.predict_lang(segment))
                      for start, end, segment in sentence_spans]
 
         # There was a try-except in Contraxsuite catching some lexnlp exception.
         # Not putting it here because it should be solved on lexnlp side.
         paragraphs = [PlainTextParagraph(start=start,
                                          end=end,
-                                         language=lang.predict_lang(segment))
+                                         language=language or lang.predict_lang(segment))
                       for segment, start, end in get_paragraphs(text, return_spans=True)]
 
         sections = [PlainTextSection(title=sect.title,
@@ -125,11 +128,9 @@ def extract_text_and_structure(pdf_fn: str,
         except StopIteration:
             title = None
 
-        doc_lang = get_lang_detector().predict_lang(text)
-
         text_struct = PlainTextStructure(
             title=title,
-            language=doc_lang,
+            language=language or lang.predict_lang(text),
             pages=pages,
             sentences=sentences,
             paragraphs=paragraphs,
