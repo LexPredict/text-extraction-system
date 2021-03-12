@@ -12,15 +12,12 @@ import org.apache.pdfbox.pdmodel.PDPageTree;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDFontDescriptor;
-import org.apache.pdfbox.pdmodel.font.PDTrueTypeFont;
-import org.apache.pdfbox.pdmodel.font.PDType3Font;
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDDocumentOutline;
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineItem;
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineNode;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.text.TextPosition;
 import org.apache.pdfbox.util.Matrix;
-import org.apache.pdfbox.util.Vector;
 import org.xml.sax.SAXException;
 
 import java.io.IOException;
@@ -171,30 +168,32 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
     @Override
     protected void writeString(String text, List<TextPosition> textPositions) throws IOException {
-        StringBuilder sb = new StringBuilder(text);
-        int deletedChars = 0;
+        if (textPositions == null)
+            return;
 
-        if (textPositions != null) {
-            for (int i = 0; i < textPositions.size(); i++) {
-                TextPosition pos = textPositions.get(i);
-                double[] glyphBox = null;
-                if (this.enhancedSizeDetection)
-                    glyphBox = this.getEnhancedGlyphBox(pos);
-                if (glyphBox == null)
-                    glyphBox = new double[]{ getCurrentPageNo() - 1, r(pos.getX()),
-                            r(pos.getY()), r(pos.getWidth()), r(pos.getHeight())};
+        StringBuilder sb = new StringBuilder();
+        for (TextPosition pos : textPositions) {
+            double[] glyphBox = null;
+            if (this.enhancedSizeDetection)
+                glyphBox = this.getEnhancedGlyphBox(pos);
+            if (glyphBox == null)
+                glyphBox = new double[]{getCurrentPageNo() - 1, r(pos.getX()),
+                        r(pos.getY()), r(pos.getWidth()), r(pos.getHeight())};
 
-                if (removeNonPrintable && (glyphBox[3] == 0 || glyphBox[4] == 0)) {
-                    // don't store the glyph
-                    // and don't store the symbol
-                    sb.deleteCharAt(i - deletedChars);
-                    deletedChars++;
-                } else {
-                    this.charBBoxesWithPageNums.add(glyphBox);
-                }
+            if (removeNonPrintable && (glyphBox[3] == 0 || glyphBox[4] == 0))
+                continue;
+
+            String symbol = pos.getUnicode();
+            if (symbol.length() == 0)
+                continue;
+            if (symbol.length() > 1) {
+                symbol = symbol.substring(0, 2);
+                this.charBBoxesWithPageNums.add(glyphBox);
             }
-        }
+            sb.append(symbol);
 
+            this.charBBoxesWithPageNums.add(glyphBox);
+        }
         super.writeString(sb.toString(), textPositions);
     }
 
