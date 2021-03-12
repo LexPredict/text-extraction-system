@@ -493,7 +493,10 @@ def deliver_results(req: RequestCallbackInfo, req_status: RequestStatus):
                       f'queue: {req.call_back_celery_queue}\n'
                       f'task_name: {req.call_back_celery_task_name}\n', exc_info=err)
 
-    log.info(f'{req.original_file_name} | Finished processing request (#{req.request_id}).')
+    status_extra = ', '.join(['plain text' if req_status.plain_text_extracted else '',
+                    'coords extracted' if req_status.pdf_coordinates_extracted else '',
+                    'pages OCRed' if req_status.pdf_pages_ocred else ''])
+    log.info(f'{req.original_file_name} | Finished processing request (#{req.request_id}). {status_extra}')
 
 
 @celery_app.task(acks_late=True, bind=True, queue=queue_celery_beat)
