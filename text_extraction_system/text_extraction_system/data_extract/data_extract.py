@@ -28,7 +28,8 @@ from text_extraction_system.config import get_settings
 from text_extraction_system.data_extract.camelot.camelot import extract_tables
 from text_extraction_system.data_extract.lang import get_lang_detector
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf
-from text_extraction_system.pdf.pdf import page_requires_ocr, extract_page_images, raise_from_pdfbox_error_messages
+from text_extraction_system.pdf.pdf import page_requires_ocr, extract_page_images, extract_page_ocr_images, \
+    raise_from_pdfbox_error_messages
 from text_extraction_system.processes import raise_from_process
 from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, PlainTextStructure, \
     PlainTextSentence, TextAndPDFCoordinates, PDFCoordinates
@@ -185,21 +186,25 @@ def process_pdf_page(pdf_fn: str,
                      ocr_timeout_sec: int = 60,
                      pdf_password: str = None) -> Generator[PDFPageProcessingResults, None, None]:
     with extract_page_images(pdf_fn, start_page=1, end_page=1, pdf_password=pdf_password) as image_fns:
-        page_image_fn = image_fns[0]
+        page_image_with_text_fn = image_fns[0]
         with open(pdf_fn, 'rb') as in_file:
             page_layout = get_first_page_layout(in_file)
 
             if ocr_enabled and page_requires_ocr(page_layout):
-                with ocr_page_to_pdf(page_image_fn=page_image_fn,
-                                     language=ocr_language,
-                                     timeout=ocr_timeout_sec) as ocred_pdf_fn:
-                    with open(ocred_pdf_fn, 'rb') as ocred_in_file:
-                        ocred_page_layout = get_first_page_layout(ocred_in_file)
-                        camelot_tables = extract_tables(page_num, ocred_page_layout, page_image_fn)
-                        yield PDFPageProcessingResults(page_requires_ocr=True,
-                                                       ocred_page_fn=ocred_pdf_fn,
-                                                       camelot_tables=camelot_tables)
+                with extract_page_ocr_images(pdf_fn, start_page=1, end_page=1, pdf_password=pdf_password) \
+                        as ocr_image_fns:
+                    page_image_without_text = ocr_image_fns[0]
+                    with ocr_page_to_pdf(page_image_fn=page_image_without_text,
+                                         language=ocr_language,
+                                         timeout=ocr_timeout_sec,
+                                         glyphless_text_only=True) as ocred_pdf_fn:
+                        with open(ocred_pdf_fn, 'rb') as ocred_in_file:
+                            ocred_page_layout = get_first_page_layout(ocred_in_file)
+                            camelot_tables = extract_tables(page_num, ocred_page_layout, page_image_with_text_fn)
+                            yield PDFPageProcessingResults(page_requires_ocr=True,
+                                                           ocred_page_fn=ocred_pdf_fn,
+                                                           camelot_tables=camelot_tables)
             else:
-                camelot_tables = extract_tables(page_num, page_layout, page_image_fn)
+                camelot_tables = extract_tables(page_num, page_layout, page_image_with_text_fn)
                 yield PDFPageProcessingResults(page_requires_ocr=False,
                                                camelot_tables=camelot_tables)
