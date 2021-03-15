@@ -9,8 +9,6 @@ import pytest
 from requests import HTTPError
 
 from text_extraction_system_api.client import TextExtractionSystemWebClient
-from text_extraction_system_api.dto import RequestStatus, PlainTextStructure, TableList, OutputFormat
-from .call_back_server import DocumentCallbackServer
 from .testing_config import test_settings
 
 log = logging.getLogger(__name__)
