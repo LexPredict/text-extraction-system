@@ -50,6 +50,11 @@ async def serve_spa(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+@app.get("")
+async def serve_spa(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
 @app.get("/page-{rest_of_path:path}")
 async def serve_spa(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
