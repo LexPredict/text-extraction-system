@@ -30,6 +30,7 @@ from text_extraction_system.data_extract.lang import get_lang_detector
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf
 from text_extraction_system.pdf.pdf import page_requires_ocr, extract_page_images, raise_from_pdfbox_error_messages
 from text_extraction_system.processes import raise_from_process
+from text_extraction_system.utils import LanguageConverter
 from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, PlainTextStructure, \
     PlainTextSentence, TextAndPDFCoordinates, PDFCoordinates
 
@@ -45,8 +46,10 @@ def extract_text_and_structure(pdf_fn: str,
                                language: str = "") \
         -> Tuple[str, TextAndPDFCoordinates]:
     java_modules_path = get_settings().java_modules_path
+
     # Convert language to language code
-    language = language[:2]
+    lang_converter = LanguageConverter()
+    language, locale_code = lang_converter.get_language_and_locale_code(language)
 
     temp_dir = mkdtemp(prefix='pdf_text_')
     out_fn = os.path.join(temp_dir, os.path.splitext(os.path.basename(pdf_fn))[0] + '.msgpack')

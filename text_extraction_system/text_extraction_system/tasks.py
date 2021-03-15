@@ -15,7 +15,7 @@ from celery import Celery, chord
 from celery.signals import after_setup_logger, worker_process_init, before_task_publish, task_success, task_failure, \
     task_revoked
 
-from text_extraction_system.ocr.constants import TESSERACT_LANGUAGES
+from text_extraction_system.utils import LanguageConverter
 from text_extraction_system_api.dto import OutputFormat
 from webdav3.exceptions import RemoteResourceNotFound
 
@@ -243,7 +243,9 @@ def process_pdf(pdf_fn: str,
         task_signatures = list()
         i = 0
 
-        ocr_language = TESSERACT_LANGUAGES.get(req.doc_language[:2] or 'en', TESSERACT_LANGUAGES['en'])
+        lang_converter = LanguageConverter()
+        language, locale_code = lang_converter.get_language_and_locale_code(req.doc_language)
+        ocr_language = lang_converter.convert_language_to_tesseract_view(language)
 
         for pdf_page_fn in pdf_page_fns:
             i += 1
