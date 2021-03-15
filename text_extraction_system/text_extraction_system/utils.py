@@ -15,8 +15,8 @@ class LanguageConverter:
         """
         Extracts language and locale code from locale representation
         """
-        try:
-            language, locale_code = locale.replace('-', '_').split("_")[:2]
-        except ValueError:
-            language, locale_code = "", ""
+        data = locale.replace('-', '_').split("_")[:2]
+        if len(data) < 2:
+            data.append("")
+        language, locale_code = data
         return language, locale_code
