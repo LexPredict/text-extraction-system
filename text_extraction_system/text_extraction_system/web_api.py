@@ -71,7 +71,7 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                                     call_back_celery_parent_task_id: str = Form(default=None),
                                     call_back_celery_root_task_id: str = Form(default=None),
                                     call_back_celery_version: int = Form(default=4),
-                                    doc_language: str = Form(default='en'),
+                                    doc_language: str = Form(default=''),
                                     ocr_enable: bool = Form(default=True),
                                     request_id: str = Form(default=None),
                                     log_extra_json_key_value: str = Form(default=None),
@@ -295,7 +295,7 @@ async def delete_request_files(request_id: str):
 @app.post('/api/v1/extract/text_and_structure/', tags=["Synchronous Data Extraction"])
 async def extract_all_data_from_document(
         file: UploadFile = File(...),
-        doc_language: str = Form(default='en'),
+        doc_language: str = Form(default=''),
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
         full_extract_timeout_sec: int = Form(default=3600),
@@ -328,7 +328,7 @@ async def extract_all_data_from_document(
 @app.post('/api/v1/extract/plain_text/', tags=["Synchronous Data Extraction"])
 async def extract_plain_text_from_document(
         file: UploadFile = File(...),
-        doc_language: str = Form(default='en'),
+        doc_language: str = Form(default=''),
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
         full_extract_timeout_sec: int = Form(default=3600),
@@ -357,7 +357,7 @@ async def extract_plain_text_from_document(
 @app.post('/api/v1/extract/searchable_pdf/', tags=["Synchronous Data Extraction"])
 async def extract_text_from_document_and_generate_searchable_pdf(
         file: UploadFile = File(...),
-        doc_language: str = Form(default='en'),
+        doc_language: str = Form(default=''),
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
         full_extract_timeout_sec: int = Form(default=3600),
