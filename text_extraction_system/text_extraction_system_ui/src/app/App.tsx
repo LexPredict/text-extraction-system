@@ -39,8 +39,8 @@ interface LocationChangedProps {
 
 export const AppRouter: React.FC<LocationChangedProps> = (props: LocationChangedProps) => {
   const menuItems = [
-    new MenuItem("Parse", "Upload and parse files", "/page-upload"),
-    new MenuItem("Tasks", "Completed parsing tasks", "/page-tasks"),
+    new MenuItem('Parse', 'Upload and parse files', '/page-upload'),
+    new MenuItem('Tasks', 'Completed parsing tasks', '/page-tasks', true),
   ];
 
   const history = useHistory();

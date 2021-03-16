@@ -16,13 +16,19 @@ type FileUploaderProps = {
 export default class FileUploader extends Component<FileUploaderProps, State> {
     static counter = 0;
     fileUploaderInput: HTMLElement | null = null;
+    dragEventCounter = 0;
 
     constructor(props) {
         super(props);
         this.state = { dragging: false, file: null };
     }
 
-    dragEventCounter = 0;
+    resetFile(): void {
+        this.setState({ dragging: false, file: null });
+        this.props.fileSelected(null);
+        // setTimeout(() => { console.log('State is:'); console.log(this.state);}, 1000);
+    }
+    
     dragenterListener = (event: React.DragEvent<HTMLDivElement>) => {
         this.overrideEventDefaults(event);
         this.dragEventCounter++;

@@ -74,3 +74,19 @@ def test_multicolumn_ocr():
     s = ''''''
 
     # assert s in text
+
+
+@with_default_settings
+def test_different_languages_extraction_with_no_ocr():
+    fn = os.path.join(data_dir, 'two_langs_no_ocr.pdf')
+
+    text, full_struct = data_extract.extract_text_and_structure(fn, language="en_US")
+    struct = full_struct.text_structure
+    assert 'This is top secret' in text
+    assert len(struct.pages) == 1
+    assert len(struct.paragraphs) == 1
+    for i in struct.paragraphs:
+        assert i.language == struct.language
+    assert len(struct.sentences) == 2
+    for i in struct.sentences:
+        assert i.language == struct.language

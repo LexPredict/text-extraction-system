@@ -31,7 +31,7 @@ export class RootStore {
 }
 
 export interface IStoreComponent {
-    stores: RootStore;
+    stores?: RootStore;
 }
 
 export default new RootStore();

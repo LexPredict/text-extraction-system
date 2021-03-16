@@ -22,7 +22,6 @@ export const FileUploaderPresentationalComponent: React.FunctionComponent<Presen
   }
 
   const fileName = props.file ? props.file.name : "No File Selected";
-  console.log(styles);
 
   return (
     <div
