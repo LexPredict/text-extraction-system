@@ -359,20 +359,19 @@ def finish_pdf_processing(task,
                     = webdav_client.unpickle(f'{request_id}/{pages_tables}/{remote_base_fn}')
                 camelot_tables_total += camelot_tables_of_page
 
-            repl_page_num_to_fn: Dict[int, str] = dict()
+            requires_page_merge: bool = False
             for remote_base_fn in webdav_client.list(f'{request_id}/{pages_ocred}'):
                 remote_page_pdf_fn = f'{req.request_id}/{pages_ocred}/{remote_base_fn}'
                 local_page_pdf_fn = os.path.join(pages_dir, remote_base_fn)
                 webdav_client.download_file(remote_page_pdf_fn, local_page_pdf_fn)
-                page_num = int(os.path.splitext(remote_base_fn)[0])
-                repl_page_num_to_fn[page_num] = local_page_pdf_fn
+                requires_page_merge = True
 
-            if repl_page_num_to_fn:
+            if requires_page_merge:
                 original_pdf_in_storage = req.converted_to_pdf or req.original_document
                 local_orig_pdf_fn = os.path.join(temp_dir, original_pdf_in_storage)
 
                 webdav_client.download_file(f'{req.request_id}/{original_pdf_in_storage}', local_orig_pdf_fn)
-                with merge_pdf_pages(local_orig_pdf_fn, repl_page_num_to_fn) as local_merged_pdf_fn:
+                with merge_pdf_pages(local_orig_pdf_fn, pages_dir) as local_merged_pdf_fn:
                     req.ocred_pdf = os.path.splitext(original_pdf_in_storage)[0] + '.ocred.pdf'
                     webdav_client.upload_file(f'{req.request_id}/{req.ocred_pdf}', local_merged_pdf_fn)
                     extract_data_and_finish(req, webdav_client,

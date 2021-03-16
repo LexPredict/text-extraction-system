@@ -223,21 +223,33 @@ def split_pdf_to_page_blocks(src_pdf_fn: str,
 
 
 @contextmanager
-def merge_pdf_pages(original_pdf_fn: str, replace_page_num_to_page_pdf_fn: Dict[int, str]) \
+def merge_pdf_pages(original_pdf_fn: str,
+                    page_pdf_dir: str,
+                    original_pdf_password: str = None,
+                    timeout_sec: int = 3000) \
         -> Generator[str, None, None]:
     temp_dir = mkdtemp()
     try:
-        with pikepdf.open(original_pdf_fn) as pdf:  # type: pikepdf.Pdf
-            dst_pdf: pikepdf.Pdf = pikepdf.new()
-            for n, page in enumerate(pdf.pages):  # type: int, pikepdf.Page
-                replace_pdf_fn: str = replace_page_num_to_page_pdf_fn.get(n + 1)
-                if not replace_pdf_fn:
-                    dst_pdf.pages.append(page)
-                else:
-                    with pikepdf.open(replace_pdf_fn) as replace_pdf:  # type: pikepdf.Pdf
-                        dst_pdf.pages.append(replace_pdf.pages[0])
-            dst_pdf_fn = os.path.join(temp_dir, os.path.basename(original_pdf_fn))
-            dst_pdf.save(dst_pdf_fn)
-            yield dst_pdf_fn
+        dst_pdf_fn = os.path.join(temp_dir, os.path.basename(original_pdf_fn))
+
+        java_modules_path = get_settings().java_modules_path
+        args = ['java', '-cp', f'{java_modules_path}/*',
+                'com.lexpredict.textextraction.mergepdf.MergeInPageLayers',
+                '--original-pdf', original_pdf_fn,
+                '--page-dir', page_pdf_dir,
+                '--dst-pdf', dst_pdf_fn]
+        if original_pdf_password:
+            args += ['--password', original_pdf_password]
+
+        completed_process: CompletedProcess = subprocess.run(args,
+                                                             check=False,
+                                                             timeout=timeout_sec,
+                                                             universal_newlines=True, stderr=PIPE, stdout=PIPE)
+        raise_from_process(log, completed_process,
+                           process_title=lambda: f'Extract page images for OCR needs (with text removed) from {pdf_fn}')
+
+        raise_from_pdfbox_error_messages(completed_process)
+
+        yield dst_pdf_fn
     finally:
         shutil.rmtree(temp_dir)
