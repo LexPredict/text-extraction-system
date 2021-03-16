@@ -1,11 +1,10 @@
 import json
 import logging
 import os
-import pickle
 import shutil
 import tempfile
 from contextlib import contextmanager
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional
 
 import msgpack
 import pycountry
@@ -14,6 +13,8 @@ from camelot.core import Table as CamelotTable
 from celery import Celery, chord
 from celery.signals import after_setup_logger, worker_process_init, before_task_publish, task_success, task_failure, \
     task_revoked
+
+from text_extraction_system.utils import LanguageConverter
 from text_extraction_system_api.dto import OutputFormat
 from webdav3.exceptions import RemoteResourceNotFound
 
@@ -33,7 +34,7 @@ from text_extraction_system.request_metadata import RequestCallbackInfo, Request
 from text_extraction_system.result_delivery.celery_client import send_task
 from text_extraction_system.task_health.task_health import store_pending_task_info_in_webdav, \
     remove_pending_task_info_from_webdav, re_schedule_unknown_pending_tasks, init_task_tracking
-from text_extraction_system_api.dto import RequestStatus, STATUS_FAILURE, STATUS_PENDING, STATUS_DONE, TextAndPDFCoordinates
+from text_extraction_system_api.dto import RequestStatus, STATUS_FAILURE, STATUS_PENDING, STATUS_DONE
 
 settings = get_settings()
 
@@ -241,12 +242,9 @@ def process_pdf(pdf_fn: str,
         task_signatures = list()
         i = 0
 
-        ocr_language = req.doc_language or 'eng'
-        if len(ocr_language) == 2:
-            try:
-                ocr_language = pycountry.languages.get(alpha_2=ocr_language).alpha_3
-            except AttributeError:
-                ocr_language = 'eng'
+        lang_converter = LanguageConverter()
+        language, locale_code = lang_converter.get_language_and_locale_code(req.doc_language)
+        ocr_language = lang_converter.convert_language_to_tesseract_view(language)
 
         for pdf_page_fn in pdf_page_fns:
             i += 1
@@ -329,7 +327,7 @@ def ocr_error_callback(task, some_id: str, request_id: str, req_callback_info: R
 
 @celery_app.task(acks_late=True, bind=True)
 def finish_pdf_processing(task,
-                          _ocred_page_nums: List[int],
+                          ocred_page_nums: List[int],
                           request_id: str,
                           original_file_name: str,
                           req_callback_info: RequestCallbackInfo,
@@ -342,8 +340,8 @@ def finish_pdf_processing(task,
                      f'processing the data extraction for request {request_id}.\n'
                      f'Request files do not exist. Probably the request was already canceled.')
             return False
-        log.info(f'{req.original_file_name} | Re-combining OCR-ed pdf blocks and processing the '
-                 f'data extraction for request #{request_id}')
+        log.info(f'{req.original_file_name} | Re-combining OCR-ed pdf blocks ({ocred_page_nums}) and '
+                 f'processing the data extraction for request #{request_id}')
         webdav_client: WebDavClient = get_webdav_client()
         if req.status != STATUS_PENDING or not webdav_client.is_dir(f'{req.request_id}/{pages_for_processing}'):
             log.info(f'{req.original_file_name} | Request is already processed/failed/canceled (#{request_id})')
@@ -397,10 +395,15 @@ def extract_data_and_finish(req: RequestMetadata,
     req.pdf_file = req.ocred_pdf or req.converted_to_pdf or req.original_document
     pdf_fn_in_storage_base = os.path.splitext(req.original_document)[0]
 
-    text, text_structure = extract_text_and_structure(
-        local_pdf_fn, glyph_enhancing=glyph_enhancing, remove_non_printable=remove_non_printable)
+    text, text_structure = extract_text_and_structure(local_pdf_fn,
+                                                      glyph_enhancing=glyph_enhancing,
+                                                      remove_non_printable=remove_non_printable,
+                                                      language=req.doc_language)
+    log.info(f'Extracted {len(text)} characters from {pdf_fn_in_storage_base}')
+    
     req.plain_text_file = pdf_fn_in_storage_base + '.plain.txt'
     webdav_client.upload_to(text.encode('utf-8'), f'{req.request_id}/{req.plain_text_file}')
+    log.info(f'Plain text is uplodaed to {req.request_id}/{req.plain_text_file}')
 
     if req.output_format == OutputFormat.json:
         req.pdf_coordinates_file = pdf_fn_in_storage_base + '.pdf_coordinates.json'
@@ -492,7 +495,10 @@ def deliver_results(req: RequestCallbackInfo, req_status: RequestStatus):
                       f'queue: {req.call_back_celery_queue}\n'
                       f'task_name: {req.call_back_celery_task_name}\n', exc_info=err)
 
-    log.info(f'{req.original_file_name} | Finished processing request (#{req.request_id}).')
+    status_extra = ', '.join(['plain text' if req_status.plain_text_extracted else '',
+                    'coords extracted' if req_status.pdf_coordinates_extracted else '',
+                    'pages OCRed' if req_status.pdf_pages_ocred else ''])
+    log.info(f'{req.original_file_name} | Finished processing request (#{req.request_id}). {status_extra}')
 
 
 @celery_app.task(acks_late=True, bind=True, queue=queue_celery_beat)

@@ -6,5 +6,6 @@ export enum SortDirection {
 
 export enum UploadRequestSortField {
     started,
-    fileName
+    fileName,
+    status
 }

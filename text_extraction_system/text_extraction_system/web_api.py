@@ -28,7 +28,8 @@ from text_extraction_system.request_metadata import RequestMetadata, RequestCall
 from text_extraction_system.tasks import process_document, celery_app, register_task_id, get_request_task_ids
 from text_extraction_system_api import dto
 from text_extraction_system_api.dto import OutputFormat, TableList, PlainTextStructure, RequestStatus, \
-    RequestStatuses, SystemInfo, TaskCancelResult, PDFCoordinates, STATUS_DONE, STATUS_FAILURE
+    RequestStatuses, SystemInfo, TaskCancelResult, PDFCoordinates, STATUS_DONE, STATUS_FAILURE, UserRequestsSummary, \
+    STATUS_PENDING, UserRequestsQuery
 
 app = FastAPI()
 
@@ -49,6 +50,11 @@ async def serve_spa(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
+@app.get("")
+async def serve_spa(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
 @app.get("/page-{rest_of_path:path}")
 async def serve_spa(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
@@ -65,7 +71,7 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                                     call_back_celery_parent_task_id: str = Form(default=None),
                                     call_back_celery_root_task_id: str = Form(default=None),
                                     call_back_celery_version: int = Form(default=4),
-                                    doc_language: str = Form(default='en'),
+                                    doc_language: str = Form(default=''),
                                     ocr_enable: bool = Form(default=True),
                                     request_id: str = Form(default=None),
                                     log_extra_json_key_value: str = Form(default=None),
@@ -162,6 +168,33 @@ async def query_multiple_request_statuses(request_ids: List[str]) -> RequestStat
         if req:
             statuses.append(req.to_request_status())
     return RequestStatuses(request_statuses=statuses).to_dict()
+
+
+@app.post('/api/v1/data_extraction_tasks/query_request_summary',
+          response_model=UserRequestsSummary,
+          tags=["Asynchronous Data Extraction"])
+async def query_user_requests(
+        request: UserRequestsQuery) -> UserRequestsSummary:
+    if not request.request_ids:
+        raise HTTPException(HTTP_400_BAD_REQUEST, 'Request ids must be specified.')
+    statuses = []
+    for request_id, request_time in zip(request.request_ids, request.request_times):
+        req = load_request_metadata(request_id)
+        if req:
+            req_status = req.to_request_status()
+            setattr(req_status, 'started', request_time)
+            statuses.append(req_status)
+
+    # sort, trim and add summary
+    sm = UserRequestsSummary(
+        [], sum(1 for s in statuses if s.status == STATUS_PENDING))
+    statuses.sort(key=lambda s: getattr(s, request.sort_column), reverse=request.sort_order == 'desc')
+    end = request.records_on_page * request.page_index
+    end = min(end, len(statuses))
+    start = end - request.records_on_page
+    start = max(start, 0)
+    sm.request_statuses = statuses[start:end]
+    return sm.to_dict()
 
 
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/packed_data.zip', tags=["Asynchronous Data Extraction"])
@@ -262,7 +295,7 @@ async def delete_request_files(request_id: str):
 @app.post('/api/v1/extract/text_and_structure/', tags=["Synchronous Data Extraction"])
 async def extract_all_data_from_document(
         file: UploadFile = File(...),
-        doc_language: str = Form(default='en'),
+        doc_language: str = Form(default=''),
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
         full_extract_timeout_sec: int = Form(default=3600),
@@ -295,7 +328,7 @@ async def extract_all_data_from_document(
 @app.post('/api/v1/extract/plain_text/', tags=["Synchronous Data Extraction"])
 async def extract_plain_text_from_document(
         file: UploadFile = File(...),
-        doc_language: str = Form(default='en'),
+        doc_language: str = Form(default=''),
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
         full_extract_timeout_sec: int = Form(default=3600),
@@ -324,7 +357,7 @@ async def extract_plain_text_from_document(
 @app.post('/api/v1/extract/searchable_pdf/', tags=["Synchronous Data Extraction"])
 async def extract_text_from_document_and_generate_searchable_pdf(
         file: UploadFile = File(...),
-        doc_language: str = Form(default='en'),
+        doc_language: str = Form(default=''),
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
         full_extract_timeout_sec: int = Form(default=3600),

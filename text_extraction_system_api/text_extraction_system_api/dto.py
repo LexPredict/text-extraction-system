@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 from typing import List, Optional, Dict
 from enum import Enum
+import datetime
 
 from dataclasses_json import dataclass_json
 from pandas import DataFrame
 from pydantic.dataclasses import dataclass as pydantic_dataclass
+from pydantic import BaseModel
 
 STATUS_PENDING = 'PENDING'
 STATUS_DONE = 'DONE'
@@ -50,6 +52,23 @@ class RequestStatus:
 @dataclass
 class RequestStatuses:
     request_statuses: List[RequestStatus]
+    
+
+class UserRequestsQuery(BaseModel):
+    request_ids: List[str]
+    request_times: List[datetime.datetime]
+    sort_column: str
+    sort_order: str
+    page_index: int
+    records_on_page: int
+
+
+@pydantic_dataclass
+@dataclass_json
+@dataclass
+class UserRequestsSummary:
+    request_statuses: List[RequestStatus]
+    tasks_pending: int
 
 
 @pydantic_dataclass
