@@ -197,6 +197,7 @@ def process_pdf_page(pdf_fn: str,
             if ocr_enabled and page_requires_ocr(page_layout):
                 with extract_page_ocr_images(pdf_fn, start_page=1, end_page=1, pdf_password=pdf_password) \
                         as ocr_image_fns:
+                    assert ocr_image_fns, "A page requires OCR but no images have been extracted."
                     page_image_without_text = ocr_image_fns[0]
                     with ocr_page_to_pdf(page_image_fn=page_image_without_text,
                                          language=ocr_language,

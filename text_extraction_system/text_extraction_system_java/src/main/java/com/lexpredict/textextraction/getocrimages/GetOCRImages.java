@@ -41,8 +41,8 @@ public class GetOCRImages {
             PDFRenderer renderer = new PDFRenderer(document);
             int startPage = Math.max(Integer.parseInt(startPageStr), 1);
             int endPage = endPageStr != null
-                    ? Math.min(Integer.parseInt(endPageStr), document.getNumberOfPages() - 1)
-                    : document.getNumberOfPages() - 1;
+                    ? Math.min(Integer.parseInt(endPageStr), document.getNumberOfPages())
+                    : document.getNumberOfPages();
             for (int i = startPage; i < endPage + 1; i++) {
                 BufferedImage image = renderer.renderImageWithDPI(i - 1, dpi, ImageType.RGB);
                 ImageIO.write(image, format,
