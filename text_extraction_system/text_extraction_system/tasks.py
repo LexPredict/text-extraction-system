@@ -13,6 +13,8 @@ from camelot.core import Table as CamelotTable
 from celery import Celery, chord
 from celery.signals import after_setup_logger, worker_process_init, before_task_publish, task_success, task_failure, \
     task_revoked
+
+from text_extraction_system.utils import LanguageConverter
 from text_extraction_system_api.dto import OutputFormat
 from webdav3.exceptions import RemoteResourceNotFound
 
@@ -240,12 +242,9 @@ def process_pdf(pdf_fn: str,
         task_signatures = list()
         i = 0
 
-        ocr_language = req.doc_language or 'eng'
-        if len(ocr_language) == 2:
-            try:
-                ocr_language = pycountry.languages.get(alpha_2=ocr_language).alpha_3
-            except AttributeError:
-                ocr_language = 'eng'
+        lang_converter = LanguageConverter()
+        language, locale_code = lang_converter.get_language_and_locale_code(req.doc_language)
+        ocr_language = lang_converter.convert_language_to_tesseract_view(language)
 
         for pdf_page_fn in pdf_page_fns:
             i += 1
@@ -397,9 +396,12 @@ def extract_data_and_finish(req: RequestMetadata,
     req.pdf_file = req.ocred_pdf or req.converted_to_pdf or req.original_document
     pdf_fn_in_storage_base = os.path.splitext(req.original_document)[0]
 
-    text, text_structure = extract_text_and_structure(
-        local_pdf_fn, glyph_enhancing=glyph_enhancing, remove_non_printable=remove_non_printable)
+    text, text_structure = extract_text_and_structure(local_pdf_fn,
+                                                      glyph_enhancing=glyph_enhancing,
+                                                      remove_non_printable=remove_non_printable,
+                                                      language=req.doc_language)
     log.info(f'Extracted {len(text)} characters from {pdf_fn_in_storage_base}')
+    
     req.plain_text_file = pdf_fn_in_storage_base + '.plain.txt'
     webdav_client.upload_to(text.encode('utf-8'), f'{req.request_id}/{req.plain_text_file}')
     log.info(f'Plain text is uplodaed to {req.request_id}/{req.plain_text_file}')
