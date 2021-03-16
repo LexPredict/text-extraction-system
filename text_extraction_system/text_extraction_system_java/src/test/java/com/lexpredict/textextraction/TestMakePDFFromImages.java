@@ -32,7 +32,7 @@ public class TestMakePDFFromImages extends TestCase {
 
             TestCase.assertTrue(outputPdf.toFile().isFile());
         } finally {
-            FileUtils.deleteDirectory(tempDir.toFile());
+            FileUtils.deleteQuietly(tempDir.toFile());
         }
 
     }

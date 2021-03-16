@@ -115,7 +115,7 @@ public class GetTextFromPDF {
             return parser.parse(options, args);
         } catch (ParseException e) {
             System.out.println(e.getMessage());
-            formatter.printHelp("utility-name", options);
+            formatter.printHelp(GetTextFromPDF.class.getName(), options);
             System.exit(1);
         }
         return null;

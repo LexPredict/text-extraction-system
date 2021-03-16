@@ -46,7 +46,7 @@ public class GetOCRImages {
             for (int i = startPage; i < endPage + 1; i++) {
                 BufferedImage image = renderer.renderImageWithDPI(i - 1, dpi, ImageType.RGB);
                 ImageIO.write(image, format,
-                        new File(outputPrefix + '_' + String.format("%05d", i) + "." + format.toLowerCase()));
+                        new File(outputPrefix + String.format("%05d", i) + "." + format.toLowerCase()));
 
             }
 
@@ -69,12 +69,12 @@ public class GetOCRImages {
 
         Option startPage = new Option("start", "start-page", true,
                 "Start page (1-based). Default: 1");
-        output.setRequired(false);
+        startPage.setRequired(false);
         options.addOption(startPage);
 
         Option endPage = new Option("end", "end-page", true,
                 "End page (1-based). Default: last page of file");
-        output.setRequired(false);
+        endPage.setRequired(false);
         options.addOption(endPage);
 
         Option pwrd = new Option("p", "password", true,
@@ -84,7 +84,7 @@ public class GetOCRImages {
 
         Option outputPrefix = new Option("op", "output-prefix", true,
                 "Output image file name prefix.");
-        pwrd.setRequired(true);
+        outputPrefix.setRequired(true);
         options.addOption(outputPrefix);
 
         CommandLineParser parser = new DefaultParser();
@@ -93,7 +93,7 @@ public class GetOCRImages {
             return parser.parse(options, args);
         } catch (ParseException e) {
             System.out.println(e.getMessage());
-            formatter.printHelp("utility-name", options);
+            formatter.printHelp(GetOCRImages.class.getName(), options);
             System.exit(1);
         }
         return null;
