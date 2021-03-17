@@ -111,10 +111,11 @@ def extract_page_ocr_images(pdf_fn: str,
                             start_page: int = None,
                             end_page: int = None,
                             pdf_password: str = None,
-                            timeout_sec: int = 1800) -> Generator[List[str], None, None]:
+                            timeout_sec: int = 1800) -> Generator[List[Tuple[str, str]], None, None]:
     java_modules_path = get_settings().java_modules_path
 
-    temp_dir = mkdtemp(prefix='pdf_images_')
+    temp_dir_no_text = mkdtemp(prefix='pdf_images_')
+    temp_dir_with_text = mkdtemp(prefix='pdf_images_')
     basefn = os.path.splitext(os.path.basename(pdf_fn))[0]
     try:
         args = ['java', '-cp', f'{java_modules_path}/*',
@@ -122,7 +123,8 @@ def extract_page_ocr_images(pdf_fn: str,
                 pdf_fn,
                 '--format', 'png',
                 '--dpi', '300',
-                '--output-prefix', f'{temp_dir}/{basefn}__']
+                '--output-prefix-no-text', f'{temp_dir_no_text}/{basefn}__',
+                '--output-prefix-with-text', f'{temp_dir_with_text}/{basefn}__']
         if pdf_password:
             args += ['--password', pdf_password]
 
@@ -144,15 +146,22 @@ def extract_page_ocr_images(pdf_fn: str,
         # We used "{temp_dir}/{basefn}__" as the prefix.
         # Now we need to get the page numbers from the filenames and return the list of file names
         # ordered by page number.
-        page_by_num: Dict[int, str] = dict()
-        for fn in os.listdir(temp_dir):
+        page_by_num_no_text: Dict[int, str] = dict()
+        for fn in os.listdir(temp_dir_no_text):
             page_num = PAGE_NUM_RE.search(os.path.splitext(fn)[0]).group(0)
-            page_by_num[int(page_num)] = os.path.join(temp_dir, fn)
+            page_by_num_no_text[int(page_num)] = os.path.join(temp_dir_no_text, fn)
 
-        yield [page_by_num[key] for key in sorted(page_by_num.keys())]
+        page_by_num_with_text: Dict[int, str] = dict()
+        for fn in os.listdir(temp_dir_with_text):
+            page_num = PAGE_NUM_RE.search(os.path.splitext(fn)[0]).group(0)
+            page_by_num_with_text[int(page_num)] = os.path.join(temp_dir_with_text, fn)
+
+        yield [(page_by_num_with_text[key], page_by_num_no_text[key])
+               for key in sorted(page_by_num_no_text.keys())]
 
     finally:
-        shutil.rmtree(temp_dir, ignore_errors=True)
+        shutil.rmtree(temp_dir_no_text, ignore_errors=True)
+        shutil.rmtree(temp_dir_with_text, ignore_errors=True)
 
 
 def calc_covers(lt_obj: LTItem) -> Tuple[int, int]:
@@ -224,7 +233,8 @@ def split_pdf_to_page_blocks(src_pdf_fn: str,
 
 @contextmanager
 def merge_pdf_pages(original_pdf_fn: str,
-                    page_pdf_dir: str,
+                    page_pdf_dir: str = None,
+                    single_page_merge_num_file: Tuple[int, str] = None,
                     original_pdf_password: str = None,
                     timeout_sec: int = 3000) \
         -> Generator[str, None, None]:
@@ -236,8 +246,13 @@ def merge_pdf_pages(original_pdf_fn: str,
         args = ['java', '-cp', f'{java_modules_path}/*',
                 'com.lexpredict.textextraction.mergepdf.MergeInPageLayers',
                 '--original-pdf', original_pdf_fn,
-                '--page-dir', page_pdf_dir,
                 '--dst-pdf', dst_pdf_fn]
+        if page_pdf_dir:
+            args += ['--page-dir', page_pdf_dir]
+
+        if single_page_merge_num_file:
+            args += [f'{single_page_merge_num_file[0]}={single_page_merge_num_file[1]}']
+
         if original_pdf_password:
             args += ['--password', original_pdf_password]
 
@@ -246,7 +261,8 @@ def merge_pdf_pages(original_pdf_fn: str,
                                                              timeout=timeout_sec,
                                                              universal_newlines=True, stderr=PIPE, stdout=PIPE)
         raise_from_process(log, completed_process,
-                           process_title=lambda: f'Extract page images for OCR needs (with text removed) from {pdf_fn}')
+                           process_title=lambda: f'Extract page images for OCR needs '
+                                                 f'(with text removed) from {original_pdf_fn}')
 
         raise_from_pdfbox_error_messages(completed_process)
 

@@ -13,46 +13,64 @@ import java.io.FileFilter;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MergeInPageLayers {
 
     private static final String EXT_PDF = ".pdf";
+
+    private static Pattern PAGE_NUM_FN = Pattern.compile("(\\d+)=(.*)");
 
     public static void main(String[] args) throws IOException {
 
         CommandLine cmd = parseCliArgs(args);
 
         String pdf = cmd.getOptionValue("original-pdf");
-        String pagesDirStr = cmd.getOptionValue("page-dir");
+        String pagesDirStr = cmd.getOptionValue("page-dir", null);
         String password = cmd.getOptionValue("password");
         String dstPdf = cmd.getOptionValue("dst-pdf");
 
-        File pagesDir = new File(pagesDirStr);
-        File[] pageFiles = pagesDir.listFiles(new FileFilter() {
-            @Override
-            public boolean accept(File pathname) {
-                return pathname.getName().endsWith(EXT_PDF);
-            }
-        });
-
-        if (pageFiles == null) {
-            System.out.println("Page directory is invalid:\n" + pagesDirStr);
-            return;
-        }
 
         Map<Integer, File> pageToFn = new HashMap<>();
-        for (File fn : pageFiles) {
-            String[] nameExt = fn.getName().split("\\.");
-            try {
-                int page = Integer.parseInt(nameExt[0]);
-                pageToFn.put(page, fn);
-            } catch (NumberFormatException nfe) {
-                //continue
+
+        if (pagesDirStr != null) {
+            File pagesDir = new File(pagesDirStr);
+            File[] pageFiles = pagesDir.listFiles(new FileFilter() {
+                @Override
+                public boolean accept(File pathname) {
+                    return pathname.getName().endsWith(EXT_PDF);
+                }
+            });
+
+            if (pageFiles == null) {
+                System.out.println("Page directory is invalid:\n" + pagesDirStr);
+                return;
+            }
+
+            for (File fn : pageFiles) {
+                String[] nameExt = fn.getName().split("\\.");
+                try {
+                    int page = Integer.parseInt(nameExt[0]);
+                    pageToFn.put(page, fn);
+                } catch (NumberFormatException nfe) {
+                    //continue
+                }
+            }
+
+            if (pageToFn.isEmpty()) {
+                System.out.println("Page directory does not contain page files named [int_page_num].pdf\n" + pagesDirStr);
             }
         }
 
-        if (pageToFn.isEmpty()) {
-            System.out.println("Page directory does not contain page files named [int_page_num].pdf\n" + pagesDirStr);
+        for (String arg : cmd.getArgList()) {
+            Matcher m = PAGE_NUM_FN.matcher(arg);
+            if (m.find()) {
+                int pageNum = Integer.parseInt(m.group(1));
+                String pageFn = m.group(2);
+                pageToFn.put(pageNum, new File(pageFn));
+            }
+
         }
 
         try (PDDocument origDocument = PDDocument.load(new File(pdf), password)) {
@@ -66,12 +84,12 @@ public class MergeInPageLayers {
 
                     PDRectangle destBox = dstPage.getBBox();
                     PDRectangle sourceBox = textPageForm.getBBox();
-                    double scaleX = destBox.getWidth()/sourceBox.getWidth();
-                    double scaleY = destBox.getHeight()/sourceBox.getHeight();
+                    double scaleX = destBox.getWidth() / sourceBox.getWidth();
+                    double scaleY = destBox.getHeight() / sourceBox.getHeight();
                     AffineTransform affineTransform = new AffineTransform();
                     affineTransform.scale(scaleX, scaleY);
-                    //.getTranslateInstance(0, destCrop.getUpperRightY() - sourceBox.getHeight());
-                    layerUtility.appendFormAsLayer(dstPage, textPageForm, affineTransform, "OCRed Text");
+                    layerUtility.appendFormAsLayer(dstPage, textPageForm, affineTransform,
+                            "Recognized Text for Page " + pageFn.getKey());
                 }
             }
             origDocument.save(dstPdf);
@@ -94,7 +112,7 @@ public class MergeInPageLayers {
 
         Option pageDir = new Option("pages", "page-dir", true,
                 "Directory containing page PDF files named as [page_num_1_based].pdf");
-        pageDir.setRequired(true);
+        pageDir.setRequired(false);
         options.addOption(pageDir);
 
         Option dstPDF = new Option("dst", "dst-pdf", true,
