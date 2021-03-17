@@ -19,7 +19,7 @@ public class GetTextFromPDFDebug {
                 GetTextFromPDF.main(new String[] {f.getAbsolutePath(), "pages_msgpack"});
             }
         } finally {
-            FileUtils.deleteDirectory(tempDir.toFile());
+            FileUtils.deleteQuietly(tempDir.toFile());
         }
 
     }

@@ -106,6 +106,64 @@ def extract_page_images(pdf_fn: str,
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
+@contextmanager
+def extract_page_ocr_images(pdf_fn: str,
+                            start_page: int = None,
+                            end_page: int = None,
+                            pdf_password: str = None,
+                            timeout_sec: int = 1800) -> Generator[List[Tuple[str, str]], None, None]:
+    java_modules_path = get_settings().java_modules_path
+
+    temp_dir_no_text = mkdtemp(prefix='pdf_images_')
+    temp_dir_with_text = mkdtemp(prefix='pdf_images_')
+    basefn = os.path.splitext(os.path.basename(pdf_fn))[0]
+    try:
+        args = ['java', '-cp', f'{java_modules_path}/*',
+                'com.lexpredict.textextraction.getocrimages.GetOCRImages',
+                pdf_fn,
+                '--format', 'png',
+                '--dpi', '300',
+                '--output-prefix-no-text', f'{temp_dir_no_text}/{basefn}__',
+                '--output-prefix-with-text', f'{temp_dir_with_text}/{basefn}__']
+        if pdf_password:
+            args += ['--password', pdf_password]
+
+        if start_page is not None:
+            args += ['--start-page', str(start_page)]
+
+        if end_page is not None:
+            args += ['--end-page', str(end_page)]
+
+        completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=timeout_sec,
+                                                             universal_newlines=True, stderr=PIPE, stdout=PIPE)
+        raise_from_process(log, completed_process,
+                           process_title=lambda: f'Extract page images for OCR needs (with text removed) from {pdf_fn}')
+
+        raise_from_pdfbox_error_messages(completed_process)
+
+        # Output of PDFToImage is a set of files with the names generated as:
+        # {prefix}+{page_num_1_based}.{ext}
+        # We used "{temp_dir}/{basefn}__" as the prefix.
+        # Now we need to get the page numbers from the filenames and return the list of file names
+        # ordered by page number.
+        page_by_num_no_text: Dict[int, str] = dict()
+        for fn in os.listdir(temp_dir_no_text):
+            page_num = PAGE_NUM_RE.search(os.path.splitext(fn)[0]).group(0)
+            page_by_num_no_text[int(page_num)] = os.path.join(temp_dir_no_text, fn)
+
+        page_by_num_with_text: Dict[int, str] = dict()
+        for fn in os.listdir(temp_dir_with_text):
+            page_num = PAGE_NUM_RE.search(os.path.splitext(fn)[0]).group(0)
+            page_by_num_with_text[int(page_num)] = os.path.join(temp_dir_with_text, fn)
+
+        yield [(page_by_num_with_text[key], page_by_num_no_text[key])
+               for key in sorted(page_by_num_no_text.keys())]
+
+    finally:
+        shutil.rmtree(temp_dir_no_text, ignore_errors=True)
+        shutil.rmtree(temp_dir_with_text, ignore_errors=True)
+
+
 def calc_covers(lt_obj: LTItem) -> Tuple[int, int]:
     text_cover = 0
     image_cover = 0
@@ -174,21 +232,40 @@ def split_pdf_to_page_blocks(src_pdf_fn: str,
 
 
 @contextmanager
-def merge_pdf_pages(original_pdf_fn: str, replace_page_num_to_page_pdf_fn: Dict[int, str]) \
+def merge_pdf_pages(original_pdf_fn: str,
+                    page_pdf_dir: str = None,
+                    single_page_merge_num_file: Tuple[int, str] = None,
+                    original_pdf_password: str = None,
+                    timeout_sec: int = 3000) \
         -> Generator[str, None, None]:
     temp_dir = mkdtemp()
     try:
-        with pikepdf.open(original_pdf_fn) as pdf:  # type: pikepdf.Pdf
-            dst_pdf: pikepdf.Pdf = pikepdf.new()
-            for n, page in enumerate(pdf.pages):
-                replace_pdf_fn: str = replace_page_num_to_page_pdf_fn.get(n + 1)
-                if not replace_pdf_fn:
-                    dst_pdf.pages.append(page)
-                else:
-                    with pikepdf.open(replace_pdf_fn) as replace_pdf:  # type: pikepdf.Pdf
-                        dst_pdf.pages.append(replace_pdf.pages[0])
-            dst_pdf_fn = os.path.join(temp_dir, os.path.basename(original_pdf_fn))
-            dst_pdf.save(dst_pdf_fn)
-            yield dst_pdf_fn
+        dst_pdf_fn = os.path.join(temp_dir, os.path.basename(original_pdf_fn))
+
+        java_modules_path = get_settings().java_modules_path
+        args = ['java', '-cp', f'{java_modules_path}/*',
+                'com.lexpredict.textextraction.mergepdf.MergeInPageLayers',
+                '--original-pdf', original_pdf_fn,
+                '--dst-pdf', dst_pdf_fn]
+        if page_pdf_dir:
+            args += ['--page-dir', page_pdf_dir]
+
+        if single_page_merge_num_file:
+            args += [f'{single_page_merge_num_file[0]}={single_page_merge_num_file[1]}']
+
+        if original_pdf_password:
+            args += ['--password', original_pdf_password]
+
+        completed_process: CompletedProcess = subprocess.run(args,
+                                                             check=False,
+                                                             timeout=timeout_sec,
+                                                             universal_newlines=True, stderr=PIPE, stdout=PIPE)
+        raise_from_process(log, completed_process,
+                           process_title=lambda: f'Extract page images for OCR needs '
+                                                 f'(with text removed) from {original_pdf_fn}')
+
+        raise_from_pdfbox_error_messages(completed_process)
+
+        yield dst_pdf_fn
     finally:
         shutil.rmtree(temp_dir)
