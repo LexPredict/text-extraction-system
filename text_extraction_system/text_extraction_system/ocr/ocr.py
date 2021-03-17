@@ -14,7 +14,10 @@ class OCRException(Exception):
 
 
 @contextmanager
-def ocr_page_to_pdf(page_image_fn: str, language: str = 'eng', timeout: int = 60) -> Generator[str, None, None]:
+def ocr_page_to_pdf(page_image_fn: str,
+                    language: str = 'eng',
+                    timeout: int = 60,
+                    glyphless_text_only: bool = False) -> Generator[str, None, None]:
     page_dir = mkdtemp(prefix='ocr_page_to_pdf_')
     proc = None
     try:
@@ -24,6 +27,7 @@ def ocr_page_to_pdf(page_image_fn: str, language: str = 'eng', timeout: int = 60
                 '--psm', '1',
                 '-l', str(language),
                 '-c', 'tessedit_create_pdf=1',
+                '-c', f'textonly_pdf={"1" if glyphless_text_only else "0"}',
                 page_image_fn,
                 dstfn]
         env = os.environ.copy()

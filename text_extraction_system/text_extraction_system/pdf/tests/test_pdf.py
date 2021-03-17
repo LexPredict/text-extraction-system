@@ -1,5 +1,4 @@
 import os
-import re
 import tempfile
 import time
 
@@ -7,8 +6,8 @@ import pikepdf
 
 from text_extraction_system.commons.tests.commons import with_default_settings
 from text_extraction_system.data_extract.data_extract import extract_text_pdfminer
-from text_extraction_system.pdf.pdf import merge_pdf_pages, \
-    split_pdf_to_page_blocks, extract_page_images, iterate_pages, page_requires_ocr
+from text_extraction_system.pdf.pdf import split_pdf_to_page_blocks, extract_page_images, iterate_pages, \
+    page_requires_ocr
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
@@ -135,21 +134,6 @@ def test_split_pdf_file_names6():
     with split_pdf_to_page_blocks(fn, 11, page_block_base_name='aaa.pdf') as block_files:
         assert len(block_files) == 1
         assert os.path.basename(block_files[0]) == 'pdf_9_pages.pdf'
-
-
-def test_merge_pdf_pages():
-    orig_pdf = os.path.join(data_dir, 'pdf_text_4_pages.pdf')
-    repl_pages = {2: os.path.join(data_dir, 'replacement_page.pdf'),
-                  4: os.path.join(data_dir, 'smile.pdf')}
-    should_be_deleted = list()
-    with merge_pdf_pages(orig_pdf, repl_pages) as pdf_fn:
-        should_be_deleted.append(pdf_fn)
-        txt = extract_text_pdfminer(pdf_fn)
-    for fn in should_be_deleted:
-        assert not os.path.isfile(fn)
-        assert not os.path.isdir(os.path.dirname(fn))
-    txt = re.sub(r'\s+', ' ', txt).strip()
-    assert txt == 'This is page 1. Replacement page! This is page 3. This is an image!'
 
 
 def test_compare_image_extraction_performance():
