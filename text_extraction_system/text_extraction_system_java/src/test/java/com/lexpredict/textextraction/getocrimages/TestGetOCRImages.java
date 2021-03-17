@@ -23,8 +23,10 @@ public class TestGetOCRImages extends TestCase {
                     "--dpi", "300",
                     "--start-page", "2",
                     "--end-page", "2",
-                    "--output-prefix", tempDir.toString() + "/page_"});
-            assertTrue(new File(tempDir.toFile(), "page_00002.png").isFile());
+                    "--output-prefix-no-text", tempDir.toString() + "/page_no_text_",
+                    "--output-prefix-with-text", tempDir.toString() + "/page_with_text_"});
+            assertTrue(new File(tempDir.toFile(), "page_no_text_00002.png").isFile());
+            assertTrue(new File(tempDir.toFile(), "page_with_text_00002.png").isFile());
         } finally {
             FileUtils.deleteQuietly(tempDir.toFile());
         }
