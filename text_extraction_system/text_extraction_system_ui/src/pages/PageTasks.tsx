@@ -107,9 +107,9 @@ type EmptyProps = {
                     if (record.status != 'DONE')
                         return <> - </>
                     return <>
-                        <a href={`/api/v1/data_extraction_tasks/${record['id']}/results/extracted_plain_text.txt`}>.txt</a>
+                        <a href={`api/v1/data_extraction_tasks/${record['id']}/results/extracted_plain_text.txt`}>.txt</a>
                         &nbsp;&nbsp;&nbsp;
-                        <a href={`/api/v1/data_extraction_tasks/${record['id']}/results/packed_data.zip`}>.zip archive</a>
+                        <a href={`api/v1/data_extraction_tasks/${record['id']}/results/packed_data.zip`}>.zip archive</a>
                     </>
                 }
             }
