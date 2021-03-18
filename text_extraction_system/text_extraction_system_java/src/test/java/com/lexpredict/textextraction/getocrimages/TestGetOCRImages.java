@@ -32,14 +32,4 @@ public class TestGetOCRImages extends TestCase {
         }
     }
 
-    public void test2() throws IOException {
-        GetOCRImages.main(new String[]{"/home/mikhail/lexpredict/misc/ocr_complicated1.pdf",
-                "--format", "PNG",
-                "--dpi", "300",
-                "--start-page", "34",
-                "--end-page", "34",
-                "--output-prefix-no-text", "/home/mikhail/lexpredict/misc/ocr_complicated1/page_no_text_",
-                "--output-prefix-with-text", "/home/mikhail/lexpredict/misc/ocr_complicated1/page_with_text_"});
-    }
-
 }
