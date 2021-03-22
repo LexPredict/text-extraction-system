@@ -166,7 +166,7 @@ def get_first_page_layout(pdf_opened_file) -> LTPage:
     parser = PDFParser(pdf_opened_file)
     doc = PDFDocument(parser)
     rsrcmgr = PDFResourceManager()
-    laparams = LAParams()
+    laparams = LAParams(all_texts=True)
     device = PDFPageAggregator(rsrcmgr, laparams=laparams)
     interpreter = PDFPageInterpreter(rsrcmgr, device)
     for page in PDFPage.create_pages(doc):
