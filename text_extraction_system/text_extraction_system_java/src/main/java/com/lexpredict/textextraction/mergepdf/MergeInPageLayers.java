@@ -116,6 +116,7 @@ public class MergeInPageLayers {
                             "Recognized Text for Page " + pageFn.getKey());
                 }
             }
+            origDocument.setAllSecurityToBeRemoved(true);
             origDocument.save(dstPdf);
         }
     }
