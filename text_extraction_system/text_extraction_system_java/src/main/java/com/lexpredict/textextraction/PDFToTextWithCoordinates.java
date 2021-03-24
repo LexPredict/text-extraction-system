@@ -300,6 +300,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     public void processPage(PDPage page) throws IOException {
         //copied and pasted from https://issues.apache.org/jira/secure/attachment/12947452/ExtractAngledText.java
         //PDFBOX-4371
+        int pageStart = this.charBBoxesWithPageNums == null ? 0 : this.charBBoxesWithPageNums.size();
         AngleCollector angleCollector = new AngleCollector(); // alternatively, reset angles
         angleCollector.setStartPage(getCurrentPageNo());
         angleCollector.setEndPage(getCurrentPageNo());
@@ -329,9 +330,8 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         PDFPlainTextPage pp = new PDFPlainTextPage();
         pp.bbox = new double[]{r(area.getLowerLeftX()), r(area.getLowerLeftY()),
                 r(area.getWidth()), r(area.getHeight())};
-        int curPageEndOffset = this.charBBoxesWithPageNums == null ? 0 : this.charBBoxesWithPageNums.size();
-        int pageStart = this.pages.size() > 0 ? this.curPageStartOffset : 0;
-        pp.location = new int[] {pageStart, curPageEndOffset};
+        int pageEnd = this.charBBoxesWithPageNums == null ? 0 : this.charBBoxesWithPageNums.size();
+        pp.location = new int[] {pageStart, pageEnd};
         this.pages.add(pp);
     }
 
