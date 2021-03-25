@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     fasttext_lang_model: str = os.path.join(project_root, 'models/lid.176.bin')
     delete_temp_files_on_request_finish: bool = True
     keep_failed_files: bool = False
+    celery_shutdown_when_no_tasks_longer_than_sec: int = None
 
     log_to_stdout: bool = True
     log_to_stdout_json: bool = True
