@@ -52,7 +52,7 @@ class CeleryConfig:
         if settings.celery_shutdown_when_no_tasks_longer_than_sec:
             return 'text_extraction_system.celery_autoscaler:ShutdownWhenNoTasksAutoscaler'
         else:
-            return None
+            return 'celery.worker.autoscale:Autoscaler'
 
 
 celery_app = Celery(
