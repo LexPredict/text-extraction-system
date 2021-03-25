@@ -86,6 +86,7 @@ elif [ "${DOLLAR}{ROLE}" == "celery-worker" ]; then
       -X beat \
       -l INFO \
       --concurrency=${DOLLAR}{CPU_QUARTER_CORES} \
+      --autoscale=${DOLLAR}{CPU_QUARTER_CORES},${DOLLAR}{CPU_QUARTER_CORES} \
       -Ofair \
       -n celery@%h \
       --statedb=/data/celery_worker_state/celery-worker-state-${DOLLAR}{HOSTNAME}.db

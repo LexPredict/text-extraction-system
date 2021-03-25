@@ -37,7 +37,7 @@ def test_basic_api_call_back():
         text_struct: PlainTextStructure = client.get_extracted_text_structure_as_msgpack(rs.request_id)
         assert text_struct.language == 'en'
         assert len(text_struct.pages) == 22
-        assert len(text_struct.paragraphs) > 1
+        assert len(text_struct.paragraphs) == 1
         assert len(text_struct.sentences) > 2
 
         log.info('Text extraction results look good. All assertions passed.')
