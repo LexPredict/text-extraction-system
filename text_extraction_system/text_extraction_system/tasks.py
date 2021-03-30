@@ -312,9 +312,23 @@ def process_pdf_page_task(_task,
                                   ocr_enabled=req.ocr_enable,
                                   ocr_language=ocr_language) as page_proc_res:  # type: PDFPageProcessingResults
                 if page_proc_res.page_requires_ocr:
-                    webdav_client.upload_file(
-                        remote_path=f'{req.request_id}/{pages_ocred}/{page_num_to_fn(page_number)}.pdf',
-                        local_path=page_proc_res.ocred_page_fn)
+                    if page_proc_res.ocred_page_rotation_angle:
+                        # if the ocred image has been rotated (de-skewed) then store it
+                        # with the file name consisting of the page number and the angle
+                        log.info(f'{original_file_name} | PDF page {page_number} is rotated at '
+                                 f'{page_proc_res.ocred_page_rotation_angle:.2f}...')
+                        webdav_client.upload_file(
+                            remote_path=f'{req.request_id}'
+                                        f'/{pages_ocred}'
+                                        f'/{page_num_to_fn(page_number)}.{page_proc_res.ocred_page_rotation_angle}.pdf',
+                            local_path=page_proc_res.ocred_page_fn)
+                    else:
+                        # if no angle - don't put it to the file name
+                        webdav_client.upload_file(
+                            remote_path=f'{req.request_id}'
+                                        f'/{pages_ocred}'
+                                        f'/{page_num_to_fn(page_number)}.pdf',
+                            local_path=page_proc_res.ocred_page_fn)
                 if page_proc_res.camelot_tables:
                     webdav_client.pickle(page_proc_res.camelot_tables,
                                          f'{req.request_id}/{pages_tables}/{page_num_to_fn(page_number)}.pickle')
@@ -364,6 +378,12 @@ def finish_pdf_processing(task,
                 camelot_tables_total += camelot_tables_of_page
 
             requires_page_merge: bool = False
+
+            # download PDFs of the OCRed pages
+            # each page contains a transparent layer (glyphless font) with the recognized text
+            # file names of the pages at webdav are generated in process_pdf_page_task(..) as:
+            # either <page_num>.<rotation_angle>.pdf
+            # or <page_num>.pdf if there is no page rotation detected
             for remote_base_fn in webdav_client.list(f'{request_id}/{pages_ocred}'):
                 remote_page_pdf_fn = f'{req.request_id}/{pages_ocred}/{remote_base_fn}'
                 local_page_pdf_fn = os.path.join(pages_dir, remote_base_fn)
@@ -375,6 +395,11 @@ def finish_pdf_processing(task,
                 local_orig_pdf_fn = os.path.join(temp_dir, original_pdf_in_storage)
 
                 webdav_client.download_file(f'{req.request_id}/{original_pdf_in_storage}', local_orig_pdf_fn)
+
+                # merge-in the OCRed pages into the original PDF by adding them as layers on the original pages
+                # merge_pdf_pages() expects the page PDF in pages_dir to be named as
+                # either <page_num>.<rotation_angle>.pdf
+                # or <page_num>.pdf
                 with merge_pdf_pages(local_orig_pdf_fn, pages_dir) as local_merged_pdf_fn:
                     req.ocred_pdf = os.path.splitext(original_pdf_in_storage)[0] + '.ocred.pdf'
                     webdav_client.upload_file(f'{req.request_id}/{req.ocred_pdf}', local_merged_pdf_fn)
@@ -409,7 +434,7 @@ def extract_data_and_finish(req: RequestMetadata,
 
     req.plain_text_file = pdf_fn_in_storage_base + '.plain.txt'
     webdav_client.upload_to(text.encode('utf-8'), f'{req.request_id}/{req.plain_text_file}')
-    log.info(f'Plain text is uplodaed to {req.request_id}/{req.plain_text_file}')
+    log.info(f'Plain text is uploaded to {req.request_id}/{req.plain_text_file}')
 
     if req.output_format == OutputFormat.json:
         req.pdf_coordinates_file = pdf_fn_in_storage_base + '.pdf_coordinates.json'
