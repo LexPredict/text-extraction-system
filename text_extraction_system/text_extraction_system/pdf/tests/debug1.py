@@ -9,5 +9,5 @@ with default_settings():
     with ocr_page_to_pdf('/home/mikhail/lexpredict/misc/ocr_complicated1/page_no_text_00034.png',
                          glyphless_text_only=True) as fn:
         with merge_pdf_pages('/home/mikhail/lexpredict/misc/ocr_complicated1/ocr_complicated1_0034.pdf',
-                             single_page_merge_num_file=(1, fn)) as fn1:
+                             single_page_merge_num_file_rotate=(1, fn, None)) as fn1:
             shutil.copy(fn1, '/home/mikhail/lexpredict/misc/ocr_complicated1/ocred/')

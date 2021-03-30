@@ -292,7 +292,7 @@ async def delete_request_files(request_id: str):
         raise HTTPException(HTTP_404_NOT_FOUND, 'No such data extraction request')
 
 
-@app.post('/api/v1/data_extraction_tasks/text_and_structure/', tags=["Synchronous Data Extraction"])
+@app.post('/api/v1/extract/text_and_structure/', tags=["Synchronous Data Extraction"])
 async def extract_all_data_from_document(
         file: UploadFile = File(...),
         doc_language: str = Form(default=''),
@@ -325,7 +325,7 @@ async def extract_all_data_from_document(
     return response
 
 
-@app.post('/api/v1/data_extraction_tasks/plain_text/', tags=["Synchronous Data Extraction"])
+@app.post('/api/v1/extract/plain_text/', tags=["Synchronous Data Extraction"])
 async def extract_plain_text_from_document(
         file: UploadFile = File(...),
         doc_language: str = Form(default=''),
@@ -354,7 +354,7 @@ async def extract_plain_text_from_document(
     return plain_text
 
 
-@app.post('/api/v1/data_extraction_tasks/searchable_pdf/', tags=["Synchronous Data Extraction"])
+@app.post('/api/v1/extract/searchable_pdf/', tags=["Synchronous Data Extraction"])
 async def extract_text_from_document_and_generate_searchable_pdf(
         file: UploadFile = File(...),
         doc_language: str = Form(default=''),

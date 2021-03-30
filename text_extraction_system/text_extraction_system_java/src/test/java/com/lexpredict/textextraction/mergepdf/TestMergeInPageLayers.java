@@ -65,7 +65,8 @@ public class TestMergeInPageLayers extends TestCase {
             MergeInPageLayers.main(new String[]{
                     "--original-pdf", fOrig.getAbsolutePath(),
                     "--dst-pdf", fDst.getAbsolutePath(),
-                    "1=" + fPage2.getAbsolutePath()});
+                    "1=" + fPage2.getAbsolutePath(),
+                    "rotate_1=-5.6789"});
 
             try (PDDocument document = PDDocument.load(fDst, (String) null)) {
                 PDFPlainText res = PDFToTextWithCoordinates

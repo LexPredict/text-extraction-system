@@ -61,7 +61,8 @@ def extract_page_images(pdf_fn: str,
                         start_page: int = None,
                         end_page: int = None,
                         pdf_password: str = None,
-                        timeout_sec: int = 1800) -> Generator[List[str], None, None]:
+                        timeout_sec: int = 1800,
+                        dpi:int = 300) -> Generator[List[str], None, None]:
     java_modules_path = get_settings().java_modules_path
 
     temp_dir = mkdtemp(prefix='pdf_images_')
@@ -70,7 +71,7 @@ def extract_page_images(pdf_fn: str,
         args = ['java', '-cp', f'{java_modules_path}/*',
                 'org.apache.pdfbox.tools.PDFToImage',
                 '-format', 'png',
-                '-dpi', '300',
+                '-dpi', f'{dpi}',
                 '-quality', '1',
                 '-prefix', f'{temp_dir}/{basefn}__']
         if pdf_password:
@@ -111,7 +112,8 @@ def extract_page_ocr_images(pdf_fn: str,
                             start_page: int = None,
                             end_page: int = None,
                             pdf_password: str = None,
-                            timeout_sec: int = 1800) -> Generator[List[Tuple[str, str]], None, None]:
+                            timeout_sec: int = 1800,
+                            dpi:int = 300) -> Generator[List[Tuple[str, str]], None, None]:
     java_modules_path = get_settings().java_modules_path
 
     temp_dir_no_text = mkdtemp(prefix='pdf_images_')
@@ -122,7 +124,7 @@ def extract_page_ocr_images(pdf_fn: str,
                 'com.lexpredict.textextraction.getocrimages.GetOCRImages',
                 pdf_fn,
                 '--format', 'png',
-                '--dpi', '300',
+                '--dpi', f'{dpi}',
                 '--output-prefix-no-text', f'{temp_dir_no_text}/{basefn}__',
                 '--output-prefix-with-text', f'{temp_dir_with_text}/{basefn}__']
         if pdf_password:
@@ -234,7 +236,7 @@ def split_pdf_to_page_blocks(src_pdf_fn: str,
 @contextmanager
 def merge_pdf_pages(original_pdf_fn: str,
                     page_pdf_dir: str = None,
-                    single_page_merge_num_file: Tuple[int, str] = None,
+                    single_page_merge_num_file_rotate: Tuple[int, str, Optional[float]] = None,
                     original_pdf_password: str = None,
                     timeout_sec: int = 3000) \
         -> Generator[str, None, None]:
@@ -250,8 +252,10 @@ def merge_pdf_pages(original_pdf_fn: str,
         if page_pdf_dir:
             args += ['--page-dir', page_pdf_dir]
 
-        if single_page_merge_num_file:
-            args += [f'{single_page_merge_num_file[0]}={single_page_merge_num_file[1]}']
+        if single_page_merge_num_file_rotate:
+            merge_page_num, merge_page_fn, merge_page_rotate = single_page_merge_num_file_rotate
+            args += [f'{merge_page_num}={merge_page_fn}']
+            args += [f'rotate_{merge_page_num}={merge_page_rotate}']
 
         if original_pdf_password:
             args += ['--password', original_pdf_password]

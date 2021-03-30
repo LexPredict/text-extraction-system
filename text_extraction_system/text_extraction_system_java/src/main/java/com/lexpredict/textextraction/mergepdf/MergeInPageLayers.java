@@ -4,8 +4,10 @@ import org.apache.commons.cli.*;
 import org.apache.pdfbox.multipdf.LayerUtility;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
+import org.apache.pdfbox.util.Matrix;
 
 import java.awt.geom.AffineTransform;
 import java.io.File;
@@ -37,7 +39,9 @@ public class MergeInPageLayers {
 
     private static final String EXT_PDF = ".pdf";
 
-    private static Pattern PAGE_NUM_FN = Pattern.compile("(\\d+)=(.*)");
+    private static final Pattern PAGE_NUM_FN = Pattern.compile("^(\\d+)=(.*)$");
+
+    private static final Pattern PAGE_ROTATE_ANGLE = Pattern.compile("^rotate_(\\d+)=(.*)$");
 
     public static void main(String[] args) throws IOException {
 
@@ -48,8 +52,8 @@ public class MergeInPageLayers {
         String password = cmd.getOptionValue("password");
         String dstPdf = cmd.getOptionValue("dst-pdf");
 
-
         Map<Integer, File> pageToFn = new HashMap<>();
+        Map<Integer, Double> pageRotateAngles = new HashMap<>();
 
         if (pagesDirStr != null) {
             File pagesDir = new File(pagesDirStr);
@@ -66,12 +70,18 @@ public class MergeInPageLayers {
             }
 
             for (File fn : pageFiles) {
-                String[] nameExt = fn.getName().split("\\.");
+                String[] nameRotateExt = fn.getName().split("\\.");
                 try {
-                    int page = Integer.parseInt(nameExt[0]);
+                    int page = Integer.parseInt(nameRotateExt[0]);
                     pageToFn.put(page, fn);
+                    if (nameRotateExt.length > 2) {
+                        Double rotate = Double.parseDouble(nameRotateExt[1]);
+                        pageRotateAngles.put(page, rotate);
+                    }
+
                 } catch (NumberFormatException nfe) {
-                    //continue
+                    System.out.println("Unable to parse page file name: " + fn.getName() + ".\n" +
+                            "Expected format: <page_num>.<rotate_angle>.pdf or <page_num>.pdf");
                 }
             }
 
@@ -80,6 +90,7 @@ public class MergeInPageLayers {
             }
         }
 
+        // Fill page file names and rotate angles from command line args
         for (String arg : cmd.getArgList()) {
             Matcher m = PAGE_NUM_FN.matcher(arg);
             if (m.find()) {
@@ -88,6 +99,12 @@ public class MergeInPageLayers {
                 pageToFn.put(pageNum, new File(pageFn));
             }
 
+            Matcher m1 = PAGE_ROTATE_ANGLE.matcher(arg);
+            if (m1.find()) {
+                int pageNum = Integer.parseInt(m1.group(1));
+                String angleStr = m1.group(2);
+                pageRotateAngles.put(pageNum, Double.parseDouble(angleStr));
+            }
         }
 
         try (PDDocument origDocument = PDDocument.load(new File(pdf), password)) {
@@ -97,8 +114,29 @@ public class MergeInPageLayers {
                 try (PDDocument mergePageDocument = PDDocument.load(pageFn.getValue(), (String) null)) {
                     PDFormXObject textPageForm = layerUtility.importPageAsForm(mergePageDocument, 0);
                     PDPage dstPage = origDocument.getPage(pageNumZeroBased);
+
+                    // Rotate original page if requested
+                    Double rotate = pageRotateAngles.get(pageFn.getKey());
+                    if (rotate != null) {
+                        PDPageContentStream cs = new PDPageContentStream(
+                                origDocument,
+                                dstPage,
+                                PDPageContentStream.AppendMode.PREPEND,
+                                false,
+                                false);
+                        PDRectangle cropBox = dstPage.getCropBox();
+                        float tx = (cropBox.getLowerLeftX() + cropBox.getUpperRightX()) / 2;
+                        float ty = (cropBox.getLowerLeftY() + cropBox.getUpperRightY()) / 2;
+                        cs.transform(Matrix.getTranslateInstance(tx, ty));
+                        cs.transform(Matrix.getRotateInstance(Math.toRadians(rotate), 0, 0));
+                        cs.transform(Matrix.getTranslateInstance(-tx, -ty));
+                        cs.close();
+                    }
+
+
                     layerUtility.wrapInSaveRestore(dstPage);
 
+                    // Scale the page being merged-in to match the size of the original page if needed
                     PDRectangle destBox = dstPage.getBBox();
                     PDRectangle sourceBox = textPageForm.getBBox();
                     AffineTransform affineTransform = new AffineTransform();
