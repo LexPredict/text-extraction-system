@@ -255,7 +255,8 @@ def merge_pdf_pages(original_pdf_fn: str,
         if single_page_merge_num_file_rotate:
             merge_page_num, merge_page_fn, merge_page_rotate = single_page_merge_num_file_rotate
             args += [f'{merge_page_num}={merge_page_fn}']
-            args += [f'rotate_{merge_page_num}={merge_page_rotate}']
+            if merge_page_rotate:
+                args += [f'rotate_{merge_page_num}={merge_page_rotate}']
 
         if original_pdf_password:
             args += ['--password', original_pdf_password]
