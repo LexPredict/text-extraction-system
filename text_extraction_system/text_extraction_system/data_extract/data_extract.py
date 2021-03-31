@@ -27,7 +27,7 @@ from pdfminer.pdfparser import PDFParser
 from text_extraction_system.config import get_settings
 from text_extraction_system.data_extract.camelot.camelot import extract_tables
 from text_extraction_system.data_extract.lang import get_lang_detector
-from text_extraction_system.ocr.ocr import ocr_page_to_pdf, deskew
+from text_extraction_system.ocr.ocr import ocr_page_to_pdf, determine_skew, rotate_image
 from text_extraction_system.pdf.pdf import page_requires_ocr, extract_page_ocr_images, \
     raise_from_pdfbox_error_messages, merge_pdf_pages
 from text_extraction_system.processes import raise_from_process
@@ -188,6 +188,7 @@ class PDFPageProcessingResults:
 def process_pdf_page(pdf_fn: str,
                      page_num: int,
                      ocr_enabled: bool = True,
+                     deskew_enabled: bool = True,
                      ocr_language: str = None,
                      ocr_timeout_sec: int = 60,
                      pdf_password: str = None) -> Generator[PDFPageProcessingResults, None, None]:
@@ -201,20 +202,23 @@ def process_pdf_page(pdf_fn: str,
         assert image_fns and image_fns[0] and image_fns[0][0] and image_fns[0][1], \
             "A page requires OCR but no images have been extracted."
 
-        page_image_with_text_fn, page_image_without_text = image_fns[0]
+        page_image_with_text_fn, page_image_without_text_fn = image_fns[0]
         with open(pdf_fn, 'rb') as in_file:
             # build pdfminer page layout - used for detecting if the page requires OCR or not
             original_page_layout = get_first_page_layout(in_file)
 
             if ocr_enabled and page_requires_ocr(original_page_layout):
                 # this detects scanned text rotation angle
-                # and returns either the original image fn (if detected angle is almost zero or > 45)
-                # or the fn of the image rotated for the text to be horizontal
-                with deskew(image_fn=page_image_without_text, deskewed_image_dpi=DPI) \
-                        as (did_deskew, angle, prepared_image_fn):
+                angle: Optional[float] = determine_skew(page_image_with_text_fn) if deskew_enabled else None
+                if angle is not None and not 0.01 < abs(angle) < 45:
+                    angle = None
+
+                # rotate_image() will pass as is if the angle is None
+                with rotate_image(page_image_with_text_fn, angle, DPI) as page_image_with_text_fn, \
+                        rotate_image(page_image_without_text_fn, angle, DPI) as page_image_without_text_fn:
                     # this returns a text-based PDF with glyph-less text only
                     # to be used for merging in front of the original PDF page layout
-                    with ocr_page_to_pdf(page_image_fn=prepared_image_fn,
+                    with ocr_page_to_pdf(page_image_fn=page_image_without_text_fn,
                                          language=ocr_language,
                                          timeout=ocr_timeout_sec,
                                          glyphless_text_only=True) as ocred_text_layer_pdf_fn:
@@ -223,8 +227,7 @@ def process_pdf_page(pdf_fn: str,
                                              original_pdf_password=pdf_password,
                                              single_page_merge_num_file_rotate=(1,
                                                                                 ocred_text_layer_pdf_fn,
-                                                                                angle if did_deskew else None)) \
-                                as ocred_pdf_for_tables:
+                                                                                angle)) as ocred_pdf_for_tables:
                             with open(ocred_pdf_for_tables, 'rb') as ocred_in_file:
                                 ocred_page_layout = get_first_page_layout(ocred_in_file)
                                 camelot_tables = extract_tables(page_num, ocred_page_layout, page_image_with_text_fn)
@@ -234,7 +237,7 @@ def process_pdf_page(pdf_fn: str,
                         # of the pages in the original PDF file to keep its small size and structure/bookmarks.
                         yield PDFPageProcessingResults(page_requires_ocr=True,
                                                        ocred_page_fn=ocred_text_layer_pdf_fn,
-                                                       ocred_page_rotation_angle=angle if did_deskew else None,
+                                                       ocred_page_rotation_angle=angle,
                                                        camelot_tables=camelot_tables)
             else:
                 # if we don't need OCR then execute Camelot on the original PDF page

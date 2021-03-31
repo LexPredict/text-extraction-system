@@ -310,6 +310,7 @@ def process_pdf_page_task(_task,
             with process_pdf_page(local_pdf_page_fn,
                                   page_num=page_number,
                                   ocr_enabled=req.ocr_enable,
+                                  deskew_enabled=req.deskew_enable,
                                   ocr_language=ocr_language) as page_proc_res:  # type: PDFPageProcessingResults
                 if page_proc_res.page_requires_ocr:
                     if page_proc_res.ocred_page_rotation_angle:
