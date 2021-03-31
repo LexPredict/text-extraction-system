@@ -377,7 +377,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
         // This prevents false-matches in paragraph detection
         // See TestPDF2Text.test_paragraphs()
-        pdf2text.setDropThreshold(3f);
+        pdf2text.setDropThreshold(3.5f);
 
         //pdf2text.setPageStart(pdf2text.getLineSeparator());
         //pdf2text.setArticleStart(pdf2text.getLineSeparator());
