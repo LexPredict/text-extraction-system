@@ -4,12 +4,12 @@ from contextlib import contextmanager
 from logging import getLogger
 from subprocess import Popen, PIPE, TimeoutExpired
 from tempfile import mkdtemp
-from typing import Generator, Tuple
+from typing import Generator, Optional
 
 import cv2
+import deskew
 import numpy as np
 from PIL import Image
-from deskew import determine_skew
 
 log = getLogger(__name__)
 
@@ -72,7 +72,24 @@ def ocr_page_to_pdf(page_image_fn: str,
 
 
 @contextmanager
-def deskew(image_fn: str, deskewed_image_dpi: int = 300) -> Generator[Tuple[bool, float, str], None, None]:
+def rotate_image(image_fn: str, angle: Optional[float] = None, dpi: int = 300) -> Generator[str, None, None]:
+    if angle is None:
+        yield image_fn
+        return
+
+    dst_dir = mkdtemp(prefix='deskew_')
+    try:
+        basename = os.path.basename(image_fn)
+        dst_fn = os.path.join(dst_dir, basename)
+        with Image.open(image_fn) as orig_image_pil:  # type: Image.Image
+            orig_image_pil.rotate(angle, fillcolor="white") \
+                .save(dst_fn, dpi=(dpi, dpi))
+        yield dst_fn
+    finally:
+        shutil.rmtree(dst_dir)
+
+
+def determine_skew(image_fn: str) -> float:
     img = cv2.imread(image_fn, 0)
 
     # Gaussian blur with a kernel size (height, width) of 9.
@@ -89,18 +106,4 @@ def deskew(image_fn: str, deskewed_image_dpi: int = 300) -> Generator[Tuple[bool
     # Dilate the image to increase the size of the grid lines.
     kernel = np.array([[0., 1., 0.], [1., 1., 1.], [0., 1., 0.]], np.uint8)
     proc = cv2.dilate(proc, kernel)
-    skew = determine_skew(proc)
-
-    if 0.01 < abs(skew) < 45:
-        with Image.open(image_fn) as orig_image_pil:  # type: Image.Image
-            dst_dir = mkdtemp(prefix='deskew_')
-            try:
-                basename = os.path.basename(image_fn)
-                dst_fn = os.path.join(dst_dir, basename)
-                orig_image_pil.rotate(skew, fillcolor="white").save(dst_fn,
-                                                                    dpi=(deskewed_image_dpi, deskewed_image_dpi))
-                yield True, skew, dst_fn
-            finally:
-                shutil.rmtree(dst_dir)
-    else:
-        yield False, skew, image_fn
+    return deskew.determine_skew(proc)

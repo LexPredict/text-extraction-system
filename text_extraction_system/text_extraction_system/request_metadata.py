@@ -48,6 +48,7 @@ class RequestMetadata:
     request_callback_info: RequestCallbackInfo
 
     ocr_enable: bool = True
+    deskew_enable: bool = True
 
     status: str = STATUS_PENDING
 
