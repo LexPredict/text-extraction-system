@@ -8,7 +8,6 @@ import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.tools.imageio.ImageIOUtil;
 
-import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -65,8 +64,9 @@ public class GetOCRImages {
                 PDPage page = document.getPage(i - 1);
                 if (outputPrefixWithText != null) {
                     BufferedImage image = renderer.renderImageWithDPI(i - 1, dpi, ImageType.RGB);
-                    ImageIO.write(image, format,
-                            new File(outputPrefixWithText + String.format("%05d", i) + "." + format.toLowerCase()));
+                    ImageIOUtil.writeImage(image,
+                            outputPrefixWithText + String.format("%05d", i) + "." + format.toLowerCase(),
+                            (int) dpi);
 
                 }
 

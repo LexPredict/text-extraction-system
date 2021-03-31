@@ -55,8 +55,18 @@ public class TestPDF2Text extends TestCase {
                 .getResourceAsStream("/RESO_20120828-01_Building_Remodel__54.pdf")) {
             try (PDDocument document = PDDocument.load(stream)) {
                 PDFPlainText res = PDFToTextWithCoordinates.process(document, false, false);
-                System.out.println(res.text);
+                assertEquals(106, res.text.chars().filter(ch -> ch == '\n').count());
 
+            }
+        }
+    }
+
+    public void test_paragraphs2() throws Exception {
+        try (InputStream stream = TestPDF2Text.class
+                .getResourceAsStream("/paragraphs2.pdf")) {
+            try (PDDocument document = PDDocument.load(stream)) {
+                PDFPlainText res = PDFToTextWithCoordinates.process(document, false, false);
+                assertEquals(73, res.text.chars().filter(ch -> ch == '\n').count());
             }
         }
     }
