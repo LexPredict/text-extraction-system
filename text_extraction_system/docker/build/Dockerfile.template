@@ -23,7 +23,8 @@ RUN apt-get -y update --fix-missing && \
 	echo "Ubuntu version: " && lsb_release -a && \
 	echo "GCC version: " && gcc-9 -v && \
 	apt-get install -y git curl htop python3-dev python3-pip libreoffice dnsutils iputils-ping && \
-	locale-gen --purge  en_US en_US.UTF-8 && \
+  egrep -v '^(#|$)' /supported_locales.text \
+    | xargs -r locale-gen --purge && \
 	echo -e \'LANG="en_US.UTF-8"\nLANGUAGE="en_US:en"\n\' > /etc/default/locale && \
 	mkdir -p /text_extraction_system/models && \
 	wget https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin -O /text_extraction_system/models/lid.176.bin && \
