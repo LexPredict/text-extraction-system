@@ -24,11 +24,14 @@ def p2():
     from text_extraction_system.ocr.ocr import determine_skew, ocr_page_to_pdf, rotate_image
     import shutil
     orig_pdf_fn = '/home/mikhail/lexpredict/misc/angles/realdoc.pdf'
-    page = 1
+    page = 121
+    with split_pdf_to_page_blocks(orig_pdf_fn, 1) as page_fns:
+        shutil.copy(page_fns[page - 1], '/home/mikhail/lexpredict/misc/angles/realdoc__00121_orig.pdf')
+
     with extract_page_ocr_images(orig_pdf_fn, page, page, dpi=300) as images:
         angle = determine_skew(images[0][1])
         with rotate_image(images[0][1], angle, 300) as rotated_or_original_image_fn:
-            with ocr_page_to_pdf(rotated_or_original_image_fn, glyphless_text_only=True) as ocred_page_pdf:
+            with ocr_page_to_pdf(rotated_or_original_image_fn, glyphless_text_only=False) as ocred_page_pdf:
                 with merge_pdf_pages(orig_pdf_fn,
                                      single_page_merge_num_file_rotate=(page,
                                                                         ocred_page_pdf,

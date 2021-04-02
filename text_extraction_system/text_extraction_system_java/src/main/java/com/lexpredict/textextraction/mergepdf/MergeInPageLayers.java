@@ -111,52 +111,60 @@ public class MergeInPageLayers {
             LayerUtility layerUtility = new LayerUtility(origDocument);
             for (Map.Entry<Integer, File> pageFn : pageToFn.entrySet()) {
                 int pageNumZeroBased = pageFn.getKey() - 1;
+                PDPage dstPage = origDocument.getPage(pageNumZeroBased);
                 try (PDDocument mergePageDocument = PDDocument.load(pageFn.getValue(), (String) null)) {
-                    PDFormXObject textPageForm = layerUtility.importPageAsForm(mergePageDocument, 0);
-                    PDPage dstPage = origDocument.getPage(pageNumZeroBased);
+                    AffineTransform insertTransform = new AffineTransform();
 
                     // Rotate original page if requested
                     Double rotate = pageRotateAngles.get(pageFn.getKey());
+
                     if (rotate != null) {
-                        PDPageContentStream cs = new PDPageContentStream(
-                                origDocument,
-                                dstPage,
-                                PDPageContentStream.AppendMode.PREPEND,
-                                false,
-                                false);
-                        PDRectangle cropBox = dstPage.getCropBox();
-                        float tx = (cropBox.getLowerLeftX() + cropBox.getUpperRightX()) / 2;
-                        float ty = (cropBox.getLowerLeftY() + cropBox.getUpperRightY()) / 2;
-                        cs.transform(Matrix.getTranslateInstance(tx, ty));
-                        cs.transform(Matrix.getRotateInstance(Math.toRadians(rotate), 0, 0));
-                        cs.transform(Matrix.getTranslateInstance(-tx, -ty));
-                        cs.close();
+                        int pageRotate = -90 * (int) Math.round(rotate / 90d);
+                        double contentsRotate = rotate + pageRotate;
+                        dstPage.setRotation(pageRotate);
+                        //mergeInPage.setRotation(-pageRotate);
+
+                        PDPage mergeInPage = mergePageDocument.getPage(0);
+                        PDRectangle mergeInCropBox = dstPage.getCropBox();
+                        float tx = (mergeInCropBox.getLowerLeftX() + mergeInCropBox.getUpperRightX()) / 2;
+                        float ty = (mergeInCropBox.getLowerLeftY() + mergeInCropBox.getUpperRightY()) / 2;
+                        insertTransform.rotate(Math.toRadians(pageRotate), tx, ty);
+                        PDRectangle dstCropBox = dstPage.getCropBox();
+
+                        /*insertTransform.translate(
+                                (dstCropBox.getLowerLeftX() - mergeInCropBox.getLowerLeftX()),
+                                (dstCropBox.getUpperRightY() - mergeInCropBox.getUpperRightY()) / 2);
+*/
+                        rotatePageContents(origDocument, dstPage, contentsRotate);
+                        //rotatePageContents(mergePageDocument, mergeInPage, pageRotate);
                     }
 
-
+                    PDFormXObject textPageForm = layerUtility.importPageAsForm(mergePageDocument, 0);
                     layerUtility.wrapInSaveRestore(dstPage);
 
-                    // Scale the page being merged-in to match the size of the original page if needed
-                    PDRectangle destBox = dstPage.getBBox();
-                    PDRectangle sourceBox = textPageForm.getBBox();
-                    AffineTransform affineTransform = new AffineTransform();
-                    if (Math.round(destBox.getWidth()) != Math.round(sourceBox.getWidth())
-                            || Math.round(destBox.getHeight()) != Math.round(sourceBox.getHeight())) {
-                        double scaleX = destBox.getWidth() / sourceBox.getWidth();
-                        double scaleY = destBox.getHeight() / sourceBox.getHeight();
-                        System.out.printf("Size of the page being added does not match " +
-                                "the size of the original page.\n" +
-                                "An additional affine transformation will be added.\n" +
-                                "scaleX = %s, scaleY = %s.%n", scaleX, scaleY);
-                        affineTransform.scale(scaleX, scaleY);
-                    }
-                    layerUtility.appendFormAsLayer(dstPage, textPageForm, affineTransform,
+                    layerUtility.appendFormAsLayer(dstPage, textPageForm, insertTransform,
                             "Recognized Text for Page " + pageFn.getKey());
                 }
             }
             origDocument.setAllSecurityToBeRemoved(true);
             origDocument.save(dstPdf);
         }
+    }
+
+    private static void rotatePageContents(PDDocument origDocument, PDPage dstPage, double contentsRotate) throws IOException {
+        PDPageContentStream cs = new PDPageContentStream(
+                origDocument,
+                dstPage,
+                PDPageContentStream.AppendMode.PREPEND,
+                false,
+                false);
+        PDRectangle cropBox = dstPage.getCropBox();
+        float tx = (cropBox.getLowerLeftX() + cropBox.getUpperRightX()) / 2;
+        float ty = (cropBox.getLowerLeftY() + cropBox.getUpperRightY()) / 2;
+        cs.transform(Matrix.getTranslateInstance(tx, ty));
+        cs.transform(Matrix.getRotateInstance(Math.toRadians(contentsRotate), 0, 0));
+        cs.transform(Matrix.getTranslateInstance(-tx, -ty));
+        cs.close();
     }
 
 
