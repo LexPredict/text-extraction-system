@@ -24,7 +24,7 @@ def p2():
     from text_extraction_system.ocr.ocr import determine_skew, ocr_page_to_pdf, rotate_image
     import shutil
     orig_pdf_fn = '/home/mikhail/lexpredict/misc/angles/realdoc.pdf'
-    page = 1
+    page = 121
     with split_pdf_to_page_blocks(orig_pdf_fn, 1) as page_fns:
         shutil.copy(page_fns[page - 1], '/home/mikhail/lexpredict/misc/angles/realdoc__00121_orig.pdf')
 
