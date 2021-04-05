@@ -98,7 +98,7 @@ def rotate_image(image_fn: str,
         shutil.rmtree(dst_dir)
 
 
-def determine_skew(image_fn: str, split_to_parts: bool = True) -> float:
+def determine_skew(image_fn: str) -> float:
 
     img = cv2.imread(image_fn, 0)
 
