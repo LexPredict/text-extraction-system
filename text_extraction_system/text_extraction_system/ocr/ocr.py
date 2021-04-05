@@ -2,6 +2,7 @@ import os
 import shutil
 from contextlib import contextmanager
 from logging import getLogger
+from statistics import median
 from subprocess import Popen, PIPE, TimeoutExpired
 from tempfile import mkdtemp
 from typing import Generator, Optional
@@ -97,7 +98,8 @@ def rotate_image(image_fn: str,
         shutil.rmtree(dst_dir)
 
 
-def determine_skew(image_fn: str) -> float:
+def determine_skew(image_fn: str, split_to_parts: bool = True) -> float:
+
     img = cv2.imread(image_fn, 0)
 
     # Gaussian blur with a kernel size (height, width) of 9.
@@ -114,5 +116,22 @@ def determine_skew(image_fn: str) -> float:
     # Dilate the image to increase the size of the grid lines.
     kernel = np.array([[0., 1., 0.], [1., 1., 1.], [0., 1., 0.]], np.uint8)
     proc = cv2.dilate(proc, kernel)
-    full_angle_degrees = deskew.determine_skew(proc)
-    return full_angle_degrees
+
+    height = img.shape[0]
+    width = img.shape[1]
+    part_size: int = 500
+    num_parts: int = round(height / part_size)
+
+    # split image to multiple blocks, determine skew angle of each part and take median
+    # this solves problem with the documents having alignment which provocates false-determining
+    # of the skew for the document as a whole
+    if height >= width:
+        ar = [(h * part_size, (h + 1) * part_size) for h in range(num_parts)]
+        images = [proc[i[0]:i[1]] for i in ar]
+    else:
+        ar = [(w * part_size, (w + 1) * part_size) for w in range(num_parts)]
+        images = [proc[:, i[0]:i[1]] for i in ar]
+
+    angles = [deskew.determine_skew(img) for img in images]
+    res = median([a for a in angles if a is not None])
+    return res
