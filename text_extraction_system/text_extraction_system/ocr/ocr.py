@@ -21,15 +21,16 @@ class OCRException(Exception):
 @contextmanager
 def ocr_page_to_pdf(page_image_fn: str,
                     language: str = 'eng',
-                    timeout: int = 60,
-                    glyphless_text_only: bool = False) -> Generator[str, None, None]:
+                    timeout: int = 180,
+                    glyphless_text_only: bool = False,
+                    tesseract_page_orientation_detection: bool = False) -> Generator[str, None, None]:
     page_dir = mkdtemp(prefix='ocr_page_to_pdf_')
     proc = None
     try:
         basename = os.path.basename(page_image_fn)
         dstfn = os.path.join(page_dir, os.path.splitext(basename)[0])
         args = ['tesseract',
-                '--psm', '1',
+                '--psm', '1' if tesseract_page_orientation_detection else '3',
                 '-l', str(language),
                 '-c', 'tessedit_create_pdf=1',
                 '-c', f'textonly_pdf={"1" if glyphless_text_only else "0"}',
@@ -72,7 +73,10 @@ def ocr_page_to_pdf(page_image_fn: str,
 
 
 @contextmanager
-def rotate_image(image_fn: str, angle: Optional[float] = None, dpi: int = 300) -> Generator[str, None, None]:
+def rotate_image(image_fn: str,
+                 angle: Optional[float] = None,
+                 dpi: int = 300,
+                 align_to_closest_90: bool = True) -> Generator[str, None, None]:
     if angle is None:
         yield image_fn
         return
@@ -81,9 +85,13 @@ def rotate_image(image_fn: str, angle: Optional[float] = None, dpi: int = 300) -
     try:
         basename = os.path.basename(image_fn)
         dst_fn = os.path.join(dst_dir, basename)
-        with Image.open(image_fn) as orig_image_pil:  # type: Image.Image
-            orig_image_pil.rotate(angle, fillcolor="white") \
-                .save(dst_fn, dpi=(dpi, dpi))
+        with Image.open(image_fn) as image_pil:  # type: Image.Image
+            page_rotate: int = 90 * round(angle / 90.0)
+            w_orig, h_orig = image_pil.size
+            if align_to_closest_90:
+                angle = angle - page_rotate
+            image_pil = image_pil.rotate(angle, expand=False, fillcolor="white")
+            image_pil.save(dst_fn, dpi=(dpi, dpi))
         yield dst_fn
     finally:
         shutil.rmtree(dst_dir)
@@ -106,4 +114,5 @@ def determine_skew(image_fn: str) -> float:
     # Dilate the image to increase the size of the grid lines.
     kernel = np.array([[0., 1., 0.], [1., 1., 1.], [0., 1., 0.]], np.uint8)
     proc = cv2.dilate(proc, kernel)
-    return deskew.determine_skew(proc)
+    full_angle_degrees = deskew.determine_skew(proc)
+    return full_angle_degrees
