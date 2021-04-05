@@ -210,12 +210,11 @@ def process_pdf_page(pdf_fn: str,
             if ocr_enabled and page_requires_ocr(original_page_layout):
                 # this detects scanned text rotation angle
                 angle: Optional[float] = determine_skew(page_image_with_text_fn) if deskew_enabled else None
-                if angle is not None and not 0.01 < abs(angle) < 45:
-                    angle = None
-
                 # rotate_image() will pass as is if the angle is None
-                with rotate_image(page_image_with_text_fn, angle, DPI) as page_image_with_text_fn, \
-                        rotate_image(page_image_without_text_fn, angle, DPI) as page_image_without_text_fn:
+                with rotate_image(page_image_with_text_fn, angle, DPI,
+                                  align_to_closest_90=True) as page_image_with_text_fn, \
+                        rotate_image(page_image_without_text_fn, angle, DPI,
+                                     align_to_closest_90=True) as page_image_without_text_fn:
                     # this returns a text-based PDF with glyph-less text only
                     # to be used for merging in front of the original PDF page layout
                     with ocr_page_to_pdf(page_image_fn=page_image_without_text_fn,

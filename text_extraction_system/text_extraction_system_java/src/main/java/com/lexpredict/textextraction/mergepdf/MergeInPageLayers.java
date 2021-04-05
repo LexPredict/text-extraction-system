@@ -113,7 +113,27 @@ public class MergeInPageLayers {
                 int pageNumZeroBased = pageFn.getKey() - 1;
                 PDPage dstPage = origDocument.getPage(pageNumZeroBased);
                 try (PDDocument mergePageDocument = PDDocument.load(pageFn.getValue(), (String) null)) {
+                    PDPage mergeInPage = mergePageDocument.getPage(0);
+                    PDRectangle dstCropBox = dstPage.getBBox();
+                    PDRectangle mergeInCropBox = dstPage.getBBox();
+
                     AffineTransform insertTransform = new AffineTransform();
+                    double dstLeft = dstCropBox.getLowerLeftX();
+                    double dstBottom = dstCropBox.getLowerLeftY();
+                    double mergeInLeft = mergeInCropBox.getLowerLeftX();
+                    double mergeInBottom = mergeInCropBox.getLowerLeftY();
+                    double dstWidth = dstCropBox.getUpperRightX() - dstCropBox.getLowerLeftX();
+                    double dstHeight = dstCropBox.getUpperRightY() - dstCropBox.getLowerLeftY();
+                    double mergeInWidth = mergeInCropBox.getUpperRightX() - mergeInCropBox.getLowerLeftX();
+                    double mergeInHeight = mergeInCropBox.getUpperRightY() - mergeInCropBox.getLowerLeftY();
+
+                    double dstCenterX = dstLeft + dstWidth / 2;
+                    double dstCenterY = dstBottom + dstHeight / 2;
+                    double mergeInCenterX = mergeInLeft + mergeInWidth / 2;
+                    double mergeInCenterY = mergeInBottom + mergeInHeight / 2;
+
+                    //insertTransform.translate(dstCenterX - mergeInWidth/2, dstCenterY - mergeInHeight/2);
+
 
                     // Rotate original page if requested
                     Double rotate = pageRotateAngles.get(pageFn.getKey());
@@ -124,17 +144,14 @@ public class MergeInPageLayers {
                         dstPage.setRotation(pageRotate);
                         //mergeInPage.setRotation(-pageRotate);
 
-                        PDPage mergeInPage = mergePageDocument.getPage(0);
-                        PDRectangle mergeInCropBox = dstPage.getCropBox();
-                        float tx = (mergeInCropBox.getLowerLeftX() + mergeInCropBox.getUpperRightX()) / 2;
-                        float ty = (mergeInCropBox.getLowerLeftY() + mergeInCropBox.getUpperRightY()) / 2;
-                        insertTransform.rotate(Math.toRadians(pageRotate), tx, ty);
-                        PDRectangle dstCropBox = dstPage.getCropBox();
 
-                        /*insertTransform.translate(
-                                (dstCropBox.getLowerLeftX() - mergeInCropBox.getLowerLeftX()),
-                                (dstCropBox.getUpperRightY() - mergeInCropBox.getUpperRightY()) / 2);
-*/
+                        /*if (pageRotate % 180 == 90) {
+                            insertTransform.rotate(Math.toRadians(pageRotate), mergeInCenterY, mergeInCenterX);
+                        } else {
+                            insertTransform.rotate(Math.toRadians(pageRotate), mergeInCenterX, mergeInCenterY);
+                        }*/
+
+
                         rotatePageContents(origDocument, dstPage, contentsRotate);
                         //rotatePageContents(mergePageDocument, mergeInPage, pageRotate);
                     }

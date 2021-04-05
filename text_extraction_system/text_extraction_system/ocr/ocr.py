@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from logging import getLogger
 from subprocess import Popen, PIPE, TimeoutExpired
 from tempfile import mkdtemp
-from typing import Generator, Optional, Tuple
+from typing import Generator, Optional
 
 import cv2
 import deskew
@@ -73,7 +73,10 @@ def ocr_page_to_pdf(page_image_fn: str,
 
 
 @contextmanager
-def rotate_image(image_fn: str, angle: Optional[float] = None, dpi: int = 300) -> Generator[str, None, None]:
+def rotate_image(image_fn: str,
+                 angle: Optional[float] = None,
+                 dpi: int = 300,
+                 align_to_closest_90: bool = True) -> Generator[str, None, None]:
     if angle is None:
         yield image_fn
         return
@@ -85,21 +88,9 @@ def rotate_image(image_fn: str, angle: Optional[float] = None, dpi: int = 300) -
         with Image.open(image_fn) as image_pil:  # type: Image.Image
             page_rotate: int = 90 * round(angle / 90.0)
             w_orig, h_orig = image_pil.size
-            image_pil = image_pil.rotate(angle, expand=True, fillcolor="white")
-            w_rot, h_rot = image_pil.size
-
-            if page_rotate % 180 != 0:
-                w_orig_b = w_orig
-                w_orig = h_orig
-                h_orig = w_orig_b
-
-            l: int = w_orig / 2 - w_rot / 2
-            u: int = h_orig / 2 - h_rot / 2
-            r: int = l + w_orig
-            b: int = u + h_orig
-
-            image_pil = image_pil.resize((w_orig, h_orig))
-
+            if align_to_closest_90:
+                angle = angle - page_rotate
+            image_pil = image_pil.rotate(angle, expand=False, fillcolor="white")
             image_pil.save(dst_fn, dpi=(dpi, dpi))
         yield dst_fn
     finally:
