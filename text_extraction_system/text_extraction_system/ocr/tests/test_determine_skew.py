@@ -1,4 +1,5 @@
 import os
+from math import floor
 
 from text_extraction_system.commons.tests.commons import with_default_settings
 from text_extraction_system.ocr.ocr import determine_skew
@@ -28,11 +29,11 @@ def test_angle3():
     fn = os.path.join(data_dir, 'rotated_small_angle.pdf')
     with extract_page_images(fn, 1, 1) as png_fns:
         angle = determine_skew(png_fns[0])
-        assert 0 < abs(angle) < 3
+        assert floor(abs(angle)) == 2
 
 
 @with_default_settings
 def test_angle4():
     fn = os.path.join(data_dir, 'realdoc__00121.png')
     angle = determine_skew(fn)
-    assert 87 < abs(angle) < 89
+    assert floor(abs(angle)) == 88

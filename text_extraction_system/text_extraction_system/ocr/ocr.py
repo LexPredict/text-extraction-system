@@ -1,5 +1,6 @@
 import os
 import shutil
+from collections import Counter
 from contextlib import contextmanager
 from logging import getLogger
 from statistics import median
@@ -78,7 +79,7 @@ def rotate_image(image_fn: str,
                  angle: Optional[float] = None,
                  dpi: int = 300,
                  align_to_closest_90: bool = True) -> Generator[str, None, None]:
-    if angle is None:
+    if not angle:
         yield image_fn
         return
 
@@ -98,8 +99,7 @@ def rotate_image(image_fn: str,
         shutil.rmtree(dst_dir)
 
 
-def determine_skew(image_fn: str) -> float:
-
+def determine_skew(image_fn: str, most_frequent_angle_of_parts: bool = True) -> Optional[float]:
     img = cv2.imread(image_fn, 0)
 
     # Gaussian blur with a kernel size (height, width) of 9.
@@ -117,6 +117,9 @@ def determine_skew(image_fn: str) -> float:
     kernel = np.array([[0., 1., 0.], [1., 1., 1.], [0., 1., 0.]], np.uint8)
     proc = cv2.dilate(proc, kernel)
 
+    if not most_frequent_angle_of_parts:
+        return deskew.determine_skew(proc)
+
     height = img.shape[0]
     width = img.shape[1]
     part_size: int = 500
@@ -133,5 +136,15 @@ def determine_skew(image_fn: str) -> float:
         images = [proc[:, i[0]:i[1]] for i in ar]
 
     angles = [deskew.determine_skew(img) for img in images]
-    res = median([a for a in angles if a is not None])
-    return res
+    angles = [a for a in angles if a is not None]
+    if not angles:
+        return None
+
+    freqs = Counter(angles)
+    most_frequent = sorted(freqs.items(), key=lambda it: it[1], reverse=True)[0]
+    if most_frequent[1] > 1:
+        # if at least some angle repeats - return the one with the max frequency
+        return most_frequent[0]
+    else:
+        # otherwise use median angle - which is usually good but not the best
+        return median(angles)
