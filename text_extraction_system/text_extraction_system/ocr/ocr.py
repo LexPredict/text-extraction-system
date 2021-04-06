@@ -99,29 +99,13 @@ def rotate_image(image_fn: str,
         shutil.rmtree(dst_dir)
 
 
-def determine_skew(image_fn: str, most_frequent_angle_of_parts: bool = True) -> Optional[float]:
-    img = cv2.imread(image_fn, 0)
-
-    # Gaussian blur with a kernel size (height, width) of 9.
-    # Note that kernel sizes must be positive and odd and the kernel must be square.
-    proc = cv2.GaussianBlur(img.copy(), (9, 9), 0)
-
-    # Adaptive threshold using 11 nearest neighbour pixels
-    proc = cv2.adaptiveThreshold(proc, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
-
-    # Invert colours, so gridlines have non-zero pixel values.
-    # Necessary to dilate the image, otherwise will look like erosion instead.
-    proc = cv2.bitwise_not(proc, proc)
-
-    # Dilate the image to increase the size of the grid lines.
-    kernel = np.array([[0., 1., 0.], [1., 1., 1.], [0., 1., 0.]], np.uint8)
-    proc = cv2.dilate(proc, kernel)
+def determine_skew(image_fn: str, most_frequent_angle_of_parts: bool = False) -> Optional[float]:
+    proc = cv2.imread(image_fn, 0)
 
     if not most_frequent_angle_of_parts:
         return deskew.determine_skew(proc)
 
-    height = img.shape[0]
-    width = img.shape[1]
+    height, width = proc.shape
     part_size: int = 500
     num_parts: int = round(height / part_size)
 
