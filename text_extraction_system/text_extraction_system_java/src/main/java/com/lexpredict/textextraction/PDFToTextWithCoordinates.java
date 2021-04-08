@@ -49,6 +49,18 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
     protected boolean removeNonPrintable = false;
 
+    private int ignoreAnglesCloserThan = 3;
+
+    private double[] curAngleLimits = null;
+
+    public int getIgnoreAnglesCloserThan() {
+        return ignoreAnglesCloserThan;
+    }
+
+    public void setIgnoreAnglesCloserThan(int ignoreAnglesCloserThan) {
+        this.ignoreAnglesCloserThan = ignoreAnglesCloserThan;
+    }
+
     protected double r(double d) {
         BigDecimal bd = BigDecimal.valueOf(d);
         bd = bd.setScale(2, RoundingMode.HALF_UP);
@@ -222,7 +234,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     protected void addNonPrintableCharBoxes(String nonPrintableText) {
         if (nonPrintableText != null && !nonPrintableText.isEmpty()) {
             for (int i = 0; i < nonPrintableText.length(); i++) {
-                this.charBBoxesWithPageNums.add(new double[] {getCurrentPageNo(), 0, 0, 0, 0});
+                this.charBBoxesWithPageNums.add(new double[]{getCurrentPageNo(), 0, 0, 0, 0});
             }
         }
     }
@@ -275,41 +287,85 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         this.addNonPrintableCharBoxes(getArticleStart());
     }
 
+    protected static double normAngle(double angle) {
+        angle = angle % 360;
+        angle = angle > 180 ? 360 - angle : angle;
+        return angle;
+    }
 
     static class AngleCollector extends PDFTextStripper {
         Set<Integer> angles = new HashSet<>();
+
+        private int ignoreAnglesCloserThan;
 
         public Set<Integer> getAngles() {
             return angles;
         }
 
-        AngleCollector() throws IOException {
+        AngleCollector(int ignoreAnglesCloserThan) throws IOException {
+            this.ignoreAnglesCloserThan = ignoreAnglesCloserThan;
+        }
+
+        private boolean angleIsTooCloseToOneOf(int angle, Set<Integer> oneOf) {
+            for (int angle2 : oneOf) {
+                int phi = Math.abs(angle - angle2) % 360;
+                int distance = phi > 180 ? 360 - phi : phi;
+                if (distance < ignoreAnglesCloserThan)
+                    return true;
+            }
+            return false;
+        }
+
+        public void cleanupAngles() {
+            Set<Integer> res = new HashSet<>();
+            for (int angle : this.angles)
+                if (!angleIsTooCloseToOneOf(angle, res))
+                    res.add(angle);
+            this.angles = res;
+        }
+
+        public double[] getLimitsByAngle(int angle) {
+            Integer closestLeft = null;
+            Integer closestRight = null;
+            for (int angle1 : this.angles) {
+                if (angle1 < angle && (closestLeft == null || angle1 > closestLeft))
+                    closestLeft = angle1;
+                else if (angle1 > angle && (closestRight == null || angle1 < closestRight))
+                    closestRight = angle1;
+            }
+
+            double limitLeft = closestLeft != null ? -((double) angle - closestLeft) / 2 : -ignoreAnglesCloserThan;
+            double limitRight = closestRight != null ? ((double) closestRight - angle) / 2 : +ignoreAnglesCloserThan;
+
+            return new double[]{limitLeft, limitRight};
+
         }
 
         @Override
         protected void processTextPosition(TextPosition text) {
             Matrix m = text.getTextMatrix();
             m.concatenate(text.getFont().getFontMatrix());
-            int angle = (int) Math.round(Math.toDegrees(Math.atan2(m.getShearY(), m.getScaleY())));
-            angle = (angle + 360) % 360;
-            angles.add(angle);
+            double angle = Math.toDegrees(Math.atan2(m.getShearY(), m.getScaleY()));
+            angle = normAngle(angle);
+            // do we need the proper float angle auto-clustering here?
+            angles.add((int) Math.round(angle));
         }
     }
 
     @Override
     public void processPage(PDPage page) throws IOException {
-        //copied and pasted from https://issues.apache.org/jira/secure/attachment/12947452/ExtractAngledText.java
-        //PDFBOX-4371
+        // based on the code from ExtractText of PDFBox
         int pageStart = this.charBBoxesWithPageNums == null ? 0 : this.charBBoxesWithPageNums.size();
-        AngleCollector angleCollector = new AngleCollector(); // alternatively, reset angles
+        AngleCollector angleCollector = new AngleCollector(this.ignoreAnglesCloserThan);
         angleCollector.setStartPage(getCurrentPageNo());
         angleCollector.setEndPage(getCurrentPageNo());
         angleCollector.getText(document);
-
+        angleCollector.cleanupAngles();
         int rotation = page.getRotation();
         page.setRotation(0);
 
         for (Integer angle : angleCollector.getAngles()) {
+            this.curAngleLimits = angleCollector.getLimitsByAngle(angle);
             if (angle == 0) {
                 super.processPage(page);
             } else {
@@ -323,6 +379,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
                 COSArray contents = (COSArray) page.getCOSObject().getItem(COSName.CONTENTS);
                 contents.remove(0);
             }
+            this.curAngleLimits = null;
         }
         page.setRotation(rotation);
 
@@ -331,7 +388,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         pp.bbox = new double[]{r(area.getLowerLeftX()), r(area.getLowerLeftY()),
                 r(area.getWidth()), r(area.getHeight())};
         int pageEnd = this.charBBoxesWithPageNums == null ? 0 : this.charBBoxesWithPageNums.size();
-        pp.location = new int[] {pageStart, pageEnd};
+        pp.location = new int[]{pageStart, pageEnd};
         this.pages.add(pp);
     }
 
@@ -339,10 +396,10 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     protected void processTextPosition(TextPosition text) {
         Matrix m = text.getTextMatrix();
         m.concatenate(text.getFont().getFontMatrix());
-        int angle = (int) Math.round(Math.toDegrees(Math.atan2(m.getShearY(), m.getScaleY())));
-        if (angle == 0) {
+        double angle = normAngle(Math.toDegrees(Math.atan2(m.getShearY(), m.getScaleY())));
+
+        if (angle >= this.curAngleLimits[0] && angle < this.curAngleLimits[1])
             super.processTextPosition(text);
-        }
     }
 
     public static PDFPlainText process(PDDocument document,
@@ -370,7 +427,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         // Setting to true breaks multi-column layouts
         // Setting to false breaks complicated diagrams
         pdf2text.setSortByPosition(false);
-        
+
         pdf2text.setShouldSeparateByBeads(true);
         pdf2text.enhancedSizeDetection = enhancedSizeDetection;
         pdf2text.removeNonPrintable = removeNonPrintable;
