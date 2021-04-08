@@ -37,3 +37,9 @@ scikit-learn==0.23.1
 scipy==1.5.1
 uvicorn==0.12.1
 webdavclient3==3.14.5
+
+Pillow~=8.0.0
+starlette~=0.13.6
+dataclasses~=0.6
+lexnlp~=1.8.0
+pytz~=2020.1

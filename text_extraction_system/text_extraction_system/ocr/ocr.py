@@ -1,17 +1,13 @@
 import os
 import shutil
-from collections import Counter
 from contextlib import contextmanager
 from logging import getLogger
-from statistics import median
 from subprocess import Popen, PIPE, TimeoutExpired
 from tempfile import mkdtemp
 from typing import Generator, Optional
-
-import cv2
-import deskew
-import numpy as np
 from PIL import Image
+
+from text_extraction_system.ocr.image_aberration_detection import ImageAberrationDetection
 
 log = getLogger(__name__)
 
@@ -100,35 +96,6 @@ def rotate_image(image_fn: str,
 
 
 def determine_skew(image_fn: str, most_frequent_angle_of_parts: bool = False) -> Optional[float]:
-    proc = cv2.imread(image_fn, 0)
-
-    if not most_frequent_angle_of_parts:
-        return deskew.determine_skew(proc)
-
-    height, width = proc.shape
-    part_size: int = 500
-    num_parts: int = round(height / part_size)
-
-    # split image to multiple blocks, determine skew angle of each part and take median
-    # this solves problem with the documents having alignment which provocates false-determining
-    # of the skew for the document as a whole
-    if height >= width:
-        ar = [(h * part_size, (h + 1) * part_size) for h in range(num_parts)]
-        images = [proc[i[0]:i[1]] for i in ar]
-    else:
-        ar = [(w * part_size, (w + 1) * part_size) for w in range(num_parts)]
-        images = [proc[:, i[0]:i[1]] for i in ar]
-
-    angles = [deskew.determine_skew(img) for img in images]
-    angles = [a for a in angles if a is not None]
-    if not angles:
-        return None
-
-    freqs = Counter(angles)
-    most_frequent = sorted(freqs.items(), key=lambda it: it[1], reverse=True)[0]
-    if most_frequent[1] > 1:
-        # if at least some angle repeats - return the one with the max frequency
-        return most_frequent[0]
-    else:
-        # otherwise use median angle - which is usually good but not the best
-        return median(angles)
+    if most_frequent_angle_of_parts:
+        return ImageAberrationDetection.determine_skew_most_frequent(image_fn)
+    return ImageAberrationDetection.determine_skew_dilated_rows(image_fn)
