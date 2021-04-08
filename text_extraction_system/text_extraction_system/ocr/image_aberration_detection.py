@@ -12,21 +12,20 @@ from PIL import ImageOps
 
 class ImageAberrationDetection:
 
-    # used in determine_skew_dilated_rows() - "ideal" image size for resizing code
-    #SKEW_IMAGE_DETECT_TARGET_SIZE = 800, 1000
+    # used in detect_rotation_dilated_rows() - "ideal" image size for resizing code
     SKEW_IMAGE_DETECT_TARGET_SIZE = 960, 1200
 
-    # used in determine_skew_dilated_rows() to blur the image before applying binary filter
+    # used in detect_rotation_dilated_rows() to blur the image before applying binary filter
     IMAGE_BLUR_RADIUS = 5
 
     # used in determine_skew_dilated_rows() - min image dimension after resizing
     MIN_IMAGE_DIMENSION = 200
 
-    # used in determine_skew_most_frequent() - size of the image subpart
+    # used in detect_rotation_most_frequent() - size of the image subpart
     IMAGE_PART_SIZE = 500
 
     @classmethod
-    def determine_skew_dilated_rows(cls, image_fn: str) -> Optional[float]:
+    def detect_rotation_dilated_rows(cls, image_fn: str) -> Optional[float]:
         # make file grayscale and not too large
         src_image = PilImage.open(image_fn)
         img_gray: PilImage = ImageOps.grayscale(src_image)
@@ -72,12 +71,12 @@ class ImageAberrationDetection:
             os.remove(filename)
 
     @classmethod
-    def determine_skew_using_skewlib(cls, image_fn: str) -> Optional[float]:
+    def detect_rotation_using_skewlib(cls, image_fn: str) -> Optional[float]:
         proc = cv2.imread(image_fn, 0)
         return deskew.determine_skew(proc)
 
     @classmethod
-    def determine_skew_most_frequent(cls, image_fn: str) -> Optional[float]:
+    def detect_rotation_most_frequent(cls, image_fn: str) -> Optional[float]:
         proc = cv2.imread(image_fn, 0)
         height, width = proc.shape
         part_size: int = cls.IMAGE_PART_SIZE

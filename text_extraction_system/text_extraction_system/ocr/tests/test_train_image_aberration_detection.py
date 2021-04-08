@@ -54,28 +54,10 @@ class TestImageAberrationDetection(TestCase):
 
     def non_test_train(self):
         # don't forget to "-"
-        y = [
-            1.8,
-            -1.86,
-            -0.33,
-            0,
-            -0.27,  # page 5
-            0.36,
-            -0.52,
-            0.5,
-            -0.7,
-            0.55,  # page 10,
-            -0.5,
-            0.6,
-            -0.6,
-            0.93,
-            -0.93,  # page 15
-            0.93,
-            -0.55,
-            0.6,
-            -0.6,
-            0.53
-        ]
+        y = [1.8, -1.86, -0.33, 0, -0.27,  # page 5
+             0.36, -0.52, 0.5, -0.7, 0.55,  # page 10,
+             -0.5, 0.6, -0.6, 0.93, -0.93,  # page 15
+             0.93, -0.55, 0.6, -0.6, 0.53]
         y = [-y for y in y]
 
         ptrs_blur = [DetectionParams(i) for i in range(5, 16, 2)]
@@ -124,7 +106,7 @@ class TestImageAberrationDetection(TestCase):
         try:
             for file_name in file_names:
                 file_path = os.path.join(self.IMAGE_FOLDER, file_name)
-                angle = ImageAberrationDetection.determine_skew_dilated_rows(file_path)
+                angle = ImageAberrationDetection.detect_rotation_dilated_rows(file_path)
                 y_hat.append(angle)
         finally:
             old_params.apply_params()
