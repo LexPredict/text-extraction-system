@@ -3,11 +3,16 @@ package com.lexpredict.textextraction;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lexpredict.textextraction.dto.PDFPlainText;
 import junit.framework.TestCase;
+import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.tools.ExtractText;
 
+import java.io.File;
 import java.io.InputStream;
 import java.io.StringWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 
 public class TestPDF2Text extends TestCase {
@@ -55,7 +60,7 @@ public class TestPDF2Text extends TestCase {
                 .getResourceAsStream("/RESO_20120828-01_Building_Remodel__54.pdf")) {
             try (PDDocument document = PDDocument.load(stream)) {
                 PDFPlainText res = PDFToTextWithCoordinates.process(document, false, false);
-                assertEquals(106, res.text.chars().filter(ch -> ch == '\n').count());
+                assertEquals(57, res.text.chars().filter(ch -> ch == '\n').count());
 
             }
         }
@@ -66,7 +71,44 @@ public class TestPDF2Text extends TestCase {
                 .getResourceAsStream("/paragraphs2.pdf")) {
             try (PDDocument document = PDDocument.load(stream)) {
                 PDFPlainText res = PDFToTextWithCoordinates.process(document, false, false);
-                assertEquals(73, res.text.chars().filter(ch -> ch == '\n').count());
+                assertEquals(40, res.text.chars().filter(ch -> ch == '\n').count());
+            }
+        }
+    }
+
+    public void test_duplication_in_rotated_text() throws Exception {
+        try (InputStream stream = TestPDF2Text.class
+                .getResourceAsStream("/rotated_duplicate_text.pdf")) {
+            try (PDDocument document = PDDocument.load(stream)) {
+                PDFPlainText res = PDFToTextWithCoordinates.process(document, false, false);
+                assertEquals(1, StringUtils.countMatches(res.text,
+                        "certain information in connection with the offering by City"));
+            }
+        }
+    }
+
+    public void test_duplication_in_rotated_text2() throws Exception {
+        try (InputStream stream = TestPDF2Text.class
+                .getResourceAsStream("/vertical_page_rotated.pdf")) {
+            try (PDDocument document = PDDocument.load(stream)) {
+                PDFPlainText res = PDFToTextWithCoordinates.process(document, false, false);
+                assertEquals(1, StringUtils.countMatches(res.text,
+                        "beneficiaries are also paid at prospectively determined rates per discharge"));
+            }
+        }
+    }
+
+
+    public void test_duplication_in_rotated_text3() throws Exception {
+        try (InputStream stream = TestPDF2Text.class
+                .getResourceAsStream("/two_angles.pdf")) {
+            try (PDDocument document = PDDocument.load(stream)) {
+                PDFPlainText res = PDFToTextWithCoordinates.process(document, false, false);
+                assertEquals(2, StringUtils.countMatches(res.text,"Hello hello"));
+                assertEquals(1, StringUtils.countMatches(res.text,"Again"));
+                assertEquals(3, StringUtils.countMatches(res.text,"again"));
+                assertEquals(1, StringUtils.countMatches(res.text,"World"));
+                assertEquals(3, StringUtils.countMatches(res.text,"world"));
             }
         }
     }
