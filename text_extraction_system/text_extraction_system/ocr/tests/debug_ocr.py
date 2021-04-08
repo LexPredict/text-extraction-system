@@ -1,6 +1,7 @@
 import shutil
 
 from text_extraction_system.commons.tests.commons import with_default_settings
+from text_extraction_system.constants import ROTATION_DETECTION_DESKEW
 from text_extraction_system.data_extract.data_extract import extract_text_and_structure
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf
 from text_extraction_system.pdf.pdf import extract_page_images, extract_page_ocr_images
@@ -29,7 +30,7 @@ def p2():
         shutil.copy(page_fns[page - 1], '/home/mikhail/lexpredict/misc/angles/realdoc__00121_orig.pdf')
 
     with extract_page_ocr_images(orig_pdf_fn, page, page, dpi=300) as images:
-        angle = determine_skew(images[0][1], False)
+        angle = determine_skew(images[0][1], ROTATION_DETECTION_DESKEW)
         with rotate_image(images[0][1], angle, 300, align_to_closest_90=True) as rotated_or_original_image_fn:
             with ocr_page_to_pdf(rotated_or_original_image_fn,
                                  glyphless_text_only=True,

@@ -7,6 +7,7 @@ from tempfile import mkdtemp
 from typing import Generator, Optional
 from PIL import Image
 
+from text_extraction_system.constants import ROTATION_DETECTION_TILE_DESKEW, ROTATION_DETECTION_DILATED_ROWS
 from text_extraction_system.ocr.image_aberration_detection import ImageAberrationDetection
 
 log = getLogger(__name__)
@@ -85,7 +86,6 @@ def rotate_image(image_fn: str,
         dst_fn = os.path.join(dst_dir, basename)
         with Image.open(image_fn) as image_pil:  # type: Image.Image
             page_rotate: int = 90 * round(angle / 90.0)
-            w_orig, h_orig = image_pil.size
             if align_to_closest_90:
                 angle = angle - page_rotate
             image_pil = image_pil.rotate(angle, expand=False, fillcolor="white")
@@ -95,7 +95,9 @@ def rotate_image(image_fn: str,
         shutil.rmtree(dst_dir)
 
 
-def determine_skew(image_fn: str, most_frequent_angle_of_parts: bool = False) -> Optional[float]:
-    if most_frequent_angle_of_parts:
-        return ImageAberrationDetection.determine_skew_most_frequent(image_fn)
-    return ImageAberrationDetection.determine_skew_dilated_rows(image_fn)
+def determine_skew(image_fn: str, detecting_method: str = ROTATION_DETECTION_TILE_DESKEW) -> Optional[float]:
+    if detecting_method == ROTATION_DETECTION_TILE_DESKEW:
+        return ImageAberrationDetection.detect_rotation_most_frequent(image_fn)
+    if detecting_method == ROTATION_DETECTION_DILATED_ROWS:
+        return ImageAberrationDetection.detect_rotation_dilated_rows(image_fn)
+    return ImageAberrationDetection.detect_rotation_using_skewlib(image_fn)
