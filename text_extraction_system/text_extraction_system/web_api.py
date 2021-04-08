@@ -46,17 +46,17 @@ templates = Jinja2Templates(directory="text_extraction_system/templates")
 
 
 @app.get("/")
-async def serve_spa(request: Request):
+async def serve_spa_slash(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.get("")
-async def serve_spa(request: Request):
+async def serve_spa_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.get("/page-{rest_of_path:path}")
-async def serve_spa(request: Request):
+async def serve_spa_rest(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
