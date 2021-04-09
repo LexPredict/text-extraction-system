@@ -97,7 +97,10 @@ def rotate_image(image_fn: str,
 
 def determine_skew(image_fn: str,
                    detecting_method: RotationDetectionMethod
-                   = RotationDetectionMethod.DILATED_ROWS) -> Optional[float]:
+                   = RotationDetectionMethod.DESKEW) -> Optional[float]:
+    # default method is set to DESKEW (plain deskew lib) because it works on
+    # larger amount of cases including images rotated on ~~90 degrees
+    # (but is slower)
     if detecting_method == RotationDetectionMethod.TILE_DESKEW:
         return ImageAberrationDetection.detect_rotation_most_frequent(image_fn)
     if detecting_method == RotationDetectionMethod.DILATED_ROWS:
