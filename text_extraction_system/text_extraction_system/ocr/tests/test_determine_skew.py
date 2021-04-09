@@ -2,7 +2,7 @@ import os
 from math import floor
 
 from text_extraction_system.commons.tests.commons import with_default_settings
-from text_extraction_system.ocr.ocr import determine_skew
+from text_extraction_system.ocr.ocr import determine_skew, RotationDetectionMethod
 from text_extraction_system.pdf.pdf import extract_page_images
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
@@ -37,3 +37,11 @@ def test_angle4():
     fn = os.path.join(data_dir, 'realdoc__00121.png')
     angle = determine_skew(fn)
     assert floor(abs(angle)) == 88
+
+
+@with_default_settings
+def test_angle5():
+    fn = os.path.join(data_dir, 'picture_angles__00003.png')
+    angle = determine_skew(fn, detecting_method=RotationDetectionMethod.DILATED_ROWS)
+    assert floor(abs(angle)) == 0
+

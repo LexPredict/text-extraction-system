@@ -196,6 +196,6 @@ class SystemInfo:
 
 
 class RotationDetectionMethod(str, Enum):
-    ROTATION_DETECTION_DESKEW = 'deskew'
-    ROTATION_DETECTION_TILE_DESKEW = 'tile_deskew'
-    ROTATION_DETECTION_DILATED_ROWS = 'dilated_rows'
+    DESKEW = 'deskew'
+    TILE_DESKEW = 'tile_deskew'
+    DILATED_ROWS = 'dilated_rows'

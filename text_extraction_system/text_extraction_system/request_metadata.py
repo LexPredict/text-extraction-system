@@ -49,7 +49,7 @@ class RequestMetadata:
 
     ocr_enable: bool = True
     deskew_enable: bool = True
-    detect_rotation_method: RotationDetectionMethod = RotationDetectionMethod.ROTATION_DETECTION_TILE_DESKEW
+    detect_rotation_method: RotationDetectionMethod = RotationDetectionMethod.TILE_DESKEW
 
     status: str = STATUS_PENDING
 
