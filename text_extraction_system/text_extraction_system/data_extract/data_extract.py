@@ -190,7 +190,7 @@ def process_pdf_page(pdf_fn: str,
                      ocr_enabled: bool = True,
                      deskew_enabled: bool = True,
                      detect_rotation_method: RotationDetectionMethod =
-                         RotationDetectionMethod.ROTATION_DETECTION_TILE_DESKEW,
+                         RotationDetectionMethod.TILE_DESKEW,
                      ocr_language: str = None,
                      ocr_timeout_sec: int = 60,
                      pdf_password: str = None) -> Generator[PDFPageProcessingResults, None, None]:
