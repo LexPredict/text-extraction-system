@@ -25,7 +25,6 @@ from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfparser import PDFParser
 
 from text_extraction_system.config import get_settings
-from text_extraction_system.constants import ROTATION_DETECTION_TILE_DESKEW
 from text_extraction_system.data_extract.camelot.camelot import extract_tables
 from text_extraction_system.data_extract.lang import get_lang_detector
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf, determine_skew, rotate_image
@@ -34,7 +33,7 @@ from text_extraction_system.pdf.pdf import page_requires_ocr, extract_page_ocr_i
 from text_extraction_system.processes import raise_from_process
 from text_extraction_system.utils import LanguageConverter
 from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, PlainTextStructure, \
-    PlainTextSentence, TextAndPDFCoordinates, PDFCoordinates
+    PlainTextSentence, TextAndPDFCoordinates, PDFCoordinates, RotationDetectionMethod
 
 log = getLogger(__name__)
 PAGE_SEPARATOR = '\n\n\f'
@@ -190,7 +189,8 @@ def process_pdf_page(pdf_fn: str,
                      page_num: int,
                      ocr_enabled: bool = True,
                      deskew_enabled: bool = True,
-                     detect_rotation_method: str = ROTATION_DETECTION_TILE_DESKEW,
+                     detect_rotation_method: RotationDetectionMethod =
+                         RotationDetectionMethod.ROTATION_DETECTION_TILE_DESKEW,
                      ocr_language: str = None,
                      ocr_timeout_sec: int = 60,
                      pdf_password: str = None) -> Generator[PDFPageProcessingResults, None, None]:

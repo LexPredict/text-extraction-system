@@ -1,3 +1,5 @@
+from enum import Enum
+
 metadata_fn = 'metadata.json'
 results_fn = 'results.zip'
 pages_ocred = 'pages_ocred'
@@ -19,12 +21,3 @@ TESSERACT_LANGUAGES = {
 }
 
 TESSERACT_DEFAULT_LANGUAGE = "eng"
-
-# that flag corresponds to ImageAberrationDetection.detect_rotation_using_skewlib
-ROTATION_DETECTION_DESKEW = 'deskew'
-
-# that flag corresponds to ImageAberrationDetection.detect_rotation_most_frequent
-ROTATION_DETECTION_TILE_DESKEW = 'tile_deskew'
-
-# that flag corresponds to ImageAberrationDetection.detect_rotation_dilated_rows
-ROTATION_DETECTION_DILATED_ROWS = 'dilated_rows'

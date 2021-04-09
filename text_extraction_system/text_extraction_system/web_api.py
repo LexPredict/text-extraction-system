@@ -21,7 +21,7 @@ from webdav3.exceptions import RemoteResourceNotFound
 from text_extraction_system import version
 from text_extraction_system.celery_log import HumanReadableTraceBackException
 from text_extraction_system.commons.escape_utils import get_valid_fn
-from text_extraction_system.constants import task_ids, ROTATION_DETECTION_TILE_DESKEW
+from text_extraction_system.constants import task_ids
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
 from text_extraction_system.request_metadata import RequestMetadata, RequestCallbackInfo, save_request_metadata, \
     load_request_metadata
@@ -29,7 +29,7 @@ from text_extraction_system.tasks import process_document, celery_app, register_
 from text_extraction_system_api import dto
 from text_extraction_system_api.dto import OutputFormat, TableList, PlainTextStructure, RequestStatus, \
     RequestStatuses, SystemInfo, TaskCancelResult, PDFCoordinates, STATUS_DONE, STATUS_FAILURE, UserRequestsSummary, \
-    STATUS_PENDING, UserRequestsQuery
+    STATUS_PENDING, UserRequestsQuery, RotationDetectionMethod
 
 app = FastAPI()
 
@@ -74,7 +74,8 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                                     doc_language: str = Form(default=''),
                                     ocr_enable: bool = Form(default=True),
                                     deskew_enable: bool = Form(default=True),
-                                    detect_rotation_method: str = Form(default=''),
+                                    detect_rotation_method: RotationDetectionMethod =
+                                        Form(default=RotationDetectionMethod.ROTATION_DETECTION_TILE_DESKEW),
                                     request_id: str = Form(default=None),
                                     log_extra_json_key_value: str = Form(default=None),
                                     convert_to_pdf_timeout_sec: int = Form(default=1800),
@@ -92,7 +93,8 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                           doc_language=doc_language,
                           ocr_enable=ocr_enable,
                           deskew_enable=deskew_enable,
-                          detect_rotation_method=detect_rotation_method or ROTATION_DETECTION_TILE_DESKEW,
+                          detect_rotation_method=detect_rotation_method or
+                                                 RotationDetectionMethod.ROTATION_DETECTION_TILE_DESKEW,
                           output_format=output_format,
                           convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
                           pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
