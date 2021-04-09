@@ -75,7 +75,7 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                                     ocr_enable: bool = Form(default=True),
                                     deskew_enable: bool = Form(default=True),
                                     detect_rotation_method: RotationDetectionMethod =
-                                        Form(default=RotationDetectionMethod.TILE_DESKEW),
+                                        Form(default=RotationDetectionMethod.DESKEW),
                                     request_id: str = Form(default=None),
                                     log_extra_json_key_value: str = Form(default=None),
                                     convert_to_pdf_timeout_sec: int = Form(default=1800),
