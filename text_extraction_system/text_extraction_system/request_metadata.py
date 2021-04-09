@@ -6,10 +6,10 @@ import dateutil.parser
 
 from dataclasses_json import dataclass_json, config
 from marshmallow import fields
-from text_extraction_system_api.dto import OutputFormat
+from text_extraction_system_api.dto import OutputFormat, RotationDetectionMethod
 from webdav3.exceptions import RemoteResourceNotFound, RemoteParentNotFound
 
-from text_extraction_system.constants import metadata_fn, ROTATION_DETECTION_TILE_DESKEW
+from text_extraction_system.constants import metadata_fn
 from text_extraction_system.file_storage import get_webdav_client
 from text_extraction_system_api.dto import RequestStatus, STATUS_PENDING
 
@@ -49,7 +49,7 @@ class RequestMetadata:
 
     ocr_enable: bool = True
     deskew_enable: bool = True
-    detect_rotation_method: str = ROTATION_DETECTION_TILE_DESKEW
+    detect_rotation_method: RotationDetectionMethod = RotationDetectionMethod.ROTATION_DETECTION_TILE_DESKEW
 
     status: str = STATUS_PENDING
 
