@@ -193,9 +193,3 @@ class SystemInfo:
     build_date: str
     python_version: str
     pandas_version: str
-
-
-class RotationDetectionMethod(str, Enum):
-    DESKEW = 'deskew'
-    TILE_DESKEW = 'tile_deskew'
-    DILATED_ROWS = 'dilated_rows'
