@@ -29,7 +29,7 @@ from text_extraction_system.tasks import process_document, celery_app, register_
 from text_extraction_system_api import dto
 from text_extraction_system_api.dto import OutputFormat, TableList, PlainTextStructure, RequestStatus, \
     RequestStatuses, SystemInfo, TaskCancelResult, PDFCoordinates, STATUS_DONE, STATUS_FAILURE, UserRequestsSummary, \
-    STATUS_PENDING, UserRequestsQuery, RotationDetectionMethod
+    STATUS_PENDING, UserRequestsQuery
 
 app = FastAPI()
 
@@ -74,8 +74,6 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                                     doc_language: str = Form(default=''),
                                     ocr_enable: bool = Form(default=True),
                                     deskew_enable: bool = Form(default=True),
-                                    detect_rotation_method: RotationDetectionMethod =
-                                        Form(default=RotationDetectionMethod.DESKEW),
                                     request_id: str = Form(default=None),
                                     log_extra_json_key_value: str = Form(default=None),
                                     convert_to_pdf_timeout_sec: int = Form(default=1800),
@@ -93,8 +91,6 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                           doc_language=doc_language,
                           ocr_enable=ocr_enable,
                           deskew_enable=deskew_enable,
-                          detect_rotation_method=detect_rotation_method or
-                                                 RotationDetectionMethod.TILE_DESKEW,
                           output_format=output_format,
                           convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
                           pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,

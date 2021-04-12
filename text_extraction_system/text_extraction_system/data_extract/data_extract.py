@@ -27,13 +27,14 @@ from pdfminer.pdfparser import PDFParser
 from text_extraction_system.config import get_settings
 from text_extraction_system.data_extract.camelot.camelot import extract_tables
 from text_extraction_system.data_extract.lang import get_lang_detector
-from text_extraction_system.ocr.ocr import ocr_page_to_pdf, determine_skew, rotate_image
+from text_extraction_system.ocr.ocr import ocr_page_to_pdf, rotate_image
+from text_extraction_system.ocr.rotation_detection import determine_skew
 from text_extraction_system.pdf.pdf import page_requires_ocr, extract_page_ocr_images, \
     raise_from_pdfbox_error_messages, merge_pdf_pages
 from text_extraction_system.processes import raise_from_process
 from text_extraction_system.utils import LanguageConverter
 from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, PlainTextStructure, \
-    PlainTextSentence, TextAndPDFCoordinates, PDFCoordinates, RotationDetectionMethod
+    PlainTextSentence, TextAndPDFCoordinates, PDFCoordinates
 
 log = getLogger(__name__)
 PAGE_SEPARATOR = '\n\n\f'
@@ -189,8 +190,6 @@ def process_pdf_page(pdf_fn: str,
                      page_num: int,
                      ocr_enabled: bool = True,
                      deskew_enabled: bool = True,
-                     detect_rotation_method: RotationDetectionMethod =
-                         RotationDetectionMethod.TILE_DESKEW,
                      ocr_language: str = None,
                      ocr_timeout_sec: int = 60,
                      pdf_password: str = None) -> Generator[PDFPageProcessingResults, None, None]:
@@ -211,8 +210,7 @@ def process_pdf_page(pdf_fn: str,
 
             if ocr_enabled and page_requires_ocr(original_page_layout):
                 # this detects scanned text rotation angle
-                angle: Optional[float] = determine_skew(page_image_with_text_fn,
-                                                        detect_rotation_method) if deskew_enabled else None
+                angle: Optional[float] = determine_skew(page_image_with_text_fn) if deskew_enabled else None
                 # rotate_image() will pass as is if the angle is None
                 with rotate_image(page_image_with_text_fn, angle, DPI,
                                   align_to_closest_90=True) as page_image_with_text_fn, \

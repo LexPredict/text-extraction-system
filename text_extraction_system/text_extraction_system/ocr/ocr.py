@@ -5,10 +5,8 @@ from logging import getLogger
 from subprocess import Popen, PIPE, TimeoutExpired
 from tempfile import mkdtemp
 from typing import Generator, Optional
-from PIL import Image
-from text_extraction_system_api.dto import RotationDetectionMethod
 
-from text_extraction_system.ocr.image_aberration_detection import ImageAberrationDetection
+from PIL import Image
 
 log = getLogger(__name__)
 
@@ -93,16 +91,3 @@ def rotate_image(image_fn: str,
         yield dst_fn
     finally:
         shutil.rmtree(dst_dir)
-
-
-def determine_skew(image_fn: str,
-                   detecting_method: RotationDetectionMethod
-                   = RotationDetectionMethod.DESKEW) -> Optional[float]:
-    # default method is set to DESKEW (plain deskew lib) because it works on
-    # larger amount of cases including images rotated on ~~90 degrees
-    # (but is slower)
-    if detecting_method == RotationDetectionMethod.TILE_DESKEW:
-        return ImageAberrationDetection.detect_rotation_most_frequent(image_fn)
-    if detecting_method == RotationDetectionMethod.DILATED_ROWS:
-        return ImageAberrationDetection.detect_rotation_dilated_rows(image_fn)
-    return ImageAberrationDetection.detect_rotation_using_skewlib(image_fn)
