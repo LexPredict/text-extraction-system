@@ -189,10 +189,10 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             if (this.enhancedSizeDetection)
                 glyphBox = this.getEnhancedGlyphBox(pos);
             if (glyphBox == null)
-                glyphBox = new double[]{getCurrentPageNo() - 1, r(pos.getX()),
+                glyphBox = new double[]{r(pos.getX()),
                         r(pos.getY()), r(pos.getWidth()), r(pos.getHeight())};
 
-            if (removeNonPrintable && (glyphBox[3] == 0 || glyphBox[4] == 0))
+            if (removeNonPrintable && (glyphBox[2] == 0 || glyphBox[3] == 0))
                 continue;
 
             String symbol = pos.getUnicode();
@@ -234,7 +234,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     protected void addNonPrintableCharBoxes(String nonPrintableText) {
         if (nonPrintableText != null && !nonPrintableText.isEmpty()) {
             for (int i = 0; i < nonPrintableText.length(); i++) {
-                this.charBBoxesWithPageNums.add(new double[]{getCurrentPageNo(), 0, 0, 0, 0});
+                this.charBBoxesWithPageNums.add(new double[]{0, 0, 0, 0});
             }
         }
     }
