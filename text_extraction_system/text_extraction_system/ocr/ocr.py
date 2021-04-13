@@ -108,8 +108,11 @@ class OSD:
     orientation: int
     rotate: int
     orientation_conf: float
-    script: str
+    script: Optional[str]
     script_conf: float
+
+
+OSD_TOO_FEW_CHARACTERS = OSD(page_num=0, orientation=0, orientation_conf=0, script=None, script_conf=0, rotate=0)
 
 
 def osd_to_dict(osd: str):
@@ -145,13 +148,16 @@ def image_to_osd(page_image_fn: str, timeout: int = 180) -> OSD:
 
         log.debug(f'{args}\nstdout:\n{data}stderr:\n{err}')
         if proc.returncode != 0:
-            raise OCRException(f'Tesseract returned non-zero code.\n'
-                               f'Command line:\n'
-                               f'{args}\n'
-                               f'Process stdout:\n'
-                               f'{err}'
-                               f'Process stderr:\n'
-                               f'{err}')
+            if 'Too few characters' in err:
+                return OSD_TOO_FEW_CHARACTERS
+            else:
+                raise OCRException(f'Tesseract returned non-zero code.\n'
+                                   f'Command line:\n'
+                                   f'{args}\n'
+                                   f'Process stdout:\n'
+                                   f'{err}'
+                                   f'Process stderr:\n'
+                                   f'{err}')
 
         return OSD(**osd_to_dict(data))
     finally:
