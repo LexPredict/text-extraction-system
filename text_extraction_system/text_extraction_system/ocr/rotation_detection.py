@@ -40,8 +40,6 @@ def detect_rotation_dilated_rows(image_fn: str, pre_calculated_orientation: Opti
     else:
         img = src_image
 
-    img.save('/tmp/111_pre.png')
-
     img_gray: PilImage = ImageOps.grayscale(img)
     min_size = min(img_gray.size[0], img_gray.size[1])
     img_area = img_gray.size[0] * img_gray.size[1]
@@ -81,7 +79,6 @@ def detect_rotation_dilated_rows(image_fn: str, pre_calculated_orientation: Opti
         if angle < -45:
             angle = 90 + angle
         angle = norm_angle(orientation + angle)
-        src_image.rotate(angle, expand=True).save('/tmp/111.png')
         return angle
     finally:
         os.remove(filename)
