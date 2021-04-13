@@ -25,3 +25,10 @@ def test_extract_text_rotated2():
 rotated at a certain angle 3. This is a text rotated at a certain angle 4. This is a text rotated at a 
 certain angle 5. This is a text rotated at a certain angle 6. This is a text rotated at a certain angle 7.'''
     assert expected in text
+
+
+def test_extract_text_rotated3():
+    fn = os.path.join(os.path.dirname(__file__), 'data', 'picture_angles__00003.png')
+    client = TextExtractionSystemWebClient(test_settings.api_url)
+    text = client.extract_plain_text_from_document(fn)
+    assert not text.strip()
