@@ -10,6 +10,7 @@ import cv2
 import deskew
 from PIL import Image as PilImage
 from PIL import ImageOps
+from text_extraction_system.ocr.ocr import image_to_osd
 
 # used in detect_rotation_dilated_rows() - "ideal" image size for resizing code
 SKEW_IMAGE_DETECT_TARGET_SIZE = 960, 1200
@@ -24,10 +25,24 @@ MIN_IMAGE_DIMENSION = 200
 IMAGE_PART_SIZE = 500
 
 
-def detect_rotation_dilated_rows(image_fn: str) -> Optional[float]:
+def detect_rotation_dilated_rows(image_fn: str, pre_calculated_orientation: Optional[int] = None) -> Optional[float]:
     # make file grayscale and not too large
-    src_image = PilImage.open(image_fn)
-    img_gray: PilImage = ImageOps.grayscale(src_image)
+    src_image: PilImage.Image = PilImage.open(image_fn)
+    orientation = None
+    if pre_calculated_orientation is not None:
+        orientation = pre_calculated_orientation
+    else:
+        osd = image_to_osd(image_fn)
+        orientation = osd.orientation if osd.orientation_conf > 1 else 0
+
+    if orientation:
+        img = src_image.rotate(orientation, expand=True)
+    else:
+        img = src_image
+
+    img.save('/tmp/111_pre.png')
+
+    img_gray: PilImage = ImageOps.grayscale(img)
     min_size = min(img_gray.size[0], img_gray.size[1])
     img_area = img_gray.size[0] * img_gray.size[1]
     scale_k = math.pow(1.0 * (SKEW_IMAGE_DETECT_TARGET_SIZE[0] *
@@ -65,7 +80,9 @@ def detect_rotation_dilated_rows(image_fn: str) -> Optional[float]:
         angle = minAreaRect[-1]
         if angle < -45:
             angle = 90 + angle
-        return 1.0 * angle
+        angle = norm_angle(orientation + angle)
+        src_image.rotate(angle, expand=True).save('/tmp/111.png')
+        return angle
     finally:
         os.remove(filename)
 
