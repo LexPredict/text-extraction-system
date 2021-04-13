@@ -106,20 +106,38 @@ def detect_rotation_most_frequent(image_fn: str) -> Optional[float]:
         return median(angles)
 
 
-class RotationDetectionMethod(str, Enum):
-    DESKEW = 'deskew'
-    TILE_DESKEW = 'tile_deskew'
-    DILATED_ROWS = 'dilated_rows'
+def norm_angle(angle_degrees: Optional[float]) -> Optional[float]:
+    if angle_degrees is None:
+        return None
+    angle_degrees = angle_degrees % 360
+    angle_degrees = angle_degrees if angle_degrees < 180 else angle_degrees - 360
+    return angle_degrees
+
+
+class RotationDetectionMethod(int, Enum):
+    DESKEW = 1
+    TILE_DESKEW = 2
+    DILATED_ROWS = 3
+
+
+_methods = {
+    RotationDetectionMethod.DESKEW: detect_rotation_using_skewlib,
+    RotationDetectionMethod.TILE_DESKEW: detect_rotation_most_frequent,
+    RotationDetectionMethod.DILATED_ROWS: detect_rotation_dilated_rows
+}
 
 
 def determine_skew(image_fn: str,
                    detecting_method: RotationDetectionMethod
-                   = RotationDetectionMethod.DESKEW) -> Optional[float]:
+                   = RotationDetectionMethod.DESKEW,
+                   max_diff_from_closest_90: float = 10) -> Optional[float]:
     # default method is set to DESKEW (plain deskew lib) because it works on
     # larger amount of cases including images rotated on ~~90 degrees
     # (but is slower)
-    if detecting_method == RotationDetectionMethod.TILE_DESKEW:
-        return detect_rotation_most_frequent(image_fn)
-    if detecting_method == RotationDetectionMethod.DILATED_ROWS:
-        return detect_rotation_dilated_rows(image_fn)
-    return detect_rotation_using_skewlib(image_fn)
+    angle = _methods[detecting_method](image_fn)
+    angle = norm_angle(angle)
+
+    if abs(angle - 90*round(angle / 90)) <= max_diff_from_closest_90:
+        return angle
+    else:
+        return None
