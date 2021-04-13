@@ -289,7 +289,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
     protected static double normAngle(double angle) {
         angle = angle % 360;
-        angle = angle > 180 ? 360 - angle : angle;
+        angle = angle > 180 ? angle - 360 : angle;
         return angle;
     }
 

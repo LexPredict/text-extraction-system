@@ -4,7 +4,7 @@ import os
 from typing import Tuple, Optional, List
 from unittest import TestCase
 import regex as re
-from text_extraction_system.ocr.image_aberration_detection import ImageAberrationDetection
+from text_extraction_system.ocr import rotation_detection
 
 
 class DetectionParams:
@@ -33,16 +33,16 @@ class DetectionParams:
         return p
 
     def apply_params(self) -> 'DetectionParams':
-        old_params = DetectionParams(ImageAberrationDetection.IMAGE_BLUR_RADIUS,
-                                     ImageAberrationDetection.SKEW_IMAGE_DETECT_TARGET_SIZE)
+        old_params = DetectionParams(rotation_detection.IMAGE_BLUR_RADIUS,
+                                     rotation_detection.SKEW_IMAGE_DETECT_TARGET_SIZE)
         if self.blur_size:
-            ImageAberrationDetection.IMAGE_BLUR_RADIUS = self.blur_size
+            rotation_detection.IMAGE_BLUR_RADIUS = self.blur_size
         if self.image_size:
-            ImageAberrationDetection.SKEW_IMAGE_DETECT_TARGET_SIZE = self.image_size
+            rotation_detection.SKEW_IMAGE_DETECT_TARGET_SIZE = self.image_size
         return old_params
 
 
-class TestImageAberrationDetection(TestCase):
+class Testrotation_detection(TestCase):
     """
     One can print a PDF file to images with the command
     gs -dBATCH -dNOPAUSE -sOutputFile=<out folder>/print-to-file.%d.png \
@@ -106,7 +106,7 @@ class TestImageAberrationDetection(TestCase):
         try:
             for file_name in file_names:
                 file_path = os.path.join(self.IMAGE_FOLDER, file_name)
-                angle = ImageAberrationDetection.detect_rotation_dilated_rows(file_path)
+                angle = rotation_detection.detect_rotation_dilated_rows(file_path)
                 y_hat.append(angle)
         finally:
             old_params.apply_params()
