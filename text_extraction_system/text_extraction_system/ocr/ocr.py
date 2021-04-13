@@ -1,6 +1,7 @@
 import os
 import shutil
 from contextlib import contextmanager
+from dataclasses import dataclass
 from logging import getLogger
 from subprocess import Popen, PIPE, TimeoutExpired
 from tempfile import mkdtemp
@@ -43,8 +44,6 @@ def ocr_page_to_pdf(page_image_fn: str,
             proc.kill()
             outs, errs = proc.communicate()
             raise OCRException(f'Timeout waiting for tesseract to finish:\n{args}') from te
-        if data:
-            data = data.decode('utf8', 'ignore')
 
         if err:
             err = err.decode('utf8', 'ignore')
@@ -91,3 +90,79 @@ def rotate_image(image_fn: str,
         yield dst_fn
     finally:
         shutil.rmtree(dst_dir)
+
+
+OSD_KEYS = {
+    'Page number': ('page_num', int),
+    'Orientation in degrees': ('orientation', int),
+    'Rotate': ('rotate', int),
+    'Orientation confidence': ('orientation_conf', float),
+    'Script': ('script', str),
+    'Script confidence': ('script_conf', float),
+}
+
+
+@dataclass
+class OSD:
+    page_num: int
+    orientation: int
+    rotate: int
+    orientation_conf: float
+    script: str
+    script_conf: float
+
+
+def osd_to_dict(osd: str):
+    res = dict()
+    for line in osd.split('\n'):
+        line_ar = line.split(':')
+        if not line_ar or len(line_ar) != 2:
+            continue
+        tess_key_str, tess_val_str = line_ar
+        (out_key, out_conv_func) = OSD_KEYS[tess_key_str.strip()]
+        res[out_key] = out_conv_func(tess_val_str.strip())
+    return res
+
+
+def image_to_osd(page_image_fn: str, timeout: int = 180) -> OSD:
+    proc = None
+    try:
+        args = ['tesseract', page_image_fn, 'stdout', '--psm', '0']
+        env = os.environ.copy()
+        log.debug(f'Executing tesseract: {args}')
+        proc = Popen(args, env=env, stdout=PIPE, stderr=PIPE)
+        try:
+            data, err = proc.communicate(timeout=timeout)
+        except TimeoutExpired as te:
+            proc.kill()
+            outs, errs = proc.communicate()
+            raise OCRException(f'Timeout waiting for tesseract to finish:\n{args}') from te
+
+        if err:
+            err = err.decode('utf8', 'ignore')
+        if data:
+            data = data.decode('utf8', 'ignore')
+
+        log.debug(f'{args}\nstdout:\n{data}stderr:\n{err}')
+        if proc.returncode != 0:
+            raise OCRException(f'Tesseract returned non-zero code.\n'
+                               f'Command line:\n'
+                               f'{args}\n'
+                               f'Process stdout:\n'
+                               f'{err}'
+                               f'Process stderr:\n'
+                               f'{err}')
+
+        return OSD(**osd_to_dict(data))
+    finally:
+        if proc is not None:
+            try:
+                proc.kill()
+            except:
+                pass
+
+
+def orientation_and_script_detected(image_fn: str) -> bool:
+    osd = image_to_osd(image_fn)
+
+    return osd.script and osd.script_conf > 1 and osd.orientation_conf > 1

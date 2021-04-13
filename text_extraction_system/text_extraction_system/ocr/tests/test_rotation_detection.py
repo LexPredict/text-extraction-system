@@ -37,11 +37,3 @@ def test_angle4():
     fn = os.path.join(data_dir, 'realdoc__00121.png')
     angle = determine_skew(fn)
     assert floor(abs(angle)) == 88
-
-
-@with_default_settings
-def test_angle5():
-    fn = os.path.join(data_dir, 'picture_angles__00003.png')
-    angle = determine_skew(fn)
-
-    assert floor(abs(angle)) == 0

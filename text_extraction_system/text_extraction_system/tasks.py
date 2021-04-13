@@ -313,23 +313,29 @@ def process_pdf_page_task(_task,
                                   deskew_enabled=req.deskew_enable,
                                   ocr_language=ocr_language) as page_proc_res:  # type: PDFPageProcessingResults
                 if page_proc_res.page_requires_ocr:
-                    if page_proc_res.ocred_page_rotation_angle:
-                        # if the ocred image has been rotated (de-skewed) then store it
-                        # with the file name consisting of the page number and the angle
-                        log.info(f'{original_file_name} | PDF page {page_number} is rotated at '
-                                 f'{page_proc_res.ocred_page_rotation_angle:.2f}...')
-                        webdav_client.upload_file(
-                            remote_path=f'{req.request_id}'
-                                        f'/{pages_ocred}'
-                                        f'/{page_num_to_fn(page_number)}.{page_proc_res.ocred_page_rotation_angle}.pdf',
-                            local_path=page_proc_res.ocred_page_fn)
-                    else:
-                        # if no angle - don't put it to the file name
-                        webdav_client.upload_file(
-                            remote_path=f'{req.request_id}'
-                                        f'/{pages_ocred}'
-                                        f'/{page_num_to_fn(page_number)}.pdf',
-                            local_path=page_proc_res.ocred_page_fn)
+
+                    if not page_proc_res.script_detected_on_page_image:
+                        log.info(f'{original_file_name} | PDF page {page_number} requires OCR but no script detected '
+                                 f'on the page image')
+
+                    if page_proc_res.script_detected_on_page_image:
+                        if page_proc_res.ocred_page_rotation_angle:
+                            # if the ocred image has been rotated (de-skewed) then store it
+                            # with the file name consisting of the page number and the angle
+                            log.info(f'{original_file_name} | PDF page {page_number} is rotated at '
+                                     f'{page_proc_res.ocred_page_rotation_angle:.2f}...')
+                            webdav_client.upload_file(
+                                remote_path=f'{req.request_id}'
+                                            f'/{pages_ocred}'
+                                            f'/{page_num_to_fn(page_number)}.{page_proc_res.ocred_page_rotation_angle}.pdf',
+                                local_path=page_proc_res.ocred_page_fn)
+                        else:
+                            # if no angle - don't put it to the file name
+                            webdav_client.upload_file(
+                                remote_path=f'{req.request_id}'
+                                            f'/{pages_ocred}'
+                                            f'/{page_num_to_fn(page_number)}.pdf',
+                                local_path=page_proc_res.ocred_page_fn)
                 if page_proc_res.camelot_tables:
                     webdav_client.pickle(page_proc_res.camelot_tables,
                                          f'{req.request_id}/{pages_tables}/{page_num_to_fn(page_number)}.pickle')
