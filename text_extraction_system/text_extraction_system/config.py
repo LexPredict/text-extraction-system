@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     delete_temp_files_on_request_finish: bool = True
     keep_failed_files: bool = False
     celery_shutdown_when_no_tasks_longer_than_sec: int = None
+    root_path: str = ''
 
     log_to_stdout: bool = True
     log_to_stdout_json: bool = True
