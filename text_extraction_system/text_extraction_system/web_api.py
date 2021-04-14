@@ -30,6 +30,7 @@ from text_extraction_system.constants import task_ids
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
 from text_extraction_system.request_metadata import RequestMetadata, RequestCallbackInfo, save_request_metadata, \
     load_request_metadata
+from text_extraction_system.config import get_settings
 from text_extraction_system.tasks import process_document, celery_app, register_task_id, get_request_task_ids
 from text_extraction_system_api import dto
 from text_extraction_system_api.dto import OutputFormat, TableList, PlainTextStructure, RequestStatus, \
@@ -52,7 +53,8 @@ templates = Jinja2Templates(directory="text_extraction_system/templates")
 
 @app.get("/", tags=['Others'])
 async def redirect_to_swagger_ui(request: Request):
-    return RedirectResponse(url='/docs')
+    root_path = get_settings().root_path
+    return RedirectResponse(url=f'{root_path}/docs')
     # Disabling own UI until we get better design
     # return templates.TemplateResponse("index.html", {"request": request})
 
