@@ -1,5 +1,3 @@
-import numpy as np
-import math
 import os
 import tempfile
 from collections import Counter
@@ -10,7 +8,7 @@ from typing import Optional
 import cv2
 import deskew
 from PIL import Image as PilImage
-from PIL import ImageOps
+
 from text_extraction_system.ocr.ocr import image_to_osd
 
 # used in detect_rotation_dilated_rows() - "ideal" image size for resizing code
@@ -27,40 +25,26 @@ IMAGE_PART_SIZE = 500
 
 
 def detect_rotation_dilated_rows(image_fn: str, pre_calculated_orientation: Optional[int] = None) -> Optional[float]:
-    # make file grayscale and not too large
-    src_image: PilImage.Image = PilImage.open(image_fn)
-    orientation = None
-    if pre_calculated_orientation is not None:
-        orientation = pre_calculated_orientation
-    else:
-        osd = image_to_osd(image_fn)
-        orientation = osd.orientation if osd.orientation_conf > 1 else 0
-
-    if orientation:
-        img = src_image.rotate(orientation, expand=True)
-    else:
-        img = src_image
-
-    img_gray: PilImage = ImageOps.grayscale(img)
-    min_size = min(img_gray.size[0], img_gray.size[1])
-    img_area = img_gray.size[0] * img_gray.size[1]
-    scale_k = math.pow(1.0 * (SKEW_IMAGE_DETECT_TARGET_SIZE[0] *
-                              SKEW_IMAGE_DETECT_TARGET_SIZE[1]) / img_area, 0.5)
-    new_min_size = int(min_size * scale_k)
-    new_min_size = max(new_min_size, min(min_size, MIN_IMAGE_DIMENSION))
-    scale_k = new_min_size / min_size
-    new_size = int(scale_k * img_gray.size[0]), int(scale_k * img_gray.size[1])
-    img_gray.thumbnail(new_size, PilImage.ANTIALIAS)
-
-    _new_file, filename = tempfile.mkstemp('.png')
+    filename = None
     try:
-        img_gray.save(filename)
+        if pre_calculated_orientation is not None:
+            orientation = pre_calculated_orientation
+        else:
+            osd = image_to_osd(image_fn)
+            orientation = osd.orientation if osd.orientation_conf > 1 else 0
+
+        if orientation:
+            _new_file, filename = tempfile.mkstemp('.png')
+            src_image: PilImage.Image = PilImage.open(image_fn)
+            src_image.rotate(orientation, expand=True).save(filename)
+            image_fn = filename
+
         # Prep image, copy, convert to gray scale, blur, and threshold
-        gray = cv2.imread(filename, 0)
+        gray = cv2.imread(image_fn, 0)
         # ksize (9, 9) is OK... (11, 11) is maybe even better
         blur = cv2.GaussianBlur(gray, (IMAGE_BLUR_RADIUS, IMAGE_BLUR_RADIUS), 0)
         thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-
+        cv2.imwrite('/tmp/111.png', thresh)
         # Apply dilate to merge text into meaningful lines/paragraphs.
         # Use larger kernel on X axis to merge characters into single line, cancelling out any spaces.
         # But use smaller kernel on Y axis to separate between different blocks of text
@@ -82,7 +66,8 @@ def detect_rotation_dilated_rows(image_fn: str, pre_calculated_orientation: Opti
         angle = norm_angle(orientation + angle)
         return angle
     finally:
-        os.remove(filename)
+        if filename:
+            os.remove(filename)
 
 
 def detect_rotation_using_skewlib(image_fn: str) -> Optional[float]:
@@ -152,7 +137,7 @@ def determine_skew(image_fn: str,
     angle = _methods[detecting_method](image_fn)
     angle = norm_angle(angle)
 
-    if abs(angle - 90*round(angle / 90)) <= max_diff_from_closest_90:
+    if abs(angle - 90 * round(angle / 90)) <= max_diff_from_closest_90:
         return angle
     else:
         return None
