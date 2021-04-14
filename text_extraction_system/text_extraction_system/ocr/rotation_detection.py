@@ -44,7 +44,6 @@ def detect_rotation_dilated_rows(image_fn: str, pre_calculated_orientation: Opti
         # ksize (9, 9) is OK... (11, 11) is maybe even better
         blur = cv2.GaussianBlur(gray, (IMAGE_BLUR_RADIUS, IMAGE_BLUR_RADIUS), 0)
         thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-        cv2.imwrite('/tmp/111.png', thresh)
         # Apply dilate to merge text into meaningful lines/paragraphs.
         # Use larger kernel on X axis to merge characters into single line, cancelling out any spaces.
         # But use smaller kernel on Y axis to separate between different blocks of text
