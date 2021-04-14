@@ -68,10 +68,25 @@ def test_angle4_dilated_rows():
 
 
 @with_default_settings
+def test_angle5():
+    fn = os.path.join(data_dir, 'two_vertical_lines.png')
+    angle = determine_skew(fn)
+    # actually should be 0 but this image will not be rotated because it does not pass OSD check
+    assert int(angle) == -89
+
+
+@with_default_settings
 def test_angle5_dilated_rows():
     fn = os.path.join(data_dir, 'two_vertical_lines.png')
     angle = detect_rotation_dilated_rows(fn, pre_calculated_orientation=None)
     assert int(angle) == 0
+
+
+@with_default_settings
+def test_angle6():
+    fn = os.path.join(data_dir, 'not_rotated1.png')
+    angle = determine_skew(fn)
+    assert int(angle) == -1
 
 
 @with_default_settings
