@@ -1,3 +1,4 @@
+import numpy as np
 import math
 import os
 import tempfile
@@ -16,7 +17,7 @@ from text_extraction_system.ocr.ocr import image_to_osd
 SKEW_IMAGE_DETECT_TARGET_SIZE = 960, 1200
 
 # used in detect_rotation_dilated_rows() to blur the image before applying binary filter
-IMAGE_BLUR_RADIUS = 5
+IMAGE_BLUR_RADIUS = 11
 
 # used in determine_skew_dilated_rows() - min image dimension after resizing
 MIN_IMAGE_DIMENSION = 200
