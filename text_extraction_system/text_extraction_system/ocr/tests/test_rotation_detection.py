@@ -50,7 +50,7 @@ def test_angle3_dilated_rows():
     fn = os.path.join(data_dir, 'rotated_small_angle.pdf')
     with extract_page_images(fn, 1, 1) as png_fns:
         angle = detect_rotation_dilated_rows(png_fns[0], pre_calculated_orientation=None)
-        assert int(angle) == -2
+        assert int(angle) == -1
 
 
 @with_default_settings
@@ -84,13 +84,21 @@ def test_angle5_dilated_rows():
 
 @with_default_settings
 def test_angle6():
+    from datetime import datetime
+    start = datetime.now()
     fn = os.path.join(data_dir, 'not_rotated1.png')
     angle = determine_skew(fn)
+    d = datetime.now() - start
+    print(f'Time: {d}')
     assert int(angle) == -1
 
 
 @with_default_settings
 def test_angle6_dilated_rows():
+    from datetime import datetime
+    start = datetime.now()
     fn = os.path.join(data_dir, 'not_rotated1.png')
     angle = detect_rotation_dilated_rows(fn, pre_calculated_orientation=None)
-    assert int(angle) == 3
+    d = datetime.now() - start
+    print(f'Time: {d}')
+    assert int(angle) == 0
