@@ -1,7 +1,9 @@
 import logging
 import os
+import zipfile
 
 from text_extraction_system_api.client import TextExtractionSystemWebClient
+from text_extraction_system_api.dto import RequestStatus
 from .testing_config import test_settings
 
 log = logging.getLogger(__name__)
@@ -28,7 +30,11 @@ certain angle 5. This is a text rotated at a certain angle 6. This is a text rot
 
 
 def test_extract_text_rotated3():
-    fn = os.path.join(os.path.dirname(__file__), 'data', 'picture_angles__00003.png')
+    fn = os.path.join(os.path.dirname(__file__), 'data', 'wrong_angle1.pdf')
     client = TextExtractionSystemWebClient(test_settings.api_url)
-    text = client.extract_plain_text_from_document(fn)
-    assert not text.strip()
+    with client.extract_all_data_from_document(fn) as zip_fn:
+        with zipfile.ZipFile(zip_fn, 'r') as archive:
+            with archive.open('status.json', 'r') as status_f:
+                s = status_f.read()
+                req_status: RequestStatus = RequestStatus.from_json(s)
+                assert int(req_status.page_rotate_angles[1]) == 3

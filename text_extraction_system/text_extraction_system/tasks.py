@@ -391,11 +391,26 @@ def finish_pdf_processing(task,
             # file names of the pages at webdav are generated in process_pdf_page_task(..) as:
             # either <page_num>.<rotation_angle>.pdf
             # or <page_num>.pdf if there is no page rotation detected
+            page_rotate_angles: Dict[int, float] = dict()
+
             for remote_base_fn in webdav_client.list(f'{request_id}/{pages_ocred}'):
                 remote_page_pdf_fn = f'{req.request_id}/{pages_ocred}/{remote_base_fn}'
                 local_page_pdf_fn = os.path.join(pages_dir, remote_base_fn)
                 webdav_client.download_file(remote_page_pdf_fn, local_page_pdf_fn)
+
+                # Page file names consist of <page_number>.<float_page_rotate_angle>.pdf
+                # Example: 00001.0.5299606323242188.pdf
+                remote_base_fn_no_ext = os.path.splitext(remote_base_fn)[0]
+                page_rotate = remote_base_fn_no_ext.split('.')
+                if len(page_rotate) > 1:
+                    page_num = int(page_rotate[0])
+                    page_rotate_angle = float(remote_base_fn_no_ext[len(page_rotate[0]) + 1:])
+                    page_rotate_angles[page_num] = page_rotate_angle
+
                 requires_page_merge = True
+
+            if page_rotate_angles:
+                req.page_rotate_angles = page_rotate_angles
 
             if requires_page_merge:
                 original_pdf_in_storage = req.converted_to_pdf or req.original_document

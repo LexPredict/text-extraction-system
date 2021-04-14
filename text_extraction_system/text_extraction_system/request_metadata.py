@@ -66,6 +66,8 @@ class RequestMetadata:
     convert_to_pdf_timeout_sec: int = 1800
     pdf_to_images_timeout_sec: int = 1800
 
+    page_rotate_angles: Optional[Dict[int, float]] = None
+
     def append_error(self, problem: str, exc: Exception):
         error_message: List[str] = list()
         if self.error_message:
@@ -90,7 +92,8 @@ class RequestMetadata:
             text_structure_extracted=self.text_structure_file is not None,
             pdf_coordinates_extracted=self.pdf_coordinates_file is not None,
             additional_info=self.request_callback_info.call_back_additional_info,
-            output_format=self.output_format
+            output_format=self.output_format,
+            page_rotate_angles=self.page_rotate_angles
         )
 
 

@@ -45,6 +45,7 @@ class RequestStatus:
     pdf_coordinates_extracted: bool = False
     tables_extracted: bool = False
     additional_info: Optional[str] = None
+    page_rotate_angles: Optional[Dict[int, float]] = None
 
 
 @pydantic_dataclass

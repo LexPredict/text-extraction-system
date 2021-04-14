@@ -2,10 +2,8 @@ import io
 import os
 import pickle
 import tempfile
-import zipfile
 from contextlib import contextmanager
 from io import BytesIO
-from shutil import rmtree
 from typing import Optional, Any, List
 
 from webdav3.client import Client, wrap_connection_error, Urn, MethodNotSupported, WebDavXmlUtils, \
@@ -82,28 +80,15 @@ class WebDavClient(Client):
                 local_file.write(block)
 
     @wrap_connection_error
-    def download_packed_files(self, remote_paths: List[str]) -> io.BytesIO:
+    def download_files(self, remote_paths: List[str], dst_dir: str) -> io.BytesIO:
         # copy-pasted from the webdav lib with the non-needed additional http queries returned
-        temp_dir = tempfile.mkdtemp()
-        try:
-            for remote_path in remote_paths:
-                urn = Urn(remote_path)
-                file_name = os.path.join(temp_dir, os.path.basename(remote_path))
-                with open(file_name, 'wb') as local_file:
-                    response = self.execute_request('download', urn.quote())
-                    for block in response.iter_content(1024):
-                        local_file.write(block)
-
-            mem_stream = io.BytesIO()
-            with zipfile.ZipFile(mem_stream, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-                for name_only in os.listdir(temp_dir):
-                    fn = os.path.join(temp_dir, name_only)
-                    if not os.path.isfile(fn):
-                        continue
-                    zip_file.write(fn, arcname=name_only)
-            return mem_stream
-        finally:
-            rmtree(temp_dir)
+        for remote_path in remote_paths:
+            urn = Urn(remote_path)
+            file_name = os.path.join(dst_dir, os.path.basename(remote_path))
+            with open(file_name, 'wb') as local_file:
+                response = self.execute_request('download', urn.quote())
+                for block in response.iter_content(1024):
+                    local_file.write(block)
 
     @wrap_connection_error
     def upload_file(self, remote_path, local_path, progress=None):

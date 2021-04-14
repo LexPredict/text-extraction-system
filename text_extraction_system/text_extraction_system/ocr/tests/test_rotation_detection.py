@@ -72,3 +72,10 @@ def test_angle5_dilated_rows():
     fn = os.path.join(data_dir, 'two_vertical_lines.png')
     angle = detect_rotation_dilated_rows(fn, pre_calculated_orientation=None)
     assert int(angle) == 0
+
+
+@with_default_settings
+def test_angle6_dilated_rows():
+    fn = os.path.join(data_dir, 'not_rotated1.png')
+    angle = detect_rotation_dilated_rows(fn, pre_calculated_orientation=None)
+    assert int(angle) == 3
