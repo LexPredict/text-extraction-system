@@ -14,6 +14,7 @@ from zipfile import ZipFile
 
 import pandas
 from fastapi import FastAPI, File, UploadFile, Form, Response, APIRouter
+from starlette.responses import RedirectResponse
 from fastapi.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import StreamingResponse
@@ -49,19 +50,23 @@ app.include_router(
 templates = Jinja2Templates(directory="text_extraction_system/templates")
 
 
-@app.get("/")
-async def serve_spa_slash(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+@app.get("/", tags=['Others'])
+async def redirect_to_swagger_ui(request: Request):
+    return RedirectResponse(url='/docs')
+    # Disabling own UI until we get better design
+    # return templates.TemplateResponse("index.html", {"request": request})
 
 
-@app.get("")
-async def serve_spa_root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+# @app.get("")
+# async def serve_spa_root(request: Request):
+#    return RedirectResponse(url='/api/docs')
+# Disabling own UI until we get better design
+# return templates.TemplateResponse("index.html", {"request": request})
 
 
-@app.get("/page-{rest_of_path:path}")
-async def serve_spa_rest(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+# @app.get("/page-{rest_of_path:path}")
+# async def serve_spa_rest(request: Request):
+#    return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.post('/api/v1/data_extraction_tasks/', response_model=str, tags=["Asynchronous Data Extraction"])
