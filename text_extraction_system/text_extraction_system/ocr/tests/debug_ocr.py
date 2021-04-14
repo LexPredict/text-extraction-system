@@ -25,11 +25,11 @@ def p2():
     from text_extraction_system.ocr.rotation_detection import determine_skew
     import shutil
     orig_pdf_fn = '/home/mikhail/Downloads/AE1EE27511E2AA211E2D29E27AA4C0D01.pdf'
-    page = 2
+    page = 68
     with split_pdf_to_page_blocks(orig_pdf_fn, 1) as page_fns:
-        shutil.copy(page_fns[page - 1], '/home/mikhail/lexpredict/misc/angles/no_text.pdf')
+        shutil.copy(page_fns[page - 1], '/home/mikhail/lexpredict/misc/angles/wrong_angle1.pdf')
 
-    with extract_page_ocr_images(orig_pdf_fn, 2, 3, dpi=300) as images:
+    with extract_page_ocr_images(orig_pdf_fn, 68, 68, dpi=300) as images:
         angle = determine_skew(images[0][1])
         with rotate_image(images[0][1], angle, 300, align_to_closest_90=True) as rotated_or_original_image_fn:
             with ocr_page_to_pdf(rotated_or_original_image_fn,

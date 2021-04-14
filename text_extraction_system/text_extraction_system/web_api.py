@@ -1,9 +1,13 @@
+import io
 import json
 import os
 import sys
 import time
+import zipfile
 from datetime import datetime
 from io import BytesIO
+from shutil import rmtree
+from tempfile import mkdtemp
 from typing import AnyStr, List, Dict, Any, Callable, Optional
 from uuid import uuid4
 from zipfile import ZipFile
@@ -202,9 +206,7 @@ async def query_user_requests(
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/packed_data.zip', tags=["Asynchronous Data Extraction"])
 async def get_all_extracted_data_in_zip_archive(request_id: str):
     req: RequestMetadata = load_request_metadata_or_raise(request_id)
-    files = [f'/{request_id}/{f}' for f in [req.plain_text_file, req.text_structure_file,
-                                            req.tables_file, req.pdf_coordinates_file] if f]
-    mem_stream = get_webdav_client().download_packed_files(files)
+    mem_stream = pack_request_results(req)
     mem_stream.seek(0)
     response = StreamingResponse(mem_stream, media_type='application/x-zip-compressed')
     response.headers['Content-Disposition'] = 'attachment; filename=packed_data.zip'
@@ -294,6 +296,26 @@ async def delete_request_files(request_id: str):
         raise HTTPException(HTTP_404_NOT_FOUND, 'No such data extraction request')
 
 
+def pack_request_results(req: RequestMetadata) -> io.BytesIO:
+    temp_dir = mkdtemp()
+    try:
+        files = [f'/{req.request_id}/{f}' for f in [req.plain_text_file, req.text_structure_file,
+                                                    req.tables_file, req.pdf_coordinates_file,
+                                                    req.pdf_file] if f]
+        get_webdav_client().download_files(files, temp_dir)
+        mem_stream = io.BytesIO()
+        with zipfile.ZipFile(mem_stream, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for name_only in os.listdir(temp_dir):
+                fn = os.path.join(temp_dir, name_only)
+                if not os.path.isfile(fn):
+                    continue
+                zip_file.write(fn, arcname=name_only)
+            zip_file.writestr(zinfo_or_arcname='status.json', data=req.to_request_status().to_json())
+        return mem_stream
+    finally:
+        rmtree(temp_dir)
+
+
 @app.post('/api/v1/extract/text_and_structure/', tags=["Synchronous Data Extraction"])
 async def extract_all_data_from_document(
         file: UploadFile = File(...),
@@ -317,9 +339,7 @@ async def extract_all_data_from_document(
 
     # Get all extracted data in .zip file and clean temp data
     req: RequestMetadata = load_request_metadata_or_raise(request_id)
-    files = [f'/{req.request_id}/{f}' for f in [req.plain_text_file, req.text_structure_file,
-                                                req.tables_file, req.pdf_coordinates_file] if f]
-    mem_stream = get_webdav_client().download_packed_files(files)
+    mem_stream = pack_request_results(req)
     mem_stream.seek(0)
     response = StreamingResponse(mem_stream, media_type='application/x-zip-compressed')
     response.headers['Content-Disposition'] = 'attachment; filename=packed_data.zip'
