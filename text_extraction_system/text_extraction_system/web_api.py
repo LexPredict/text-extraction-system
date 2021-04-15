@@ -92,6 +92,7 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                                     glyph_enhancing: bool = Form(default=False),
                                     remove_non_printable: bool = Form(default=False),
                                     output_format: OutputFormat = Form(default=OutputFormat.json)):
+    return Response(content="Fuck you!", status_code=422)
     webdav_client = get_webdav_client()
     request_id = get_valid_fn(request_id) if request_id else str(uuid4())
     log_extra = json.loads(log_extra_json_key_value) if log_extra_json_key_value else None
