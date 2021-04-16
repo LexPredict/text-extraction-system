@@ -138,7 +138,7 @@ class PlainTextStructure:
 @dataclass_json
 @dataclass
 class PDFCoordinates:
-    char_bboxes_with_page_nums: List[List[float]]
+    char_bboxes: List[List[float]]
 
 
 @pydantic_dataclass

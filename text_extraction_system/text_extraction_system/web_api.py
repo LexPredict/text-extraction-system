@@ -14,9 +14,9 @@ from zipfile import ZipFile
 
 import pandas
 from fastapi import FastAPI, File, UploadFile, Form, Response, APIRouter
-from starlette.responses import RedirectResponse
 from fastapi.exceptions import HTTPException
 from starlette.requests import Request
+from starlette.responses import RedirectResponse
 from starlette.responses import StreamingResponse
 from starlette.staticfiles import StaticFiles
 from starlette.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
@@ -26,11 +26,11 @@ from webdav3.exceptions import RemoteResourceNotFound
 from text_extraction_system import version
 from text_extraction_system.celery_log import HumanReadableTraceBackException
 from text_extraction_system.commons.escape_utils import get_valid_fn
+from text_extraction_system.config import get_settings
 from text_extraction_system.constants import task_ids
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
 from text_extraction_system.request_metadata import RequestMetadata, RequestCallbackInfo, save_request_metadata, \
     load_request_metadata
-from text_extraction_system.config import get_settings
 from text_extraction_system.tasks import process_document, celery_app, register_task_id, get_request_task_ids
 from text_extraction_system_api import dto
 from text_extraction_system_api.dto import OutputFormat, TableList, PlainTextStructure, RequestStatus, \
@@ -89,8 +89,6 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                                     log_extra_json_key_value: str = Form(default=None),
                                     convert_to_pdf_timeout_sec: int = Form(default=1800),
                                     pdf_to_images_timeout_sec: int = Form(default=1800),
-                                    glyph_enhancing: bool = Form(default=False),
-                                    remove_non_printable: bool = Form(default=False),
                                     output_format: OutputFormat = Form(default=OutputFormat.json)):
     webdav_client = get_webdav_client()
     request_id = get_valid_fn(request_id) if request_id else str(uuid4())
@@ -123,7 +121,7 @@ async def post_data_extraction_task(file: UploadFile = File(...),
     save_request_metadata(req)
     webdav_client.upload_to(file.file, f'{req.request_id}/{req.original_document}')
     async_task = process_document.apply_async(
-        (req.request_id, req.request_callback_info, glyph_enhancing, remove_non_printable))
+        (req.request_id, req.request_callback_info))
 
     webdav_client.mkdir(f'{req.request_id}/{task_ids}')
     register_task_id(webdav_client, req.request_id, async_task.id)
@@ -330,14 +328,12 @@ async def extract_all_data_from_document(
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
         full_extract_timeout_sec: int = Form(default=3600),
-        glyph_enhancing: bool = Form(default=False),
-        remove_non_printable: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
 ):
     webdav_client = get_webdav_client()
     request_id = str(uuid4())
     _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
-                             pdf_to_images_timeout_sec, glyph_enhancing, remove_non_printable, output_format)
+                             pdf_to_images_timeout_sec, output_format)
 
     # Wait until celery finishes extracting else return TimeoutError
     if not _wait_for_pdf_extraction_finish(request_id, full_extract_timeout_sec):
@@ -361,14 +357,12 @@ async def extract_plain_text_from_document(
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
         full_extract_timeout_sec: int = Form(default=3600),
-        glyph_enhancing: bool = Form(default=False),
-        remove_non_printable: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
 ):
     webdav_client = get_webdav_client()
     request_id = str(uuid4())
     _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
-                             pdf_to_images_timeout_sec, glyph_enhancing, remove_non_printable, output_format)
+                             pdf_to_images_timeout_sec, output_format)
 
     # Wait until celery finishes extracting else return TimeoutError
     if not _wait_for_pdf_extraction_finish(request_id, full_extract_timeout_sec):
@@ -390,14 +384,12 @@ async def extract_text_from_document_and_generate_searchable_pdf(
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
         full_extract_timeout_sec: int = Form(default=3600),
-        glyph_enhancing: bool = Form(default=False),
-        remove_non_printable: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
 ):
     webdav_client = get_webdav_client()
     request_id = str(uuid4())
     _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
-                             pdf_to_images_timeout_sec, glyph_enhancing, remove_non_printable, output_format)
+                             pdf_to_images_timeout_sec, output_format)
 
     # Wait until celery finishes extracting else return TimeoutError
     if not _wait_for_pdf_extraction_finish(request_id, full_extract_timeout_sec):
@@ -492,8 +484,6 @@ def _run_sync_pdf_processing(webdav_client, request_id: str,
                              doc_language: str,
                              convert_to_pdf_timeout_sec: int,
                              pdf_to_images_timeout_sec: int,
-                             glyph_enhancing: bool,
-                             remove_non_printable: bool,
                              output_format: OutputFormat):
     """Run celery tasks to extract data from document
     """
@@ -512,6 +502,6 @@ def _run_sync_pdf_processing(webdav_client, request_id: str,
     save_request_metadata(req)
     webdav_client.upload_to(file.file, f'{req.request_id}/{req.original_document}')
     async_task = process_document.apply_async(
-        (req.request_id, req.request_callback_info, glyph_enhancing, remove_non_printable))
+        (req.request_id, req.request_callback_info))
     webdav_client.mkdir(f'{req.request_id}/{task_ids}')
     register_task_id(webdav_client, req.request_id, async_task.id)

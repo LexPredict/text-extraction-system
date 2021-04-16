@@ -36,7 +36,7 @@ public class TestMergeInPageLayers extends TestCase {
 
             try (PDDocument document = PDDocument.load(fDst, (String) null)) {
                 PDFPlainText res = PDFToTextWithCoordinates
-                        .process(document, true, true);
+                        .process(document);
                 assertTrue(res.text.contains("Never in history has private"));
             }
 
@@ -70,7 +70,7 @@ public class TestMergeInPageLayers extends TestCase {
 
             try (PDDocument document = PDDocument.load(fDst, (String) null)) {
                 PDFPlainText res = PDFToTextWithCoordinates
-                        .process(document, true, true);
+                        .process(document);
                 assertTrue(res.text.contains("Never in history has private"));
             }
 
@@ -105,7 +105,7 @@ public class TestMergeInPageLayers extends TestCase {
 
             try (PDDocument document = PDDocument.load(fDst, (String) null)) {
                 PDFPlainText res = PDFToTextWithCoordinates
-                        .process(document, true, true);
+                        .process(document);
                 assertTrue(res.text.contains("Allegan General Hospital"));
             }
 

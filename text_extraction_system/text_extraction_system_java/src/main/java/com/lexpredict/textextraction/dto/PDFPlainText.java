@@ -6,7 +6,7 @@ public class PDFPlainText {
 
     public String text;
 
-    public List<double[]> charBBoxesWithPageNums;
+    public List<double[]> charBBoxes;
 
     public List<PDFPlainTextPage> pages;
 
