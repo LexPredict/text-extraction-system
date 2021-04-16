@@ -20,6 +20,8 @@ import org.apache.pdfbox.text.TextPosition;
 import org.apache.pdfbox.util.Matrix;
 import org.xml.sax.SAXException;
 
+import java.awt.*;
+import java.awt.geom.AffineTransform;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
@@ -41,25 +43,21 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
     protected List<PDFPlainTextPage> pages;
 
-    protected List<double[]> charBBoxesWithPageNums;
+    protected List<double[]> charBBoxes;
 
     protected int curPageStartOffset;
+
+    protected AffineTransform curCharBackTransform;
 
     protected boolean enhancedSizeDetection = false;
 
     protected boolean removeNonPrintable = false;
 
-    private int ignoreAnglesCloserThan = 3;
+    protected int ignoreAnglesCloserThan = 3;
+
+    protected boolean detectAngles = false;
 
     private double[] curAngleLimits = null;
-
-    public int getIgnoreAnglesCloserThan() {
-        return ignoreAnglesCloserThan;
-    }
-
-    public void setIgnoreAnglesCloserThan(int ignoreAnglesCloserThan) {
-        this.ignoreAnglesCloserThan = ignoreAnglesCloserThan;
-    }
 
     protected double r(double d) {
         BigDecimal bd = BigDecimal.valueOf(d);
@@ -88,7 +86,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     @Override
     protected void startPage(PDPage page) throws IOException {
         super.startPage(page);
-        this.curPageStartOffset = this.charBBoxesWithPageNums == null ? 0 : this.charBBoxesWithPageNums.size();
+        this.curPageStartOffset = this.charBBoxes == null ? 0 : this.charBBoxes.size();
     }
 
     @Override
@@ -200,13 +198,20 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
                 continue;
             if (symbol.length() > 1) {
                 symbol = symbol.substring(0, 2);
-                this.charBBoxesWithPageNums.add(glyphBox);
+                this.charBBoxes.add(restoreAngle(glyphBox));
             }
             sb.append(symbol);
 
-            this.charBBoxesWithPageNums.add(glyphBox);
+            this.charBBoxes.add(restoreAngle(glyphBox));
         }
         super.writeString(sb.toString(), textPositions);
+    }
+
+    protected double[] restoreAngle(double[] bbox) {
+        if (this.curCharBackTransform != null) {
+            this.curCharBackTransform.transform(bbox, 0, bbox, 0, 1);
+        }
+        return bbox;
     }
 
     protected double[] getEnhancedGlyphBox(TextPosition pos) throws IOException {
@@ -226,7 +231,6 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         y -= ascAbs;
 
         return new double[]{
-                getCurrentPageNo() - 1,
                 r(pos.getX()), r(y),
                 r(pos.getWidth()), r(capHtAbs)};
     }
@@ -234,7 +238,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     protected void addNonPrintableCharBoxes(String nonPrintableText) {
         if (nonPrintableText != null && !nonPrintableText.isEmpty()) {
             for (int i = 0; i < nonPrintableText.length(); i++) {
-                this.charBBoxesWithPageNums.add(new double[]{0, 0, 0, 0});
+                this.charBBoxes.add(new double[]{0, 0, 0, 0});
             }
         }
     }
@@ -296,7 +300,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     static class AngleCollector extends PDFTextStripper {
         Set<Integer> angles = new HashSet<>();
 
-        private int ignoreAnglesCloserThan;
+        private final int ignoreAnglesCloserThan;
 
         public Set<Integer> getAngles() {
             return angles;
@@ -355,45 +359,65 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     @Override
     public void processPage(PDPage page) throws IOException {
         // based on the code from ExtractText of PDFBox
-        int pageStart = this.charBBoxesWithPageNums == null ? 0 : this.charBBoxesWithPageNums.size();
-        AngleCollector angleCollector = new AngleCollector(this.ignoreAnglesCloserThan);
-        angleCollector.setStartPage(getCurrentPageNo());
-        angleCollector.setEndPage(getCurrentPageNo());
-        angleCollector.getText(document);
-        angleCollector.cleanupAngles();
-        int rotation = page.getRotation();
-        page.setRotation(0);
+        int pageStart = this.charBBoxes == null ? 0 : this.charBBoxes.size();
 
-        for (Integer angle : angleCollector.getAngles()) {
-            this.curAngleLimits = angleCollector.getLimitsByAngle(angle);
-            if (angle == 0) {
-                super.processPage(page);
-            } else {
-                // prepend a transformation
-                try (PDPageContentStream cs = new PDPageContentStream(document,
-                        page, PDPageContentStream.AppendMode.PREPEND, false)) {
-                    cs.transform(Matrix.getRotateInstance(-Math.toRadians(angle), 0, 0));
+        if (this.detectAngles) {
+            PDRectangle cropBox = page.getCropBox();
+            AngleCollector angleCollector = new AngleCollector(this.ignoreAnglesCloserThan);
+            angleCollector.setStartPage(getCurrentPageNo());
+            angleCollector.setEndPage(getCurrentPageNo());
+            angleCollector.getText(document);
+            angleCollector.cleanupAngles();
+            int rotation = page.getRotation();
+            page.setRotation(0);
+
+            for (Integer angle : angleCollector.getAngles()) {
+                this.curAngleLimits = angleCollector.getLimitsByAngle(angle);
+                if (angle == 0) {
+                    super.processPage(page);
+                } else {
+                    // prepend a transformation
+                    try (PDPageContentStream cs = new PDPageContentStream(document,
+                            page, PDPageContentStream.AppendMode.PREPEND, false)) {
+                        Matrix m = Matrix.getRotateInstance(-Math.toRadians(angle), 0, 0);
+                        double[] zeroBefore = new double[]{cropBox.getLowerLeftX(), cropBox.getLowerLeftY()};
+                        Rectangle r = cropBox.transform(m).getBounds();
+                        double[] zeroAfter = new double[]{r.x, r.y};
+
+                        double tx = (zeroBefore[0] - zeroAfter[0]) / 2;
+                        double ty = (zeroBefore[1] - zeroAfter[1]) / 2;
+                        m = Matrix.getRotateInstance(-Math.toRadians(angle), (float) tx, (float) ty);
+                        cs.transform(m);
+
+                        this.curCharBackTransform = m.createAffineTransform();
+                    }
+                    super.processPage(page);
+                    // remove transformation
+                    COSArray contents = (COSArray) page.getCOSObject().getItem(COSName.CONTENTS);
+                    contents.remove(0);
                 }
-                super.processPage(page);
-                // remove transformation
-                COSArray contents = (COSArray) page.getCOSObject().getItem(COSName.CONTENTS);
-                contents.remove(0);
+                this.curAngleLimits = null;
             }
-            this.curAngleLimits = null;
+            page.setRotation(rotation);
+        } else {
+            super.processPage(page);
         }
-        page.setRotation(rotation);
 
         PDRectangle area = page.getMediaBox();
         PDFPlainTextPage pp = new PDFPlainTextPage();
         pp.bbox = new double[]{r(area.getLowerLeftX()), r(area.getLowerLeftY()),
                 r(area.getWidth()), r(area.getHeight())};
-        int pageEnd = this.charBBoxesWithPageNums == null ? 0 : this.charBBoxesWithPageNums.size();
+        int pageEnd = this.charBBoxes == null ? 0 : this.charBBoxes.size();
         pp.location = new int[]{pageStart, pageEnd};
         this.pages.add(pp);
     }
 
     @Override
     protected void processTextPosition(TextPosition text) {
+        if (!this.detectAngles) {
+            super.processTextPosition(text);
+            return;
+        }
         Matrix m = text.getTextMatrix();
         m.concatenate(text.getFont().getFontMatrix());
         double angle = normAngle(Math.toDegrees(Math.atan2(m.getShearY(), m.getScaleY())));
@@ -402,23 +426,20 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             super.processTextPosition(text);
     }
 
-    public static PDFPlainText process(PDDocument document,
-                                       boolean enhancedSizeDetection,
-                                       boolean removeNonPrintable) throws Exception {
-        return process(document, -1, Integer.MAX_VALUE, enhancedSizeDetection, removeNonPrintable);
+    public static PDFPlainText process(PDDocument document) throws Exception {
+        return process(document, -1, Integer.MAX_VALUE);
     }
 
     public static PDFPlainText process(PDDocument document,
                                        int startPage,
-                                       int endPage,
-                                       boolean enhancedSizeDetection,
-                                       boolean removeNonPrintable) throws Exception {
+                                       int endPage) throws Exception {
         PDFToTextWithCoordinates pdf2text = new PDFToTextWithCoordinates();
         pdf2text.document = document;
         pdf2text.output = new StringWriter();
-        pdf2text.charBBoxesWithPageNums = new ArrayList<>();
+        pdf2text.charBBoxes = new ArrayList<>();
         pdf2text.pages = new ArrayList<>();
         pdf2text.setStartPage(startPage);
+        pdf2text.detectAngles = true;
         pdf2text.setEndPage(endPage);
         pdf2text.setAddMoreFormatting(true);
         pdf2text.setParagraphEnd("\n");
@@ -429,8 +450,8 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         pdf2text.setSortByPosition(false);
 
         pdf2text.setShouldSeparateByBeads(true);
-        pdf2text.enhancedSizeDetection = enhancedSizeDetection;
-        pdf2text.removeNonPrintable = removeNonPrintable;
+        pdf2text.enhancedSizeDetection = false;
+        pdf2text.removeNonPrintable = true;
 
         // This prevents false-matches in paragraph detection
         // See TestPDF2Text.test_paragraphs()
@@ -447,7 +468,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         PDFPlainText res = new PDFPlainText();
         res.text = pdf2text.output.toString();
         res.pages = pdf2text.pages;
-        res.charBBoxesWithPageNums = pdf2text.charBBoxesWithPageNums;
+        res.charBBoxes = pdf2text.charBBoxes;
         return res;
     }
 }

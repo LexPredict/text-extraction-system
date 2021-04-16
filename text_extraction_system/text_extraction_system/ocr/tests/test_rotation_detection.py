@@ -102,3 +102,17 @@ def test_angle6_dilated_rows():
     d = datetime.now() - start
     print(f'Time: {d}')
     assert int(angle) == 0
+
+
+@with_default_settings
+def test_angle7():
+    fn = os.path.join(data_dir, 'wrong_angle1.png')
+    angle = determine_skew(fn)
+    assert int(angle) == 2
+
+
+@with_default_settings
+def test_angle7_dilated_rows():
+    fn = os.path.join(data_dir, 'wrong_angle1.png')
+    angle = detect_rotation_dilated_rows(fn, pre_calculated_orientation=None)
+    assert int(angle) == 1

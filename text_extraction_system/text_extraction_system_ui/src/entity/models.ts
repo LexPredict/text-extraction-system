@@ -13,8 +13,6 @@ export class UploadTaskSettings {
     language: string;
     ocr_enable: boolean;
     output_format: string;
-    glyph_enhancing: boolean;
-    remove_non_printable: boolean;
     convert_to_pdf_timeout_sec: number;
     pdf_to_images_timeout_sec: number;
 

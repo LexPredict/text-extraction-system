@@ -44,8 +44,6 @@ DPI: int = 300
 def extract_text_and_structure(pdf_fn: str,
                                pdf_password: str = None,
                                timeout_sec: int = 3600,
-                               glyph_enhancing: bool = False,
-                               remove_non_printable: bool = False,
                                language: str = "") \
         -> Tuple[str, TextAndPDFCoordinates]:
     java_modules_path = get_settings().java_modules_path
@@ -67,14 +65,6 @@ def extract_text_and_structure(pdf_fn: str,
             args.append('-p')
             args.append(pdf_password)
 
-        if glyph_enhancing:
-            args.append('-ge')
-            args.append('true')
-
-        if remove_non_printable:
-            args.append('-rn')
-            args.append('true')
-
         completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=timeout_sec,
                                                              universal_newlines=True, stderr=PIPE, stdout=PIPE)
         raise_from_process(log, completed_process, process_title=lambda: f'Extract text and structure from {pdf_fn}')
@@ -88,7 +78,7 @@ def extract_text_and_structure(pdf_fn: str,
         # Remove Null characters because of incompatibility with PostgreSQL
         text = pdfbox_res['text'].replace("\x00", "")
         if len(text) == 0:
-            pdf_coordinates = PDFCoordinates(char_bboxes_with_page_nums=pdfbox_res['charBBoxesWithPageNums'])
+            pdf_coordinates = PDFCoordinates(char_bboxes=pdfbox_res['charBBoxes'])
             text_struct = PlainTextStructure(title='',
                                              language=language or 'en',  # FastText returns English for empty strings
                                              pages=[],
@@ -142,8 +132,8 @@ def extract_text_and_structure(pdf_fn: str,
             paragraphs=paragraphs,
             sections=sections)
 
-        char_bboxes_with_page_nums = pdfbox_res['charBBoxesWithPageNums']
-        pdf_coordinates = PDFCoordinates(char_bboxes_with_page_nums=char_bboxes_with_page_nums)
+        char_bboxes = pdfbox_res['charBBoxes']
+        pdf_coordinates = PDFCoordinates(char_bboxes=char_bboxes)
         return text, TextAndPDFCoordinates(text_structure=text_struct,
                                            pdf_coordinates=pdf_coordinates)
 
@@ -226,7 +216,8 @@ def process_pdf_page(pdf_fn: str,
                         with ocr_page_to_pdf(page_image_fn=page_image_without_text_fn,
                                              language=ocr_language,
                                              timeout=ocr_timeout_sec,
-                                             glyphless_text_only=True) as ocred_text_layer_pdf_fn:
+                                             glyphless_text_only=True,
+                                             tesseract_page_orientation_detection=True) as ocred_text_layer_pdf_fn:
                             # We need fully merged PDF page here for the proper work of the table extraction by Camelot
                             with merge_pdf_pages(original_pdf_fn=pdf_fn,
                                                  original_pdf_password=pdf_password,

@@ -128,46 +128,6 @@ type FileUploaderProps = {
                             </div>
                         </div>
 
-                        <div className={styles.row}>
-                            <div className={styles.column}>
-                                <Form.Item
-                                    label="Glyph boxes enhancing"
-                                    name="glyph_enhancing"
-                                    rules={[
-                                        {
-                                            required: false,
-                                            message: 'Enhanced glyph boxes detection',
-                                        },
-                                    ]}
-                                >
-                                    <Checkbox 
-                                      onChange={(e) => {this.modifyState('glyph_enhancing', e.target.checked);}} 
-                                      checked={this.state.uploadSettings.glyph_enhancing} 
-                                      />
-                                </Form.Item>
-                            </div>
-
-                            <div className={styles.column}>
-                                <Form.Item
-                                    label="Remove non-printable"
-                                    name="remove_non_printable"
-                                    rules={[
-                                        {
-                                            required: false,
-                                            message: 'Remove non-printable symbols',
-                                        },
-                                    ]}
-                                >
-                                    <Checkbox 
-                                     onChange={(e) => {this.modifyState('remove_non_printable', e.target.checked);}} 
-                                     checked={this.state.uploadSettings.remove_non_printable}
-                                     />
-                                </Form.Item>
-                            </div>
-                            <div className={styles.column}>
-                                &nbsp;
-                            </div>
-                        </div>
                     </div>
                 </Panel>
                 <Panel header="System settings" key="2">
