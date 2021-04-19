@@ -24,10 +24,10 @@ def p2():
     from text_extraction_system.ocr.ocr import ocr_page_to_pdf, rotate_image
     from text_extraction_system.ocr.rotation_detection import determine_skew, detect_rotation_dilated_rows
     import shutil
-    orig_pdf_fn = '/home/mikhail/lexpredict/misc/angles/vertical_lag1.pdf'
-    page = 1
-    #with split_pdf_to_page_blocks(orig_pdf_fn, 1) as page_fns:
-    #    shutil.copy(page_fns[page - 1], '/home/mikhail/lexpredict/misc/angles/vertical_lag1.pdf')
+    orig_pdf_fn = '/home/mikhail/lexpredict/misc/angles/no_text_page_4.pdf'
+    page = 4
+    with split_pdf_to_page_blocks(orig_pdf_fn, 1) as page_fns:
+        shutil.copy(page_fns[page - 1], '/home/mikhail/lexpredict/misc/angles/wrong_angle3.pdf')
 
     with extract_page_ocr_images(orig_pdf_fn, page, page, dpi=300) as images:
         angle = detect_rotation_dilated_rows(images[0][1])
