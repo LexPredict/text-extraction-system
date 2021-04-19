@@ -175,4 +175,4 @@ def orientation_and_script_detected(image_fn: str) -> bool:
 
 
 def orientation_and_script_detected_in_osd(osd: OSD) -> bool:
-    return osd.script and osd.script_conf > 1 and osd.orientation_conf > 1
+    return osd.script and osd.script_conf > 1 and osd.orientation_conf > 5

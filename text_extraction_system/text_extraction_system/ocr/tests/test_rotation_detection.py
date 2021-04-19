@@ -133,7 +133,7 @@ def test_angle8_dilated_rows():
 
 
 @with_default_settings
-def test_angle8_dilated_rows():
-    fn = os.path.join(data_dir, 'wrong_angle3.png')
+def test_angle9_dilated_rows():
+    fn = os.path.join(data_dir, 'wrong_angle4.png')
     angle = detect_rotation_dilated_rows(fn, pre_calculated_orientation=None)
     assert int(angle) == 0
