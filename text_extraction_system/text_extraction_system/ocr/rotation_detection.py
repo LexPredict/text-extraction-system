@@ -57,7 +57,8 @@ def detect_rotation_dilated_rows(image_fn: str, pre_calculated_orientation: Opti
         max_area = -1
         max_area_angle = 0
         for c in contours:
-            angle = cv2.minAreaRect(c)[-1]
+            r = cv2.minAreaRect(c)
+            angle = r[-1]
             if angle < -45:
                 angle = angle + 90
             angle = norm_angle(orientation + angle)

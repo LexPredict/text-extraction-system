@@ -1,8 +1,9 @@
 import os
 
 from text_extraction_system.commons.tests.commons import with_default_settings
-from text_extraction_system.data_extract.data_extract import extract_text_pdfminer, extract_text_and_structure
-from text_extraction_system.ocr.ocr import ocr_page_to_pdf, orientation_and_script_detected
+from text_extraction_system.data_extract.data_extract import extract_text_pdfminer, extract_text_and_structure, DPI
+from text_extraction_system.ocr.ocr import ocr_page_to_pdf, orientation_and_script_detected, OSD, image_to_osd, \
+    orientation_and_script_detected_in_osd
 from text_extraction_system.pdf.pdf import extract_page_images, extract_page_ocr_images
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
