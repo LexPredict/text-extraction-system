@@ -37,7 +37,7 @@ def test_extract_text_rotated3():
             with archive.open('status.json', 'r') as status_f:
                 s = status_f.read()
                 req_status: RequestStatus = RequestStatus.from_json(s)
-                assert int(req_status.page_rotate_angles[1]) == 0
+                assert req_status.page_rotate_angles is None or int(req_status.page_rotate_angles[1]) == 0
 
 
 def test_extract_text_rotated4():
@@ -50,3 +50,11 @@ def test_extract_text_rotated4():
                 req_status: RequestStatus = RequestStatus.from_json(s)
                 # it should not be rotated because tesseract can't detect any script on it
                 assert req_status.page_rotate_angles is None
+
+
+def test_no_script_mistake1():
+    fn = os.path.join(os.path.dirname(__file__), 'data', 'mistake_no_text1.pdf')
+    client = TextExtractionSystemWebClient(test_settings.api_url)
+    text = client.extract_plain_text_from_document(fn)
+    expected = '''Approvals and Licenses'''
+    assert expected in text

@@ -56,7 +56,7 @@ def test_extract_all_data_from_document():
     resp = client.extract_all_data_from_document(fn)
     with resp as tfn:
         with closing(ZipFile(tfn)) as archive:
-            assert len(archive.infolist()) == 3
+            assert len(archive.infolist()) == 5
 
 
 def test_extract_all_data_from_document_expired():

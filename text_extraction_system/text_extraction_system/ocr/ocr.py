@@ -127,10 +127,10 @@ def osd_to_dict(osd: str):
     return res
 
 
-def image_to_osd(page_image_fn: str, timeout: int = 180) -> OSD:
+def image_to_osd(page_image_fn: str, timeout: int = 180, dpi: int = 300) -> OSD:
     proc = None
     try:
-        args = ['tesseract', page_image_fn, 'stdout', '--psm', '0']
+        args = ['tesseract', page_image_fn, 'stdout', '--psm', '0', '--dpi', str(dpi)]
         env = os.environ.copy()
         log.debug(f'Executing tesseract: {args}')
         proc = Popen(args, env=env, stdout=PIPE, stderr=PIPE)
@@ -171,4 +171,8 @@ def image_to_osd(page_image_fn: str, timeout: int = 180) -> OSD:
 def orientation_and_script_detected(image_fn: str) -> bool:
     osd = image_to_osd(image_fn)
 
+    return orientation_and_script_detected_in_osd(osd)
+
+
+def orientation_and_script_detected_in_osd(osd: OSD) -> bool:
     return osd.script and osd.script_conf > 1 and osd.orientation_conf > 1
