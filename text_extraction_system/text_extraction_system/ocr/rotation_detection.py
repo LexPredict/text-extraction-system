@@ -52,18 +52,24 @@ def detect_rotation_dilated_rows(image_fn: str, pre_calculated_orientation: Opti
 
         # Find all contours
         contours, hierarchy = cv2.findContours(dilate, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-        contours = sorted(contours, key=cv2.contourArea, reverse=True)
 
-        # Find largest contour and surround in min area box
-        largestContour = contours[0]
-        minAreaRect = cv2.minAreaRect(largestContour)
+        angles_to_areas = dict()
+        max_area = -1
+        max_area_angle = 0
+        for c in contours:
+            angle = cv2.minAreaRect(c)[-1]
+            if angle < -45:
+                angle = angle + 90
+            angle = norm_angle(orientation + angle)
+            angle = round(angle * 10) / 10
+            area = angles_to_areas.get(angle) or 0
+            area += cv2.contourArea(c)
+            angles_to_areas[angle] = area
+            if max_area < area:
+                max_area = area
+                max_area_angle = angle
 
-        # Determine the angle. Convert it to the value that was originally used to obtain skewed image
-        angle = minAreaRect[-1]
-        if angle < -45:
-            angle = 90 + angle
-        angle = norm_angle(orientation + angle)
-        return angle
+        return max_area_angle
     finally:
         if filename:
             os.remove(filename)
