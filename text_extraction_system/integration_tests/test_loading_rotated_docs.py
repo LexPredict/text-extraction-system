@@ -14,7 +14,7 @@ def test_extract_text_rotated1():
     client = TextExtractionSystemWebClient(test_settings.api_url)
     text = client.extract_plain_text_from_document(fn)
     expected = '''This is a text rotated at a certain angle 1. This is a text rotated at a certain angle 2. This is a text 
-rotated at a certain angle 3. This is a text rotated at a certain angle 4. This is a text rotated ata 
+rotated at a certain angle 3. This is a text rotated at a certain angle 4. This is a text rotated at a 
 certain angle 5. This is a text rotated at a certain angle 6. This is a text rotated at a certain angle 7.'''
     assert expected in text
 

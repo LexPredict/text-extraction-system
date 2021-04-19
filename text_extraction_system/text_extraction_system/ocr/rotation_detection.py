@@ -9,7 +9,7 @@ import cv2
 import deskew
 from PIL import Image as PilImage
 
-from text_extraction_system.ocr.ocr import image_to_osd
+from text_extraction_system.ocr.ocr import image_to_osd, orientation_and_script_detected_in_osd
 
 # used in detect_rotation_dilated_rows() - "ideal" image size for resizing code
 SKEW_IMAGE_DETECT_TARGET_SIZE = 960, 1200
@@ -31,7 +31,10 @@ def detect_rotation_dilated_rows(image_fn: str, pre_calculated_orientation: Opti
             orientation = pre_calculated_orientation
         else:
             osd = image_to_osd(image_fn)
-            orientation = osd.orientation if osd.orientation_conf > 1 else 0
+            if orientation_and_script_detected_in_osd(osd):
+                orientation = osd.orientation
+            else:
+                orientation = 0
 
         if orientation:
             _new_file, filename = tempfile.mkstemp('.png')
