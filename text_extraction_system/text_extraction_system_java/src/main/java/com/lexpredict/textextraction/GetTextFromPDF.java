@@ -128,14 +128,14 @@ public class GetTextFromPDF {
                 contentStream.lineTo((float) l[2], (float) l[3]);
                 contentStream.stroke();
 
-                PDType1Font pdfFont = PDType1Font.TIMES_ITALIC;
-                int fontSize = 9;
-                contentStream.setFont(pdfFont, fontSize);
-                contentStream.setStrokingColor(Color.CYAN);
-                contentStream.beginText();
-                contentStream.newLineAtOffset((float) l[0], (float) l[1]);
-                contentStream.showText(lineTexts.get(k));
-                contentStream.endText();
+                //PDType1Font pdfFont = PDType1Font.HELVETICA;
+                //int fontSize = 9;
+                //contentStream.setFont(pdfFont, fontSize);
+                //contentStream.setStrokingColor(Color.CYAN);
+                //contentStream.beginText();
+                //contentStream.newLineAtOffset((float) l[0], (float) l[1]);
+                //contentStream.showText(lineTexts.get(k));
+                //contentStream.endText();
                 k++;
             }
             contentStream.close();

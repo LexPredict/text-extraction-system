@@ -108,9 +108,9 @@ public class TestPDF2Text extends TestCase {
         }
     }
 
-    public void test_wrong_angle2() throws Exception {
+    /*public void test_vertical_lag1() throws Exception {
         try (InputStream stream = TestPDF2Text.class
-                .getResourceAsStream("/wrong_angle2.pdf")) {
+                .getResourceAsStream("/vertical_lag1_ocred.pdf")) {
             try (PDDocument document = PDDocument.load(stream)) {
                 PDFPlainText res = PDFToTextWithCoordinates.process(document);
 
@@ -118,5 +118,15 @@ public class TestPDF2Text extends TestCase {
             }
         }
     }
+
+    public void test_vertical_lag_full() throws Exception {
+        try (InputStream stream = new FileInputStream("/home/mikhail/lexpredict/misc/angles/vertical_lag_full.pdf")) {
+            try (PDDocument document = PDDocument.load(stream)) {
+                PDFPlainText res = PDFToTextWithCoordinates.process(document);
+
+                GetTextFromPDF.renderDebugPDF(document, res, "/tmp/111.pdf");
+            }
+        }
+    }*/
 
 }
