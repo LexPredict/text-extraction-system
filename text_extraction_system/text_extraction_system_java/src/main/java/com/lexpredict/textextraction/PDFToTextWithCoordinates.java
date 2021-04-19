@@ -374,6 +374,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             for (Integer angle : angleCollector.getAngles()) {
                 this.curAngleLimits = angleCollector.getLimitsByAngle(angle);
                 if (angle == 0) {
+                    this.curCharBackTransform = null;
                     super.processPage(page);
                 } else {
                     // prepend a transformation
