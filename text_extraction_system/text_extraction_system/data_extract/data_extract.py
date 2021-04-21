@@ -148,23 +148,26 @@ def extract_text_pdfminer(pdf_fn: str) -> str:
         parser = PDFParser(in_file)
         doc = PDFDocument(parser)
         rsrcmgr = PDFResourceManager()
-        device = TextConverter(rsrcmgr, output_string, laparams=LAParams())
+        device = TextConverter(rsrcmgr, output_string)
         interpreter = PDFPageInterpreter(rsrcmgr, device)
         for page in PDFPage.create_pages(doc):
             interpreter.process_page(page)
     return output_string.getvalue()
 
 
-def get_first_page_layout(pdf_opened_file) -> LTPage:
+def get_first_page_layout(pdf_opened_file,
+                          use_advanced_detection: bool = True) -> LTPage:
     parser = PDFParser(pdf_opened_file)
     doc = PDFDocument(parser)
     rsrcmgr = PDFResourceManager()
-    laparams = LAParams(all_texts=True)
+    laparams = LAParams(all_texts=True) if use_advanced_detection else LAParams(all_texts=True, boxes_flow=None)
     device = PDFPageAggregator(rsrcmgr, laparams=laparams)
     interpreter = PDFPageInterpreter(rsrcmgr, device)
+
     for page in PDFPage.create_pages(doc):
         interpreter.process_page(page)
         return device.get_result()
+
     raise Exception('Unable to build LTPage from opened file')
 
 
@@ -197,7 +200,8 @@ def process_pdf_page(pdf_fn: str,
         page_image_with_text_fn, page_image_without_text_fn = image_fns[0]
         with open(pdf_fn, 'rb') as in_file:
             # build pdfminer page layout - used for detecting if the page requires OCR or not
-            original_page_layout = get_first_page_layout(in_file)
+            original_page_layout = get_first_page_layout(
+                in_file, use_advanced_detection=True)
 
             if ocr_enabled and page_requires_ocr(original_page_layout):
                 angle: Optional[float] = None
@@ -226,7 +230,8 @@ def process_pdf_page(pdf_fn: str,
                                                                                 ocred_text_layer_pdf_fn,
                                                                                 angle)) as ocred_pdf_for_tables:
                             with open(ocred_pdf_for_tables, 'rb') as ocred_in_file:
-                                ocred_page_layout = get_first_page_layout(ocred_in_file)
+                                ocred_page_layout = get_first_page_layout(
+                                    ocred_in_file, use_advanced_detection=False)
                                 camelot_tables = extract_tables(page_num, ocred_page_layout,
                                                                 page_image_with_text_fn)
 
