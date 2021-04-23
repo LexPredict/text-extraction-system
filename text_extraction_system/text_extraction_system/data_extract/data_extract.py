@@ -200,43 +200,27 @@ def process_pdf_page(pdf_fn: str,
             original_page_layout = get_first_page_layout(in_file)
 
             if ocr_enabled and page_requires_ocr(original_page_layout):
-                angle: Optional[float] = None
+                # this returns a text-based PDF with glyph-less text only
+                # to be used for merging in front of the original PDF page layout
+                with ocr_page_to_pdf(page_image_fn=page_image_without_text_fn,
+                                     language=ocr_language,
+                                     timeout=ocr_timeout_sec,
+                                     glyphless_text_only=True,
+                                     tesseract_page_orientation_detection=True) as ocred_text_layer_pdf_fn:
+                    # We need fully merged PDF page here for the proper work of the table extraction by Camelot
+                    with merge_pdf_pages(original_pdf_fn=pdf_fn,
+                                         original_pdf_password=pdf_password) as ocred_pdf_for_tables:
+                        with open(ocred_pdf_for_tables, 'rb') as ocred_in_file:
+                            ocred_page_layout = get_first_page_layout(ocred_in_file)
+                            camelot_tables = extract_tables(page_num, ocred_page_layout,
+                                                            page_image_with_text_fn)
 
-                if deskew_enabled:
-                    osd: OSD = image_to_osd(page_image_with_text_fn)
-                    if orientation_and_script_detected_in_osd(osd):
-                        angle = detect_rotation_dilated_rows(page_image_with_text_fn,
-                                                             pre_calculated_orientation=osd.orientation)
-                # rotate_image() will bypass as is if the angle is None
-                with rotate_image(page_image_with_text_fn, angle, DPI,
-                                  align_to_closest_90=True) as page_image_with_text_fn, \
-                        rotate_image(page_image_without_text_fn, angle, DPI,
-                                     align_to_closest_90=True) as page_image_without_text_fn:
-                    # this returns a text-based PDF with glyph-less text only
-                    # to be used for merging in front of the original PDF page layout
-                    with ocr_page_to_pdf(page_image_fn=page_image_without_text_fn,
-                                         language=ocr_language,
-                                         timeout=ocr_timeout_sec,
-                                         glyphless_text_only=True,
-                                         tesseract_page_orientation_detection=True) as ocred_text_layer_pdf_fn:
-                        # We need fully merged PDF page here for the proper work of the table extraction by Camelot
-                        with merge_pdf_pages(original_pdf_fn=pdf_fn,
-                                             original_pdf_password=pdf_password,
-                                             single_page_merge_num_file_rotate=(1,
-                                                                                ocred_text_layer_pdf_fn,
-                                                                                angle)) as ocred_pdf_for_tables:
-                            with open(ocred_pdf_for_tables, 'rb') as ocred_in_file:
-                                ocred_page_layout = get_first_page_layout(ocred_in_file)
-                                camelot_tables = extract_tables(page_num, ocred_page_layout,
-                                                                page_image_with_text_fn)
-
-                        # But we return only the transparent text layer PDF and not the merged page
-                        # because in the final step we will need to merge these transparent layer in front
-                        # of the pages in the original PDF file to keep its small size and structure/bookmarks.
-                        yield PDFPageProcessingResults(page_requires_ocr=True,
-                                                       ocred_page_fn=ocred_text_layer_pdf_fn,
-                                                       ocred_page_rotation_angle=angle,
-                                                       camelot_tables=camelot_tables)
+                    # But we return only the transparent text layer PDF and not the merged page
+                    # because in the final step we will need to merge these transparent layer in front
+                    # of the pages in the original PDF file to keep its small size and structure/bookmarks.
+                    yield PDFPageProcessingResults(page_requires_ocr=True,
+                                                   ocred_page_fn=ocred_text_layer_pdf_fn,
+                                                   camelot_tables=camelot_tables)
             else:
                 # if we don't need OCR then execute Camelot on the original PDF page
                 camelot_tables = extract_tables(page_num, original_page_layout, page_image_with_text_fn)

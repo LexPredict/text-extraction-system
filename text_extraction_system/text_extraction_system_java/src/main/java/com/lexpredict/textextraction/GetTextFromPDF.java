@@ -96,50 +96,22 @@ public class GetTextFromPDF {
     protected static void renderDebugPDF(PDDocument document, PDFPlainText res, String fn) throws IOException {
         int i = 0;
         for (PDPage page : document.getPages()) {
+            float urY = page.getCropBox().getUpperRightY();
             PDFPlainTextPage pageRes = res.pages.get(i);
             List<double[]> pageCoords = res.charBBoxes.subList(pageRes.location[0], pageRes.location[1]);
             String pageText = res.text.substring(pageRes.location[0], pageRes.location[1]);
-            List<double[]> lineCoordsStartEnd = new ArrayList<>();
-            List<String> lineTexts = new ArrayList<>();
-            double[] coordsStart = null;
-            int chNumStart = -1;
 
-            for (int chNum = 0; chNum < pageText.length(); chNum++) {
-                if (coordsStart == null && pageText.charAt(chNum) != '\n' && pageText.charAt(chNum) != ' ') {
-                    double[] charCoords = pageCoords.get(chNum);
-                    coordsStart = new double[]{charCoords[0], charCoords[1]};
-                    chNumStart = chNum;
-                } else if ((pageText.charAt(chNum) == '\n' || pageText.charAt(chNum) == ' ') && chNum > 1 && coordsStart != null) {
-                    double[] charCoords = pageCoords.get(chNum - 1);
-                    lineCoordsStartEnd.add(new double[]{coordsStart[0], pageRes.bbox[3] - coordsStart[1],
-                            charCoords[0] + charCoords[2], pageRes.bbox[3] - charCoords[1]});
-                    String sub = pageText.substring(chNumStart, chNum);
-                    lineTexts.add(sub);
-                    coordsStart = null;
-                    chNumStart = -1;
-                }
-            }
             PDPageContentStream contentStream = new PDPageContentStream(document, page,
                     PDPageContentStream.AppendMode.APPEND, true, true);
             int k = 0;
-            for (double[] l : lineCoordsStartEnd) {
-                contentStream.setStrokingColor(Color.RED);
-                contentStream.moveTo((float) l[0], (float) l[1]);
-                contentStream.lineTo((float) l[2], (float) l[3]);
+            for (double[] c : pageCoords) {
+                char ch = pageText.charAt(k);
+                contentStream.setStrokingColor(Color.BLUE);
+                contentStream.addRect((float)c[0], urY - (float) c[1], (float) c[2], (float) c[3]);
                 contentStream.stroke();
-
-                //PDType1Font pdfFont = PDType1Font.HELVETICA;
-                //int fontSize = 9;
-                //contentStream.setFont(pdfFont, fontSize);
-                //contentStream.setStrokingColor(Color.CYAN);
-                //contentStream.beginText();
-                //contentStream.newLineAtOffset((float) l[0], (float) l[1]);
-                //contentStream.showText(lineTexts.get(k));
-                //contentStream.endText();
                 k++;
             }
             contentStream.close();
-
 
             i++;
         }

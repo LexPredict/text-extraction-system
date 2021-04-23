@@ -133,7 +133,28 @@ def test_angle8_dilated_rows():
 
 
 @with_default_settings
+def test_angle9():
+    fn = os.path.join(data_dir, 'wrong_angle4.png')
+    angle = determine_skew(fn)
+    assert int(angle) == 0
+
+
+@with_default_settings
 def test_angle9_dilated_rows():
     fn = os.path.join(data_dir, 'wrong_angle4.png')
     angle = detect_rotation_dilated_rows(fn, pre_calculated_orientation=None)
+    assert int(angle) == 0
+
+
+def test_angle10():
+    fn = os.path.join(data_dir, 'wrong_angle5.png')
+    angle = determine_skew(fn)
+    assert int(angle) == -89
+
+
+@with_default_settings
+def test_angle10_dilated_rows():
+    fn = os.path.join(data_dir, 'wrong_angle5.png')
+    angle = detect_rotation_dilated_rows(fn, pre_calculated_orientation=None)
+    # should be -89 but it crashes because tesseract is not sure there is text on the page
     assert int(angle) == 0
