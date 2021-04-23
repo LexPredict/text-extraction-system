@@ -45,6 +45,8 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
     protected boolean deskew;
 
+    protected int maxDeskewAngleAbs = 4;
+
     protected Matrix curCharBackTransform;
 
     protected double curAngle;
@@ -299,7 +301,11 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
         public void cleanupAngles() {
             Map<Integer, Integer> res = new HashMap<>();
-            for (Map.Entry<Integer, Integer> angleNum : this.anglesToCharNum.entrySet()) {
+
+            List<Map.Entry<Integer, Integer>> anglesToCharNumSorted = new ArrayList<>(this.anglesToCharNum.entrySet());
+            anglesToCharNumSorted.sort(Map.Entry.<Integer, Integer>comparingByValue().reversed());
+
+            for (Map.Entry<Integer, Integer> angleNum : anglesToCharNumSorted) {
                 Integer closestAngle = null;
                 Integer closestAngleCharNum = null;
                 for (Map.Entry<Integer, Integer> angleNum2 : res.entrySet()) {
@@ -367,25 +373,35 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             // do we need the proper float angle auto-clustering here?
             anglesToCharNum.merge((int) Math.round(angle), text.getCharacterCodes().length, Integer::sum);
         }
+
+        protected int[] selectDeskewAngle(int skewAngleAbsLimit) {
+            for (int i = this.sortedAngles.length - 1; i >= 0; i--) {
+                int angle = sortedAngles[i];
+                int pageRotation = 90 * Math.round((float) angle / 90);
+                int skewAngle = angle - pageRotation;
+                if (Math.abs(skewAngle) <= Math.abs(skewAngleAbsLimit))
+                    return new int[]{angle, pageRotation, skewAngle};
+            }
+
+            int angle = sortedAngles[this.sortedAngles.length - 1];
+            int pageRotation = 90 * Math.round((float) angle / 90);
+            int skewAngle = 0;
+            return new int[]{angle, pageRotation, skewAngle};
+        }
     }
 
-    protected static Matrix rotateMatrix(float tx, float ty, int angle) {
+    protected Matrix rotateMatrix(PDRectangle cropBox, int angle) {
+        float tx = (cropBox.getLowerLeftX() + cropBox.getUpperRightX()) / 2;
+        float ty = (cropBox.getLowerLeftY() + cropBox.getUpperRightY()) / 2;
         Matrix m = Matrix.getTranslateInstance(tx, ty);
         m.concatenate(Matrix.getRotateInstance(Math.toRadians(angle), 0, 0));
         m.concatenate(Matrix.getTranslateInstance(-tx, -ty));
         return m;
     }
 
-    protected Matrix rotateMatrix(PDRectangle cropBox, int angle) {
-        float tx = (cropBox.getLowerLeftX() + cropBox.getUpperRightX()) / 2;
-        float ty = (cropBox.getLowerLeftY() + cropBox.getUpperRightY()) / 2;
-        return rotateMatrix(tx, ty, angle);
-    }
-
 
     @Override
     public void processPage(PDPage page) throws IOException {
-        // based on the code from ExtractText of PDFBox
         int pageStart = this.charBBoxes == null ? 0 : this.charBBoxes.size();
 
         if (this.detectAngles) {
@@ -397,21 +413,11 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             angleCollector.getText(document);
             angleCollector.cleanupAngles();
 
-            int finalAngle = angleCollector.sortedAngles[angleCollector.sortedAngles.length - 1];
-            int finalPageRotation = 90 * Math.round((float) finalAngle / 90);
-            int finalSkewAngle = finalAngle - finalPageRotation;
 
-            Matrix deskewMatrix = rotateMatrix(page.getCropBox(), -finalSkewAngle);
-            PDRectangle cropBox = page.getCropBox();
-            Rectangle2D cropBoxDeskewRotated = cropBox.transform(deskewMatrix).getBounds2D();
-            double deskewScale = cropBox.getWidth() / cropBoxDeskewRotated.getWidth();
-            deskewMatrix.concatenate(Matrix.getScaleInstance((float) deskewScale, (float) deskewScale));
-
-            // we rotated a rectangle around its center
-            // we scaled it, now we need to move it so that the negative part to be at zero
-            double deskewTx = cropBox.getLowerLeftX() - cropBoxDeskewRotated.getMinX();
-            double deskewTy = cropBox.getLowerLeftY() - cropBoxDeskewRotated.getMinY();
-            deskewMatrix.concatenate(Matrix.getTranslateInstance((float) -deskewTx, (float) -deskewTy));
+            int[] deskewFullAngleRotationSkewAngle = angleCollector.selectDeskewAngle(this.maxDeskewAngleAbs);
+            int deskewFullAngle = deskewFullAngleRotationSkewAngle[0];
+            int deskewPageRotation = deskewFullAngleRotationSkewAngle[1];
+            int deskewSkewAngle = deskewFullAngleRotationSkewAngle[2];
 
             for (Integer angle : angleCollector.sortedAngles) {
                 this.curAngleLimits = angleCollector.getLimitsByAngle(angle);
@@ -426,10 +432,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
                     Matrix charRestoreMatrix = null;
                     if (deskew) {
-                        charRestoreMatrix = rotateMatrix(page.getCropBox(), -angle + finalSkewAngle);
-                        charRestoreMatrix.concatenate(Matrix.getScaleInstance((float) deskewScale, (float) deskewScale));
-                        charRestoreMatrix.concatenate(Matrix.getTranslateInstance((float) -deskewTx, (float) -deskewTy));
-
+                        charRestoreMatrix = rotateMatrix(page.getCropBox(), -angle + deskewSkewAngle);
                     } else {
                         charRestoreMatrix = rotateMatrix(page.getCropBox(), -angle);
                     }
@@ -446,12 +449,12 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             }
 
             if (deskew) {
-                page.setRotation(finalPageRotation);
-                if (finalSkewAngle != 0) {
+                page.setRotation(deskewPageRotation);
+                if (deskewSkewAngle != 0) {
                     try (PDPageContentStream cs = new PDPageContentStream(document,
                             page, PDPageContentStream.AppendMode.PREPEND, false)) {
 
-                        cs.transform(deskewMatrix);
+                        cs.transform(rotateMatrix(page.getCropBox(), -deskewSkewAngle));
                     }
                 }
             } else {
@@ -485,8 +488,8 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             super.processTextPosition(text);
     }
 
-    public static PDFPlainText process(PDDocument document) throws Exception {
-        return process(document, -1, Integer.MAX_VALUE, true);
+    public static PDFPlainText process(PDDocument document, boolean deskew) throws Exception {
+        return process(document, -1, Integer.MAX_VALUE, deskew);
     }
 
     public static PDFPlainText process(PDDocument document,
@@ -501,6 +504,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         pdf2text.pages = new ArrayList<>();
         pdf2text.setStartPage(startPage);
         pdf2text.detectAngles = true;
+        pdf2text.maxDeskewAngleAbs = 4;
         pdf2text.setEndPage(endPage);
         pdf2text.setAddMoreFormatting(true);
         pdf2text.setParagraphEnd("\n");

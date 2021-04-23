@@ -7,12 +7,10 @@ import org.apache.commons.cli.*;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.msgpack.jackson.dataformat.MessagePackFactory;
 
 import java.awt.*;
 import java.io.*;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -70,9 +68,10 @@ public class GetTextFromPDF {
         String format = cmd.getOptionValue("f", PLAIN_TEXT);
         String password = cmd.getOptionValue("p", "");
         String debugOutputPDF = cmd.getOptionValue("debug");
+        String deskewOutputPDF = cmd.getOptionValue("deskew");
 
         try (PDDocument document = PDDocument.load(new File(pdf), password)) {
-            PDFPlainText res = PDFToTextWithCoordinates.process(document);
+            PDFPlainText res = PDFToTextWithCoordinates.process(document, deskewOutputPDF != null);
 
             try (OutputStream os = new FileOutputStream(outFn)) {
                 if (PLAIN_TEXT.equals(format)) {
@@ -88,6 +87,8 @@ public class GetTextFromPDF {
                 }
             }
 
+            if (deskewOutputPDF != null)
+                document.save(deskewOutputPDF);
             if (debugOutputPDF != null)
                 GetTextFromPDF.renderDebugPDF(document, res, debugOutputPDF);
         }
@@ -107,7 +108,7 @@ public class GetTextFromPDF {
             for (double[] c : pageCoords) {
                 char ch = pageText.charAt(k);
                 contentStream.setStrokingColor(Color.BLUE);
-                contentStream.addRect((float)c[0], urY - (float) c[1], (float) c[2], (float) c[3]);
+                contentStream.addRect((float) c[0], urY - (float) c[1], (float) c[2], (float) c[3]);
                 contentStream.stroke();
                 k++;
             }
@@ -132,9 +133,14 @@ public class GetTextFromPDF {
         options.addOption(pwrd);
 
         Option debugOutput = new Option("debug", "debug_pdf_output", true,
-                "write debug pdf with the text marked with lines and color");
+                "write debug pdf with the text marked with rectangles");
         debugOutput.setRequired(false);
         options.addOption(debugOutput);
+
+        Option deskewOutput = new Option("deskew", "deskew_pdf_output", true,
+                "write de-skewed pdf to file");
+        deskewOutput.setRequired(false);
+        options.addOption(deskewOutput);
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
