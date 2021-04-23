@@ -47,13 +47,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
     protected Matrix curCharBackTransform;
 
-    protected double curAngleRad;
-
-    protected double curAngleCos;
-
-    protected int finalPageRotation;
-
-    protected boolean enhancedSizeDetection = false;
+    protected double curAngle;
 
     protected boolean removeNonPrintable = false;
 
@@ -205,31 +199,6 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         super.writeString(sb.toString(), textPositions);
     }
 
-    protected void xywhToTwoPoints(double[] xywh) {
-        xywh[2] += xywh[0];
-        xywh[3] += xywh[1];
-    }
-
-    protected void normTwoPoints(double[] twoPoints) {
-        if (twoPoints[2] < twoPoints[0]) {
-            twoPoints[2] = twoPoints[0] - twoPoints[2]; // width
-            twoPoints[0] -= twoPoints[2];
-            twoPoints[2] += twoPoints[0];
-        }
-
-        if (twoPoints[3] < twoPoints[1]) {
-            twoPoints[3] = twoPoints[1] - twoPoints[3]; // height
-            twoPoints[1] -= twoPoints[3];
-            twoPoints[3] += twoPoints[1];
-        }
-    }
-
-    protected void twoPointsToXywh(double[] twoPoints) {
-        normTwoPoints(twoPoints);
-        twoPoints[2] -= twoPoints[0];
-        twoPoints[3] -= twoPoints[1];
-    }
-
     protected void restoreAngle(double[] bbox) {
 
         if (this.curCharBackTransform != null) {
@@ -240,16 +209,19 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             bbox[2] = r1.getWidth();
             bbox[3] = r1.getHeight();
 
-            //bbox[1] -= bbox[3]*Math.sin(this.curAngleRad);
+            double a = Math.abs(this.curAngle);
+            a = a <= 180 ? a : 360 - a;
+            double b = this.curAngle;
+            b = b <= -90 ? -180 - b
+                    : b <= 0 ? b
+                    : b <= 90 ? b
+                    : 180 - b;
+
+
+            bbox[1] += bbox[3] * 2 * (a / 180);
+            bbox[0] += bbox[2] * (b / 90);
         }
 
-        /*if (this.finalPageRotation == -90) {
-            bbox[1] = bbox[1] + bbox[3];
-            bbox[0] = bbox[0] + bbox[2];
-        } else if (this.finalPageRotation == 90) {
-            bbox[1] = bbox[1] + bbox[3];
-            bbox[0] = bbox[0] - bbox[2];
-        }*/
     }
 
     protected void addNonPrintableCharBoxes(String nonPrintableText) {
@@ -429,30 +401,42 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             int finalPageRotation = 90 * Math.round((float) finalAngle / 90);
             int finalSkewAngle = finalAngle - finalPageRotation;
 
-            this.finalPageRotation = deskew ? finalPageRotation : 0;
+            Matrix deskewMatrix = rotateMatrix(page.getCropBox(), -finalSkewAngle);
+            PDRectangle cropBox = page.getCropBox();
+            Rectangle2D cropBoxDeskewRotated = cropBox.transform(deskewMatrix).getBounds2D();
+            double deskewScale = cropBox.getWidth() / cropBoxDeskewRotated.getWidth();
+            deskewMatrix.concatenate(Matrix.getScaleInstance((float) deskewScale, (float) deskewScale));
 
+            // we rotated a rectangle around its center
+            // we scaled it, now we need to move it so that the negative part to be at zero
+            double deskewTx = cropBox.getLowerLeftX() - cropBoxDeskewRotated.getMinX();
+            double deskewTy = cropBox.getLowerLeftY() - cropBoxDeskewRotated.getMinY();
+            deskewMatrix.concatenate(Matrix.getTranslateInstance((float) -deskewTx, (float) -deskewTy));
 
             for (Integer angle : angleCollector.sortedAngles) {
                 this.curAngleLimits = angleCollector.getLimitsByAngle(angle);
                 this.curCharBackTransform = null;
-                this.curAngleRad = 0;
-                this.curAngleCos = 0;
+                this.curAngle = 0;
                 if (angle != 0) {
-                    Matrix curDeSkewMatrix = rotateMatrix(page.getCropBox(), -angle);
+                    Matrix curAngleMatrix = rotateMatrix(page.getCropBox(), -angle);
                     try (PDPageContentStream cs = new PDPageContentStream(document,
                             page, PDPageContentStream.AppendMode.PREPEND, false)) {
-                        cs.transform(curDeSkewMatrix);
+                        cs.transform(curAngleMatrix);
                     }
 
-                    /*PDRectangle cropBox = page.getCropBox();
-                    double[] centerBefore = new double[]{cropBox.getLowerLeftX() + cropBox.getWidth() / 2,
-                            cropBox.getLowerLeftY() + cropBox.getHeight() / 2};
-                    Rectangle2D cropBoxAfter = cropBox.transform(curDeSkewMatrix).getBounds2D();
+                    Matrix charRestoreMatrix = null;
+                    if (deskew) {
+                        charRestoreMatrix = rotateMatrix(page.getCropBox(), -angle + finalSkewAngle);
+                        charRestoreMatrix.concatenate(Matrix.getScaleInstance((float) deskewScale, (float) deskewScale));
+                        charRestoreMatrix.concatenate(Matrix.getTranslateInstance((float) -deskewTx, (float) -deskewTy));
 
-                    double[] centerAfter = new double[]{cropBoxAfter.getCenterX(), cropBoxAfter.getCenterY()};*/
-                    //rotateMatrix((float) centerAfter[0], (float) centerAfter[1], -angle);
-                    this.curCharBackTransform = curDeSkewMatrix;
-                    this.curAngleRad = Math.toRadians(-angle);
+                    } else {
+                        charRestoreMatrix = rotateMatrix(page.getCropBox(), -angle);
+                    }
+
+
+                    this.curCharBackTransform = charRestoreMatrix;
+                    this.curAngle = -angle;
                     super.processPage(page);
                     ((COSArray) page.getCOSObject().getItem(COSName.CONTENTS)).remove(0);
                 } else {
@@ -462,14 +446,14 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             }
 
             if (deskew) {
-                //page.setRotation(finalPageRotation);
-                /*if (finalSkewAngle != 0) {
+                page.setRotation(finalPageRotation);
+                if (finalSkewAngle != 0) {
                     try (PDPageContentStream cs = new PDPageContentStream(document,
                             page, PDPageContentStream.AppendMode.PREPEND, false)) {
-                        Matrix finalDeSkewMatrix = rotateMatrix(page.getCropBox(), finalSkewAngle);
-                        cs.transform(finalDeSkewMatrix);
+
+                        cs.transform(deskewMatrix);
                     }
-                }*/
+                }
             } else {
                 page.setRotation(oldRotation);
             }
@@ -527,7 +511,6 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         pdf2text.setSortByPosition(false);
 
         pdf2text.setShouldSeparateByBeads(true);
-        pdf2text.enhancedSizeDetection = false;
         pdf2text.removeNonPrintable = true;
 
         // This prevents false-matches in paragraph detection
