@@ -39,6 +39,7 @@ class RequestStatus:
     error_message: Optional[str] = None
     converted_cleaned_pdf: bool = False
     searchable_pdf_created: bool = False
+    corrected_pdf_created: bool = False
     pdf_pages_ocred: Optional[List[int]] = None
     plain_text_extracted: bool = False
     text_structure_extracted: bool = False

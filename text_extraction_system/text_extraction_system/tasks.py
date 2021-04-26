@@ -18,6 +18,7 @@ from text_extraction_system.celery_log import JSONFormatter, set_log_extra
 from text_extraction_system.config import get_settings
 from text_extraction_system.constants import pages_ocred, task_ids, pages_for_processing, pages_tables, \
     queue_celery_beat
+from text_extraction_system.data_extract.camelot.camelot import extract_tables_from_pdf_file
 from text_extraction_system.data_extract.data_extract import extract_text_and_structure, process_pdf_page, \
     PDFPageProcessingResults
 from text_extraction_system.data_extract.tables import get_table_dtos_from_camelot_output
@@ -306,29 +307,13 @@ def process_pdf_page_task(_task,
             with process_pdf_page(local_pdf_page_fn,
                                   page_num=page_number,
                                   ocr_enabled=req.ocr_enable,
-                                  deskew_enabled=req.deskew_enable,
                                   ocr_language=ocr_language) as page_proc_res:  # type: PDFPageProcessingResults
                 if page_proc_res.page_requires_ocr:
-                    if page_proc_res.ocred_page_rotation_angle:
-                        # if the ocred image has been rotated (de-skewed) then store it
-                        # with the file name consisting of the page number and the angle
-                        log.info(f'{original_file_name} | PDF page {page_number} is rotated at '
-                                 f'{page_proc_res.ocred_page_rotation_angle:.2f}...')
-                        webdav_client.upload_file(
-                            remote_path=f'{req.request_id}'
-                                        f'/{pages_ocred}'
-                                        f'/{page_num_to_fn(page_number)}.{page_proc_res.ocred_page_rotation_angle}.pdf',
-                            local_path=page_proc_res.ocred_page_fn)
-                    else:
-                        # if no angle - don't put it to the file name
-                        webdav_client.upload_file(
-                            remote_path=f'{req.request_id}'
-                                        f'/{pages_ocred}'
-                                        f'/{page_num_to_fn(page_number)}.pdf',
-                            local_path=page_proc_res.ocred_page_fn)
-                if page_proc_res.camelot_tables:
-                    webdav_client.pickle(page_proc_res.camelot_tables,
-                                         f'{req.request_id}/{pages_tables}/{page_num_to_fn(page_number)}.pickle')
+                    webdav_client.upload_file(
+                        remote_path=f'{req.request_id}'
+                                    f'/{pages_ocred}'
+                                    f'/{page_num_to_fn(page_number)}.pdf',
+                        local_path=page_proc_res.ocred_page_fn)
     except Exception as e:
         raise Exception(f'{original_file_name} |  Exception caught while processing '
                         f'PDF page {page_number}: {pdf_page_base_fn}') from e
@@ -365,12 +350,6 @@ def finish_pdf_processing(task,
         try:
             pages_dir = os.path.join(temp_dir, 'pages')
             os.mkdir(pages_dir)
-
-            camelot_tables_total: List[CamelotTable] = list()
-            for remote_base_fn in webdav_client.list(f'{request_id}/{pages_tables}'):
-                camelot_tables_of_page: List[CamelotTable] \
-                    = webdav_client.unpickle(f'{request_id}/{pages_tables}/{remote_base_fn}')
-                camelot_tables_total += camelot_tables_of_page
 
             requires_page_merge: bool = False
 
@@ -431,46 +410,59 @@ def extract_data_and_finish(req: RequestMetadata,
                             camelot_tables: List[CamelotTable]):
     req.pdf_file = req.ocred_pdf or req.converted_to_pdf or req.original_document
     pdf_fn_in_storage_base = os.path.splitext(req.original_document)[0]
+    camelot_tables: List[CamelotTable] = None
 
-    text, text_structure = extract_text_and_structure(local_pdf_fn,
-                                                      language=req.doc_language)
-    log.info(f'Extracted {len(text)} characters from {pdf_fn_in_storage_base}')
+    log.info(f'Extracting plain text and structure from {req.pdf_file} '
+             + ' and de-skewing pdf...' if req.deskew_enable else '...')
+    with extract_text_and_structure(local_pdf_fn, language=req.doc_language,
+                                    correct_pdf=req.deskew_enable,
+                                    render_coords_debug=req.char_coords_debug_enable) \
+            as (text, text_structure, orig_or_corrected_pdf_fn):
+        log.info(f'Extracted {len(text)} characters from {pdf_fn_in_storage_base}')
 
-    req.plain_text_file = pdf_fn_in_storage_base + '.plain.txt'
-    webdav_client.upload_to(text.encode('utf-8'), f'{req.request_id}/{req.plain_text_file}')
-    log.info(f'Plain text is uploaded to {req.request_id}/{req.plain_text_file}')
+        req.plain_text_file = pdf_fn_in_storage_base + '.plain.txt'
+        webdav_client.upload_to(text.encode('utf-8'), f'{req.request_id}/{req.plain_text_file}')
+        log.info(f'Plain text is uploaded to {req.request_id}/{req.plain_text_file}')
 
-    if req.output_format == OutputFormat.json:
-        req.pdf_coordinates_file = pdf_fn_in_storage_base + '.pdf_coordinates.json'
-        jsn = json.dumps(text_structure.pdf_coordinates.to_dict(), indent=2)
-        webdav_client.upload_to(jsn.encode('utf-8'), f'{req.request_id}/{req.pdf_coordinates_file}')
-
-        req.text_structure_file = pdf_fn_in_storage_base + '.document_structure.json'
-        plain_text_structure = json.dumps(text_structure.text_structure.to_dict(), indent=2)
-        webdav_client.upload_to(plain_text_structure.encode('utf-8'),
-                                f'{req.request_id}/{req.text_structure_file}')
-
-    if req.output_format == OutputFormat.msgpack:
-        req.pdf_coordinates_file = pdf_fn_in_storage_base + '.pdf_coordinates.msgpack'
-        packed = msgpack.packb(text_structure.pdf_coordinates.__dict__, use_bin_type=True, use_single_float=True)
-        webdav_client.upload_to(packed, f'{req.request_id}/{req.pdf_coordinates_file}')
-
-        req.text_structure_file = pdf_fn_in_storage_base + '.document_structure.msgpack'
-        packed = msgpack.packb(text_structure.text_structure.to_dict(), use_bin_type=True, use_single_float=True)
-        webdav_client.upload_to(packed,
-                                f'{req.request_id}/{req.text_structure_file}')
-
-    tables = get_table_dtos_from_camelot_output(camelot_tables)
-    if tables and tables.tables:
         if req.output_format == OutputFormat.json:
-            req.tables_file = pdf_fn_in_storage_base + '.tables.json'
-            webdav_client.upload_to(json.dumps(tables.to_dict(), indent=2).encode('utf-8'),
-                                    f'{req.request_id}/{req.tables_file}')
+            req.pdf_coordinates_file = pdf_fn_in_storage_base + '.pdf_coordinates.json'
+            jsn = json.dumps(text_structure.pdf_coordinates.to_dict(), indent=2)
+            webdav_client.upload_to(jsn.encode('utf-8'), f'{req.request_id}/{req.pdf_coordinates_file}')
+
+            req.text_structure_file = pdf_fn_in_storage_base + '.document_structure.json'
+            plain_text_structure = json.dumps(text_structure.text_structure.to_dict(), indent=2)
+            webdav_client.upload_to(plain_text_structure.encode('utf-8'),
+                                    f'{req.request_id}/{req.text_structure_file}')
 
         if req.output_format == OutputFormat.msgpack:
-            req.tables_file = pdf_fn_in_storage_base + '.tables.msgpack'
-            packed = msgpack.packb(tables.to_dict(), use_bin_type=True, use_single_float=True)
-            webdav_client.upload_to(packed, f'{req.request_id}/{req.tables_file}')
+            req.pdf_coordinates_file = pdf_fn_in_storage_base + '.pdf_coordinates.msgpack'
+            packed = msgpack.packb(text_structure.pdf_coordinates.__dict__, use_bin_type=True, use_single_float=True)
+            webdav_client.upload_to(packed, f'{req.request_id}/{req.pdf_coordinates_file}')
+
+            req.text_structure_file = pdf_fn_in_storage_base + '.document_structure.msgpack'
+            packed = msgpack.packb(text_structure.text_structure.to_dict(), use_bin_type=True, use_single_float=True)
+            webdav_client.upload_to(packed,
+                                    f'{req.request_id}/{req.text_structure_file}')
+
+        if req.char_coords_debug_enable or req.deskew_enable:
+            req.pdf_file = os.path.splitext(os.path.basename(req.pdf_file))[0] + '_corr.pdf'
+            webdav_client.upload(f'{req.request_id}/{req.corrected_pdf}', orig_or_corrected_pdf_fn)
+
+        log.info(f'Extracting tables from {req.pdf_file}...')
+        camelot_tables = extract_tables_from_pdf_file(orig_or_corrected_pdf_fn)
+
+    if camelot_tables:
+        tables = get_table_dtos_from_camelot_output(camelot_tables)
+        if tables and tables.tables:
+            if req.output_format == OutputFormat.json:
+                req.tables_file = pdf_fn_in_storage_base + '.tables.json'
+                webdav_client.upload_to(json.dumps(tables.to_dict(), indent=2).encode('utf-8'),
+                                        f'{req.request_id}/{req.tables_file}')
+    
+            if req.output_format == OutputFormat.msgpack:
+                req.tables_file = pdf_fn_in_storage_base + '.tables.msgpack'
+                packed = msgpack.packb(tables.to_dict(), use_bin_type=True, use_single_float=True)
+                webdav_client.upload_to(packed, f'{req.request_id}/{req.tables_file}')
 
     if settings.delete_temp_files_on_request_finish:
         if req.converted_to_pdf and req.converted_to_pdf != req.pdf_file:

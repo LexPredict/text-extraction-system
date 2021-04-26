@@ -67,11 +67,11 @@ public class GetTextFromPDF {
 
         String format = cmd.getOptionValue("f", PLAIN_TEXT);
         String password = cmd.getOptionValue("p", "");
-        String debugOutputPDF = cmd.getOptionValue("debug");
-        String deskewOutputPDF = cmd.getOptionValue("deskew");
+        boolean renderCharRects = "true".equals(cmd.getOptionValue("render_char_rects").toLowerCase());
+        String correctedPDFOutput = cmd.getOptionValue("corrected_pdf_output");
 
         try (PDDocument document = PDDocument.load(new File(pdf), password)) {
-            PDFPlainText res = PDFToTextWithCoordinates.process(document, deskewOutputPDF != null);
+            PDFPlainText res = PDFToTextWithCoordinates.process(document, correctedPDFOutput != null);
 
             try (OutputStream os = new FileOutputStream(outFn)) {
                 if (PLAIN_TEXT.equals(format)) {
@@ -87,10 +87,11 @@ public class GetTextFromPDF {
                 }
             }
 
-            if (deskewOutputPDF != null)
-                document.save(deskewOutputPDF);
-            if (debugOutputPDF != null)
-                GetTextFromPDF.renderDebugPDF(document, res, debugOutputPDF);
+            if (correctedPDFOutput != null)
+                if (renderCharRects)
+                    GetTextFromPDF.renderDebugPDF(document, res, correctedPDFOutput);
+                else
+                    document.save(correctedPDFOutput);
         }
     }
 
@@ -132,15 +133,15 @@ public class GetTextFromPDF {
         pwrd.setRequired(false);
         options.addOption(pwrd);
 
-        Option debugOutput = new Option("debug", "debug_pdf_output", true,
-                "write debug pdf with the text marked with rectangles");
-        debugOutput.setRequired(false);
-        options.addOption(debugOutput);
+        Option correctedPDFOutput = new Option("corrected_output", "corrected_pdf_output", true,
+                "write corrected/de-skewed pdf to file");
+        correctedPDFOutput.setRequired(false);
+        options.addOption(correctedPDFOutput);
 
-        Option deskewOutput = new Option("deskew", "deskew_pdf_output", true,
-                "write de-skewed pdf to file");
-        deskewOutput.setRequired(false);
-        options.addOption(deskewOutput);
+        Option renderCharRects = new Option("render_char_rects", "render_char_rects", false,
+                "render character rectangles in corrected pdf output (true/false)");
+        renderCharRects.setRequired(false);
+        options.addOption(renderCharRects);
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();

@@ -49,12 +49,14 @@ class RequestMetadata:
 
     ocr_enable: bool = True
     deskew_enable: bool = True
+    char_coords_debug_enable: bool = True
 
     status: str = STATUS_PENDING
 
     output_format: OutputFormat = OutputFormat.msgpack
     converted_to_pdf: Optional[str] = None
     ocred_pdf: Optional[str] = None
+    corrected_pdf: Optional[str] = None
     pdf_file: Optional[str] = None
     plain_text_file: Optional[str] = None
     text_structure_file: Optional[str] = None
@@ -86,6 +88,7 @@ class RequestMetadata:
             error_message=self.error_message,
             converted_cleaned_pdf=self.converted_to_pdf is not None,
             searchable_pdf_created=self.ocred_pdf is not None,
+            corrected_pdf_created=self.corrected_pdf is not None,
             pdf_pages_ocred=sorted(list(self.pages_for_ocr.keys())) if self.pages_for_ocr else None,
             tables_extracted=self.tables_file is not None,
             plain_text_extracted=self.plain_text_file is not None,
