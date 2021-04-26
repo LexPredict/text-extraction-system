@@ -29,12 +29,13 @@ def page_requires_ocr(page_layout: LTPage) -> bool:
     return text_cover < 0.3 * image_cover
 
 
-def iterate_pages(pdf_fn: str) -> Generator[LTPage, None, None]:
+def iterate_pages(pdf_fn: str, use_advanced_detection: bool = False) -> Generator[LTPage, None, None]:
     with open(pdf_fn, 'rb') as pdf_f:
         parser = PDFParser(pdf_f)
         doc = PDFDocument(parser)
         rsrcmgr = PDFResourceManager()
-        laparams = LAParams()
+        laparams = LAParams(all_texts=True) if use_advanced_detection \
+            else LAParams(all_texts=True, boxes_flow=None)
         device = PDFPageAggregator(rsrcmgr, laparams=laparams)
         interpreter = PDFPageInterpreter(rsrcmgr, device)
         for page in PDFPage.create_pages(doc):
@@ -62,7 +63,7 @@ def extract_page_images(pdf_fn: str,
                         end_page: int = None,
                         pdf_password: str = None,
                         timeout_sec: int = 1800,
-                        dpi:int = 300) -> Generator[List[str], None, None]:
+                        dpi: int = 300) -> Generator[List[str], None, None]:
     java_modules_path = get_settings().java_modules_path
 
     temp_dir = mkdtemp(prefix='pdf_images_')
@@ -113,11 +114,10 @@ def extract_page_ocr_images(pdf_fn: str,
                             end_page: int = None,
                             pdf_password: str = None,
                             timeout_sec: int = 1800,
-                            dpi:int = 300) -> Generator[List[Tuple[str, str]], None, None]:
+                            dpi: int = 300) -> Generator[List[Tuple[str, str]], None, None]:
     java_modules_path = get_settings().java_modules_path
 
     temp_dir_no_text = mkdtemp(prefix='pdf_images_')
-    temp_dir_with_text = mkdtemp(prefix='pdf_images_')
     basefn = os.path.splitext(os.path.basename(pdf_fn))[0]
     try:
         args = ['java', '-cp', f'{java_modules_path}/*',
@@ -125,8 +125,7 @@ def extract_page_ocr_images(pdf_fn: str,
                 pdf_fn,
                 '--format', 'png',
                 '--dpi', f'{dpi}',
-                '--output-prefix-no-text', f'{temp_dir_no_text}/{basefn}__',
-                '--output-prefix-with-text', f'{temp_dir_with_text}/{basefn}__']
+                '--output-prefix-no-text', f'{temp_dir_no_text}/{basefn}__']
         if pdf_password:
             args += ['--password', pdf_password]
 
@@ -153,17 +152,10 @@ def extract_page_ocr_images(pdf_fn: str,
             page_num = PAGE_NUM_RE.search(os.path.splitext(fn)[0]).group(0)
             page_by_num_no_text[int(page_num)] = os.path.join(temp_dir_no_text, fn)
 
-        page_by_num_with_text: Dict[int, str] = dict()
-        for fn in os.listdir(temp_dir_with_text):
-            page_num = PAGE_NUM_RE.search(os.path.splitext(fn)[0]).group(0)
-            page_by_num_with_text[int(page_num)] = os.path.join(temp_dir_with_text, fn)
-
-        yield [(page_by_num_with_text[key], page_by_num_no_text[key])
-               for key in sorted(page_by_num_no_text.keys())]
+        yield [page_by_num_no_text[key] for key in sorted(page_by_num_no_text.keys())]
 
     finally:
         shutil.rmtree(temp_dir_no_text, ignore_errors=True)
-        shutil.rmtree(temp_dir_with_text, ignore_errors=True)
 
 
 def calc_covers(lt_obj: LTItem) -> Tuple[int, int]:

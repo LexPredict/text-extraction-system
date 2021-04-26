@@ -7,12 +7,10 @@ import org.apache.commons.cli.*;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
-import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.msgpack.jackson.dataformat.MessagePackFactory;
 
 import java.awt.*;
 import java.io.*;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -53,8 +51,8 @@ public class GetTextFromPDF {
                     new double[]{2d, 5.6d, 6.7d, 7.8d, 8.9d});
 
 
-            p.pages = Arrays.asList(new PDFPlainTextPage(new double[]{0, 0, 4.5, 5.6}, new int[]{1, 100}),
-                    new PDFPlainTextPage(new double[]{0, 0, 4.5, 5.6}, new int[]{100, 200}));
+            p.pages = Arrays.asList(new PDFPlainTextPage(new double[]{0, 0, 4.5, 5.6}, new int[]{1, 100}, 0),
+                    new PDFPlainTextPage(new double[]{0, 0, 4.5, 5.6}, new int[]{100, 200}, 0));
 
             String example = om.writerWithDefaultPrettyPrinter().writeValueAsString(p);
             System.out.println("JSON / MsgPack output example:\n" + example);
@@ -69,10 +67,11 @@ public class GetTextFromPDF {
 
         String format = cmd.getOptionValue("f", PLAIN_TEXT);
         String password = cmd.getOptionValue("p", "");
-        String debugOutputPDF = cmd.getOptionValue("debug");
+        boolean renderCharRects = cmd.hasOption("render_char_rects");
+        String correctedPDFOutput = cmd.getOptionValue("corrected_pdf_output");
 
         try (PDDocument document = PDDocument.load(new File(pdf), password)) {
-            PDFPlainText res = PDFToTextWithCoordinates.process(document);
+            PDFPlainText res = PDFToTextWithCoordinates.process(document, correctedPDFOutput != null);
 
             try (OutputStream os = new FileOutputStream(outFn)) {
                 if (PLAIN_TEXT.equals(format)) {
@@ -88,58 +87,33 @@ public class GetTextFromPDF {
                 }
             }
 
-            if (debugOutputPDF != null)
-                GetTextFromPDF.renderDebugPDF(document, res, debugOutputPDF);
+            if (correctedPDFOutput != null)
+                if (renderCharRects)
+                    GetTextFromPDF.renderDebugPDF(document, res, correctedPDFOutput);
+                else
+                    document.save(correctedPDFOutput);
         }
     }
 
     protected static void renderDebugPDF(PDDocument document, PDFPlainText res, String fn) throws IOException {
         int i = 0;
         for (PDPage page : document.getPages()) {
+            float urY = page.getCropBox().getUpperRightY();
             PDFPlainTextPage pageRes = res.pages.get(i);
             List<double[]> pageCoords = res.charBBoxes.subList(pageRes.location[0], pageRes.location[1]);
             String pageText = res.text.substring(pageRes.location[0], pageRes.location[1]);
-            List<double[]> lineCoordsStartEnd = new ArrayList<>();
-            List<String> lineTexts = new ArrayList<>();
-            double[] coordsStart = null;
-            int chNumStart = -1;
 
-            for (int chNum = 0; chNum < pageText.length(); chNum++) {
-                if (coordsStart == null && pageText.charAt(chNum) != '\n' && pageText.charAt(chNum) != ' ') {
-                    double[] charCoords = pageCoords.get(chNum);
-                    coordsStart = new double[]{charCoords[0], charCoords[1]};
-                    chNumStart = chNum;
-                } else if ((pageText.charAt(chNum) == '\n' || pageText.charAt(chNum) == ' ') && chNum > 1 && coordsStart != null) {
-                    double[] charCoords = pageCoords.get(chNum - 1);
-                    lineCoordsStartEnd.add(new double[]{coordsStart[0], pageRes.bbox[3] - coordsStart[1],
-                            charCoords[0] + charCoords[2], pageRes.bbox[3] - charCoords[1]});
-                    String sub = pageText.substring(chNumStart, chNum);
-                    lineTexts.add(sub);
-                    coordsStart = null;
-                    chNumStart = -1;
-                }
-            }
             PDPageContentStream contentStream = new PDPageContentStream(document, page,
                     PDPageContentStream.AppendMode.APPEND, true, true);
             int k = 0;
-            for (double[] l : lineCoordsStartEnd) {
-                contentStream.setStrokingColor(Color.RED);
-                contentStream.moveTo((float) l[0], (float) l[1]);
-                contentStream.lineTo((float) l[2], (float) l[3]);
+            for (double[] c : pageCoords) {
+                char ch = pageText.charAt(k);
+                contentStream.setStrokingColor(Color.BLUE);
+                contentStream.addRect((float) c[0], urY - (float) c[1], (float) c[2], (float) c[3]);
                 contentStream.stroke();
-
-                //PDType1Font pdfFont = PDType1Font.HELVETICA;
-                //int fontSize = 9;
-                //contentStream.setFont(pdfFont, fontSize);
-                //contentStream.setStrokingColor(Color.CYAN);
-                //contentStream.beginText();
-                //contentStream.newLineAtOffset((float) l[0], (float) l[1]);
-                //contentStream.showText(lineTexts.get(k));
-                //contentStream.endText();
                 k++;
             }
             contentStream.close();
-
 
             i++;
         }
@@ -159,10 +133,15 @@ public class GetTextFromPDF {
         pwrd.setRequired(false);
         options.addOption(pwrd);
 
-        Option debugOutput = new Option("debug", "debug_pdf_output", true,
-                "write debug pdf with the text marked with lines and color");
-        debugOutput.setRequired(false);
-        options.addOption(debugOutput);
+        Option correctedPDFOutput = new Option("corrected_output", "corrected_pdf_output", true,
+                "write corrected/de-skewed pdf to file");
+        correctedPDFOutput.setRequired(false);
+        options.addOption(correctedPDFOutput);
+
+        Option renderCharRects = new Option("render_char_rects", "render_char_rects", false,
+                "render character rectangles in corrected pdf output (true/false)");
+        renderCharRects.setRequired(false);
+        options.addOption(renderCharRects);
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();

@@ -1,12 +1,12 @@
-from dataclasses import dataclass
-from typing import List, Optional, Dict
-from enum import Enum
 import datetime
+from dataclasses import dataclass
+from enum import Enum
+from typing import List, Optional, Dict
 
 from dataclasses_json import dataclass_json
 from pandas import DataFrame
-from pydantic.dataclasses import dataclass as pydantic_dataclass
 from pydantic import BaseModel
+from pydantic.dataclasses import dataclass as pydantic_dataclass
 
 STATUS_PENDING = 'PENDING'
 STATUS_DONE = 'DONE'
@@ -39,13 +39,14 @@ class RequestStatus:
     error_message: Optional[str] = None
     converted_cleaned_pdf: bool = False
     searchable_pdf_created: bool = False
+    corrected_pdf_created: bool = False
     pdf_pages_ocred: Optional[List[int]] = None
     plain_text_extracted: bool = False
     text_structure_extracted: bool = False
     pdf_coordinates_extracted: bool = False
     tables_extracted: bool = False
     additional_info: Optional[str] = None
-    page_rotate_angles: Optional[Dict[int, float]] = None
+    page_rotate_angles: Optional[List[float]] = None
 
 
 @pydantic_dataclass
@@ -53,7 +54,7 @@ class RequestStatus:
 @dataclass
 class RequestStatuses:
     request_statuses: List[RequestStatus]
-    
+
 
 class UserRequestsQuery(BaseModel):
     request_ids: List[str]

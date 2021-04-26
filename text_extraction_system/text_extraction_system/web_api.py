@@ -85,6 +85,7 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                                     doc_language: str = Form(default=''),
                                     ocr_enable: bool = Form(default=True),
                                     deskew_enable: bool = Form(default=True),
+                                    char_coords_debug_enable: bool = Form(default=False),
                                     request_id: str = Form(default=None),
                                     log_extra_json_key_value: str = Form(default=None),
                                     convert_to_pdf_timeout_sec: int = Form(default=1800),
@@ -100,6 +101,7 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                           doc_language=doc_language,
                           ocr_enable=ocr_enable,
                           deskew_enable=deskew_enable,
+                          char_coords_debug_enable=char_coords_debug_enable,
                           output_format=output_format,
                           convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
                           pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
@@ -342,6 +344,10 @@ async def extract_all_data_from_document(
 
     # Get all extracted data in .zip file and clean temp data
     req: RequestMetadata = load_request_metadata_or_raise(request_id)
+    if req.status != dto.STATUS_DONE:
+        raise HTTPException(status_code=500, detail=f'Request is not finished successfully.\n'
+                                                    f'Status: {req.status}.\n'
+                                                    f'Detail:\n{req.error_message}')
     mem_stream = pack_request_results(req)
     mem_stream.seek(0)
     response = StreamingResponse(mem_stream, media_type='application/x-zip-compressed')

@@ -7,6 +7,8 @@ from camelot.parsers.stream import Stream
 from camelot.utils import get_text_objects
 from pdfminer.layout import LTPage
 
+from text_extraction_system.pdf.pdf import extract_page_images, iterate_pages
+
 
 class CustomizedLattice(Lattice):
 
@@ -65,6 +67,19 @@ def extract_tables(pageno: int,
     # putting a dummy file name to avoid Camelot arguing
     # Camelot extracts the page number from the file name.
     return lattice.extract_tables(f'page-{pageno}.pdf', suppress_stdout=True)
+
+
+def extract_tables_from_pdf_file(pdf_fn: str, pdfminer_advanced_detection: bool = False) -> List[CamelotTable]:
+    res: List[CamelotTable] = list()
+    with extract_page_images(pdf_fn=pdf_fn) as image_fns:
+        page_num = 0
+        for ltpage in iterate_pages(pdf_fn, use_advanced_detection=pdfminer_advanced_detection):
+            page_image_fn = image_fns[page_num]
+            camelot_tables: List[CamelotTable] = extract_tables(page_num, ltpage, page_image_fn)
+            if camelot_tables:
+                res += camelot_tables
+            page_num += 1
+    return res or None
 
 
 def extract_tables_borderless(pageno: int,

@@ -245,5 +245,6 @@ def test_proper_page_merge_in():
     client.schedule_data_extraction_task(fn,
                                          call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
                                          call_back_additional_info='hello world',
-                                         log_extra={'hello': 'world', 'test': True})
+                                         log_extra={'hello': 'world', 'test': True},
+                                         output_format=OutputFormat.msgpack)
     srv.wait_for_test_results(120)
