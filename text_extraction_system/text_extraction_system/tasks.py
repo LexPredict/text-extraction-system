@@ -356,30 +356,19 @@ def finish_pdf_processing(task,
             # download PDFs of the OCRed pages
             # each page contains a transparent layer (glyphless font) with the recognized text
             # file names of the pages at webdav are generated in process_pdf_page_task(..) as:
-            # either <page_num>.<rotation_angle>.pdf
-            # or <page_num>.pdf if there is no page rotation detected
-            page_rotate_angles: Dict[int, float] = dict()
+            # <page_num>.pdf
+
+            pdf_pages_ocred: List[int] = list()
 
             for remote_base_fn in webdav_client.list(f'{request_id}/{pages_ocred}'):
                 remote_page_pdf_fn = f'{req.request_id}/{pages_ocred}/{remote_base_fn}'
                 local_page_pdf_fn = os.path.join(pages_dir, remote_base_fn)
                 webdav_client.download_file(remote_page_pdf_fn, local_page_pdf_fn)
-
-                # Page file names consist of <page_number>.<float_page_rotate_angle>.pdf
-                # Example: 00001.0.5299606323242188.pdf
-                remote_base_fn_no_ext = os.path.splitext(remote_base_fn)[0]
-                page_rotate = remote_base_fn_no_ext.split('.')
-                if len(page_rotate) > 1:
-                    page_num = int(page_rotate[0])
-                    page_rotate_angle = float(remote_base_fn_no_ext[len(page_rotate[0]) + 1:])
-                    page_rotate_angles[page_num] = page_rotate_angle
-
+                pdf_pages_ocred.append(int(os.path.splitext(remote_base_fn)[0]))
                 requires_page_merge = True
 
-            if page_rotate_angles:
-                req.page_rotate_angles = page_rotate_angles
-
             if requires_page_merge:
+                req.pdf_pages_ocred = pdf_pages_ocred
                 original_pdf_in_storage = req.converted_to_pdf or req.original_document
                 local_orig_pdf_fn = os.path.join(temp_dir, original_pdf_in_storage)
 
@@ -393,12 +382,12 @@ def finish_pdf_processing(task,
                     req.ocred_pdf = os.path.splitext(original_pdf_in_storage)[0] + '.ocred.pdf'
                     webdav_client.upload_file(f'{req.request_id}/{req.ocred_pdf}', local_merged_pdf_fn)
                     extract_data_and_finish(req, webdav_client,
-                                            local_merged_pdf_fn, camelot_tables_total)
+                                            local_merged_pdf_fn)
             else:
                 remote_fn = req.converted_to_pdf or req.original_document
                 with webdav_client.get_as_local_fn(f'{req.request_id}/{remote_fn}') as (local_pdf_fn, _remote_path):
                     extract_data_and_finish(req, webdav_client,
-                                            local_pdf_fn, camelot_tables_total)
+                                            local_pdf_fn)
 
         finally:
             shutil.rmtree(temp_dir)
@@ -406,8 +395,7 @@ def finish_pdf_processing(task,
 
 def extract_data_and_finish(req: RequestMetadata,
                             webdav_client: WebDavClient,
-                            local_pdf_fn: str,
-                            camelot_tables: List[CamelotTable]):
+                            local_pdf_fn: str):
     req.pdf_file = req.ocred_pdf or req.converted_to_pdf or req.original_document
     pdf_fn_in_storage_base = os.path.splitext(req.original_document)[0]
     camelot_tables: List[CamelotTable] = None
@@ -417,7 +405,7 @@ def extract_data_and_finish(req: RequestMetadata,
     with extract_text_and_structure(local_pdf_fn, language=req.doc_language,
                                     correct_pdf=req.deskew_enable,
                                     render_coords_debug=req.char_coords_debug_enable) \
-            as (text, text_structure, orig_or_corrected_pdf_fn):
+            as (text, text_structure, orig_or_corrected_pdf_fn, page_rotate_angles):
         log.info(f'Extracted {len(text)} characters from {pdf_fn_in_storage_base}')
 
         req.plain_text_file = pdf_fn_in_storage_base + '.plain.txt'
@@ -445,7 +433,9 @@ def extract_data_and_finish(req: RequestMetadata,
                                     f'{req.request_id}/{req.text_structure_file}')
 
         if req.char_coords_debug_enable or req.deskew_enable:
-            req.pdf_file = os.path.splitext(os.path.basename(req.pdf_file))[0] + '_corr.pdf'
+            req.page_rotate_angles = page_rotate_angles
+            req.corrected_pdf = os.path.splitext(os.path.basename(req.pdf_file))[0] + '_corr.pdf'
+            req.pdf_file = req.corrected_pdf
             webdav_client.upload(f'{req.request_id}/{req.corrected_pdf}', orig_or_corrected_pdf_fn)
 
         log.info(f'Extracting tables from {req.pdf_file}...')
@@ -458,7 +448,7 @@ def extract_data_and_finish(req: RequestMetadata,
                 req.tables_file = pdf_fn_in_storage_base + '.tables.json'
                 webdav_client.upload_to(json.dumps(tables.to_dict(), indent=2).encode('utf-8'),
                                         f'{req.request_id}/{req.tables_file}')
-    
+
             if req.output_format == OutputFormat.msgpack:
                 req.tables_file = pdf_fn_in_storage_base + '.tables.msgpack'
                 packed = msgpack.packb(tables.to_dict(), use_bin_type=True, use_single_float=True)
@@ -469,10 +459,6 @@ def extract_data_and_finish(req: RequestMetadata,
             webdav_client.clean(f'{req.request_id}/{req.converted_to_pdf}')
         if req.ocred_pdf and req.ocred_pdf != req.pdf_file:
             webdav_client.clean(f'{req.request_id}/{req.ocred_pdf}')
-        if req.pages_for_ocr:
-            webdav_client.clean(f'{req.request_id}/{pages_for_processing}/')
-            webdav_client.clean(f'{req.request_id}/{pages_ocred}/')
-            webdav_client.clean(f'{req.request_id}/{pages_tables}/')
 
     req.status = STATUS_DONE
 

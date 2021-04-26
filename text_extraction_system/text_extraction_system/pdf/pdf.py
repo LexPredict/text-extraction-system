@@ -29,12 +29,13 @@ def page_requires_ocr(page_layout: LTPage) -> bool:
     return text_cover < 0.3 * image_cover
 
 
-def iterate_pages(pdf_fn: str) -> Generator[LTPage, None, None]:
+def iterate_pages(pdf_fn: str, use_advanced_detection: bool = False) -> Generator[LTPage, None, None]:
     with open(pdf_fn, 'rb') as pdf_f:
         parser = PDFParser(pdf_f)
         doc = PDFDocument(parser)
         rsrcmgr = PDFResourceManager()
-        laparams = LAParams()
+        laparams = LAParams(all_texts=True) if use_advanced_detection \
+            else LAParams(all_texts=True, boxes_flow=None)
         device = PDFPageAggregator(rsrcmgr, laparams=laparams)
         interpreter = PDFPageInterpreter(rsrcmgr, device)
         for page in PDFPage.create_pages(doc):

@@ -6,11 +6,14 @@ public class PDFPlainTextPage {
 
     public int[] location;
 
+    public double deskewAngle;
+
     public PDFPlainTextPage() {
     }
 
-    public PDFPlainTextPage(double[] bbox, int[] location) {
+    public PDFPlainTextPage(double[] bbox, int[] location, double deskewAngle) {
         this.bbox = bbox;
         this.location = location;
+        this.deskewAngle = deskewAngle;
     }
 }

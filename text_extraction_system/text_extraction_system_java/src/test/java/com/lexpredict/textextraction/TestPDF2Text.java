@@ -55,7 +55,7 @@ public class TestPDF2Text extends TestCase {
                 .getResourceAsStream("/RESO_20120828-01_Building_Remodel__54.pdf")) {
             try (PDDocument document = PDDocument.load(stream)) {
                 PDFPlainText res = PDFToTextWithCoordinates.process(document, true);
-                assertEquals(58, res.text.chars().filter(ch -> ch == '\n').count());
+                assertEquals(57, res.text.chars().filter(ch -> ch == '\n').count());
 
             }
         }
@@ -66,7 +66,7 @@ public class TestPDF2Text extends TestCase {
                 .getResourceAsStream("/paragraphs2.pdf")) {
             try (PDDocument document = PDDocument.load(stream)) {
                 PDFPlainText res = PDFToTextWithCoordinates.process(document, true);
-                assertEquals(43, res.text.chars().filter(ch -> ch == '\n').count());
+                assertEquals(40, res.text.chars().filter(ch -> ch == '\n').count());
             }
         }
     }
@@ -104,6 +104,20 @@ public class TestPDF2Text extends TestCase {
                 assertEquals(3, StringUtils.countMatches(res.text, "again"));
                 assertEquals(1, StringUtils.countMatches(res.text, "World"));
                 assertEquals(3, StringUtils.countMatches(res.text, "world"));
+            }
+        }
+    }
+
+    public void test_angle() throws Exception {
+        try (InputStream stream = TestPDF2Text.class
+                .getResourceAsStream("/rotated1_pdf.converted.pdf")) {
+            try (PDDocument document = PDDocument.load(stream)) {
+                PDFPlainText res = PDFToTextWithCoordinates.process(document, true);
+                System.out.println(res.text);
+
+                String t = "certain angle 1";
+
+                assertTrue(res.text.contains(t));
             }
         }
     }

@@ -49,7 +49,7 @@ class RequestMetadata:
 
     ocr_enable: bool = True
     deskew_enable: bool = True
-    char_coords_debug_enable: bool = True
+    char_coords_debug_enable: bool = False
 
     status: str = STATUS_PENDING
 
@@ -63,12 +63,12 @@ class RequestMetadata:
     pdf_coordinates_file: Optional[str] = None
     tables_file: Optional[str] = None
     doc_language: Optional[str] = None
-    pages_for_ocr: Optional[Dict[int, str]] = None
+    pdf_pages_ocred: Optional[List[int]] = None
     error_message: Optional[str] = None
     convert_to_pdf_timeout_sec: int = 1800
     pdf_to_images_timeout_sec: int = 1800
 
-    page_rotate_angles: Optional[Dict[int, float]] = None
+    page_rotate_angles: Optional[List[float]] = None
 
     def append_error(self, problem: str, exc: Exception):
         error_message: List[str] = list()
@@ -89,7 +89,7 @@ class RequestMetadata:
             converted_cleaned_pdf=self.converted_to_pdf is not None,
             searchable_pdf_created=self.ocred_pdf is not None,
             corrected_pdf_created=self.corrected_pdf is not None,
-            pdf_pages_ocred=sorted(list(self.pages_for_ocr.keys())) if self.pages_for_ocr else None,
+            pdf_pages_ocred=self.pdf_pages_ocred,
             tables_extracted=self.tables_file is not None,
             plain_text_extracted=self.plain_text_file is not None,
             text_structure_extracted=self.text_structure_file is not None,

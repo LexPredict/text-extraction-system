@@ -1,4 +1,5 @@
 import os
+import os
 import shutil
 import subprocess
 from contextlib import contextmanager
@@ -7,10 +8,9 @@ from io import StringIO
 from logging import getLogger
 from subprocess import CompletedProcess, PIPE
 from tempfile import mkdtemp
-from typing import List, Tuple, Generator, Optional, Dict, Any
+from typing import Tuple, Generator, Optional, Dict, Any, List
 
 import msgpack
-from camelot.core import Table as CamelotTable
 from lexnlp.nlp.en.segments.paragraphs import get_paragraphs
 from lexnlp.nlp.en.segments.sections import get_document_sections_with_titles
 from lexnlp.nlp.en.segments.sentences import get_sentence_span_list
@@ -25,11 +25,10 @@ from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfparser import PDFParser
 
 from text_extraction_system.config import get_settings
-from text_extraction_system.data_extract.camelot.camelot import extract_tables
 from text_extraction_system.data_extract.lang import get_lang_detector
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf
 from text_extraction_system.pdf.pdf import page_requires_ocr, extract_page_ocr_images, \
-    raise_from_pdfbox_error_messages, merge_pdf_pages
+    raise_from_pdfbox_error_messages
 from text_extraction_system.processes import raise_from_process
 from text_extraction_system.utils import LanguageConverter
 from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, PlainTextStructure, \
@@ -40,13 +39,15 @@ PAGE_SEPARATOR = '\n\n\f'
 DPI: int = 300
 
 
+@contextmanager
 def extract_text_and_structure(pdf_fn: str,
                                pdf_password: str = None,
                                timeout_sec: int = 3600,
                                language: str = "",
                                correct_pdf: bool = False,
                                render_coords_debug: bool = False) \
-        -> Tuple[str, TextAndPDFCoordinates, str]:  # text, structure, corrected_pdf_fn
+        -> Tuple[
+            str, TextAndPDFCoordinates, str, Dict[int, float]]:  # text, structure, corrected_pdf_fn, page_rotate_angles
 
     if render_coords_debug:
         correct_pdf = True
@@ -99,8 +100,14 @@ def extract_text_and_structure(pdf_fn: str,
                                              sentences=[],
                                              paragraphs=[],
                                              sections=[])
-            yield text, TextAndPDFCoordinates(text_structure=text_struct, pdf_coordinates=pdf_coordinates), out_pdf_fn
+            yield text, \
+                  TextAndPDFCoordinates(text_structure=text_struct, pdf_coordinates=pdf_coordinates), \
+                  out_pdf_fn, \
+                  None
+
             return
+
+        page_rotate_angles: List[float] = [pdfpage['deskewAngle'] for pdfpage in pdfbox_res['pages']]
 
         pages = []
         num: int = 0
@@ -150,7 +157,7 @@ def extract_text_and_structure(pdf_fn: str,
         char_bboxes = pdfbox_res['charBBoxes']
         pdf_coordinates = PDFCoordinates(char_bboxes=char_bboxes)
         yield text, TextAndPDFCoordinates(text_structure=text_struct,
-                                          pdf_coordinates=pdf_coordinates), out_pdf_fn
+                                          pdf_coordinates=pdf_coordinates), out_pdf_fn, page_rotate_angles
         return
 
     finally:
