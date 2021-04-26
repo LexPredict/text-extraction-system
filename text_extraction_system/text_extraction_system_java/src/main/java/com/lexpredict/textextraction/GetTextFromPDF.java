@@ -51,8 +51,8 @@ public class GetTextFromPDF {
                     new double[]{2d, 5.6d, 6.7d, 7.8d, 8.9d});
 
 
-            p.pages = Arrays.asList(new PDFPlainTextPage(new double[]{0, 0, 4.5, 5.6}, new int[]{1, 100}),
-                    new PDFPlainTextPage(new double[]{0, 0, 4.5, 5.6}, new int[]{100, 200}));
+            p.pages = Arrays.asList(new PDFPlainTextPage(new double[]{0, 0, 4.5, 5.6}, new int[]{1, 100}, 0),
+                    new PDFPlainTextPage(new double[]{0, 0, 4.5, 5.6}, new int[]{100, 200}, 0));
 
             String example = om.writerWithDefaultPrettyPrinter().writeValueAsString(p);
             System.out.println("JSON / MsgPack output example:\n" + example);
@@ -67,7 +67,7 @@ public class GetTextFromPDF {
 
         String format = cmd.getOptionValue("f", PLAIN_TEXT);
         String password = cmd.getOptionValue("p", "");
-        boolean renderCharRects = "true".equals(cmd.getOptionValue("render_char_rects").toLowerCase());
+        boolean renderCharRects = cmd.hasOption("render_char_rects");
         String correctedPDFOutput = cmd.getOptionValue("corrected_pdf_output");
 
         try (PDDocument document = PDDocument.load(new File(pdf), password)) {

@@ -25,11 +25,14 @@ class TextExtractionSystemWebClient:
         except HTTPError as e:
             message = '\n'.join([str(a) for a in e.args])
             body_str = str(resp.request.body)
+            resp_body = str(resp.text)
             if len(body_str) > 2048:
                 body_str = body_str[:2048] + '...'
             message += f'\nRequest url:\n{resp.request.url}' \
                        f'\nRequest headers:\n{resp.request.headers}' \
-                       f'\nRequest body:\n{body_str}...'
+                       f'\nRequest body:\n{body_str}\n' \
+                       f'\n' \
+                       f'\nResponse body:\n{resp_body}\n'
             raise HTTPError(message, response=resp)
 
     def schedule_data_extraction_task(self,
@@ -47,6 +50,7 @@ class TextExtractionSystemWebClient:
                                       pdf_to_images_timeout_sec: int = 1800,
                                       ocr_enable: bool = True,
                                       deskew_enable: bool = True,
+                                      char_coords_debug_enable: bool = False,
                                       call_back_celery_version: int = 4,
                                       request_id: str = None,
                                       log_extra: Dict[str, str] = None,
@@ -69,6 +73,7 @@ class TextExtractionSystemWebClient:
                                        doc_language=doc_language,
                                        ocr_enable=ocr_enable,
                                        deskew_enable=deskew_enable,
+                                       char_coords_debug_enable=char_coords_debug_enable,
                                        request_id=request_id,
                                        log_extra_json_key_value=json.dumps(log_extra) if log_extra else None,
                                        glyph_enhancing=glyph_enhancing,

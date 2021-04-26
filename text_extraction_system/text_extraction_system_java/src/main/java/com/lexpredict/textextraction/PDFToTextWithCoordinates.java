@@ -43,6 +43,8 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
     protected int curPageStartOffset;
 
+    protected boolean insideInternalPageProcessing = false;
+
     protected boolean deskew;
 
     protected int maxDeskewAngleAbs = 4;
@@ -260,12 +262,16 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
     @Override
     protected void writePageStart() throws IOException {
+        if (this.insideInternalPageProcessing)
+            return;
         super.writePageStart();
         this.addNonPrintableCharBoxes(getPageStart());
     }
 
     @Override
     protected void writePageEnd() throws IOException {
+        if (this.insideInternalPageProcessing)
+            return;
         super.writePageEnd();
         this.addNonPrintableCharBoxes(getPageEnd());
     }
@@ -350,7 +356,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         public double[] getLimitsByAngle(int angle) {
             Integer closestLeft = null;
             Integer closestRight = null;
-            for (int angle1 : this.anglesToCharNum.keySet()) {
+            for (int angle1 : this.sortedAngles) {
                 if (angle1 < angle && (closestLeft == null || angle1 > closestLeft))
                     closestLeft = angle1;
                 else if (angle1 > angle && (closestRight == null || angle1 < closestRight))
@@ -375,6 +381,10 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         }
 
         protected int[] selectDeskewAngle(int skewAngleAbsLimit) {
+            if (sortedAngles == null || sortedAngles.length == 0) {
+                return new int[] {0, 0, 0};
+            }
+
             for (int i = this.sortedAngles.length - 1; i >= 0; i--) {
                 int angle = sortedAngles[i];
                 int pageRotation = 90 * Math.round((float) angle / 90);
@@ -403,6 +413,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     @Override
     public void processPage(PDPage page) throws IOException {
         int pageStart = this.charBBoxes == null ? 0 : this.charBBoxes.size();
+        int deskewFullAngle = 0;
 
         if (this.detectAngles) {
             int oldRotation = page.getRotation();
@@ -415,10 +426,11 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
 
             int[] deskewFullAngleRotationSkewAngle = angleCollector.selectDeskewAngle(this.maxDeskewAngleAbs);
-            int deskewFullAngle = deskewFullAngleRotationSkewAngle[0];
+            deskewFullAngle = deskewFullAngleRotationSkewAngle[0];
             int deskewPageRotation = deskewFullAngleRotationSkewAngle[1];
             int deskewSkewAngle = deskewFullAngleRotationSkewAngle[2];
-
+            this.writePageStart();
+            this.insideInternalPageProcessing = true;
             for (Integer angle : angleCollector.sortedAngles) {
                 this.curAngleLimits = angleCollector.getLimitsByAngle(angle);
                 this.curCharBackTransform = null;
@@ -447,6 +459,8 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
                 }
                 this.curAngleLimits = null;
             }
+            this.insideInternalPageProcessing = false;
+            this.writePageEnd();
 
             if (deskew) {
                 page.setRotation(deskewPageRotation);
@@ -471,6 +485,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
                 r(area.getWidth()), r(area.getHeight())};
         int pageEnd = this.charBBoxes == null ? 0 : this.charBBoxes.size();
         pp.location = new int[]{pageStart, pageEnd};
+        pp.deskewAngle = (double) deskewFullAngle;
         this.pages.add(pp);
     }
 
