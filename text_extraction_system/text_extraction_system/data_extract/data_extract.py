@@ -27,9 +27,7 @@ from pdfminer.pdfparser import PDFParser
 from text_extraction_system.config import get_settings
 from text_extraction_system.data_extract.camelot.camelot import extract_tables
 from text_extraction_system.data_extract.lang import get_lang_detector
-from text_extraction_system.ocr.ocr import ocr_page_to_pdf, rotate_image, image_to_osd, OSD, \
-    orientation_and_script_detected_in_osd
-from text_extraction_system.ocr.rotation_detection import detect_rotation_dilated_rows
+from text_extraction_system.ocr.ocr import ocr_page_to_pdf
 from text_extraction_system.pdf.pdf import page_requires_ocr, extract_page_ocr_images, \
     raise_from_pdfbox_error_messages, merge_pdf_pages
 from text_extraction_system.processes import raise_from_process
@@ -45,8 +43,14 @@ DPI: int = 300
 def extract_text_and_structure(pdf_fn: str,
                                pdf_password: str = None,
                                timeout_sec: int = 3600,
-                               language: str = "") \
-        -> Tuple[str, TextAndPDFCoordinates]:
+                               language: str = "",
+                               correct_pdf: bool = False,
+                               render_coords_debug: bool = False) \
+        -> Tuple[str, TextAndPDFCoordinates, str]:  # text, structure, corrected_pdf_fn
+
+    if render_coords_debug:
+        correct_pdf = True
+
     java_modules_path = get_settings().java_modules_path
 
     # Convert language to language code
@@ -55,6 +59,7 @@ def extract_text_and_structure(pdf_fn: str,
 
     temp_dir = mkdtemp(prefix='pdf_text_')
     out_fn = os.path.join(temp_dir, os.path.splitext(os.path.basename(pdf_fn))[0] + '.msgpack')
+    out_pdf_fn = pdf_fn
     try:
         args = ['java', '-cp', f'{java_modules_path}/*',
                 'com.lexpredict.textextraction.GetTextFromPDF',
@@ -65,6 +70,14 @@ def extract_text_and_structure(pdf_fn: str,
         if pdf_password:
             args.append('-p')
             args.append(pdf_password)
+
+        if correct_pdf:
+            out_pdf_fn = os.path.join(temp_dir, os.path.splitext(os.path.basename(pdf_fn))[0] + '_corr.pdf')
+            args.append('-corrected_output')
+            args.append(out_pdf_fn)
+
+            if render_coords_debug:
+                args.append('-render_char_rects')
 
         completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=timeout_sec,
                                                              universal_newlines=True, stderr=PIPE, stdout=PIPE)
@@ -86,7 +99,8 @@ def extract_text_and_structure(pdf_fn: str,
                                              sentences=[],
                                              paragraphs=[],
                                              sections=[])
-            return text, TextAndPDFCoordinates(text_structure=text_struct, pdf_coordinates=pdf_coordinates)
+            yield text, TextAndPDFCoordinates(text_structure=text_struct, pdf_coordinates=pdf_coordinates), out_pdf_fn
+            return
 
         pages = []
         num: int = 0
@@ -135,8 +149,9 @@ def extract_text_and_structure(pdf_fn: str,
 
         char_bboxes = pdfbox_res['charBBoxes']
         pdf_coordinates = PDFCoordinates(char_bboxes=char_bboxes)
-        return text, TextAndPDFCoordinates(text_structure=text_struct,
-                                           pdf_coordinates=pdf_coordinates)
+        yield text, TextAndPDFCoordinates(text_structure=text_struct,
+                                          pdf_coordinates=pdf_coordinates), out_pdf_fn
+        return
 
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
@@ -173,14 +188,12 @@ class PDFPageProcessingResults:
     page_requires_ocr: bool
     ocred_page_fn: Optional[str] = None
     ocred_page_rotation_angle: Optional[float] = None
-    camelot_tables: Optional[List[CamelotTable]] = None
 
 
 @contextmanager
 def process_pdf_page(pdf_fn: str,
                      page_num: int,
                      ocr_enabled: bool = True,
-                     deskew_enabled: bool = True,
                      ocr_language: str = None,
                      ocr_timeout_sec: int = 60,
                      pdf_password: str = None) -> Generator[PDFPageProcessingResults, None, None]:
@@ -190,11 +203,11 @@ def process_pdf_page(pdf_fn: str,
     # all the text elements removed - to be used for OCR by Tesseract to avoid the text duplication.
     #
     # We extract both images in one step to decrease the number of times we parse the PDF.
-    with extract_page_ocr_images(pdf_fn, start_page=1, end_page=1, pdf_password=pdf_password, dpi=DPI) as image_fns:
-        assert image_fns and image_fns[0] and image_fns[0][0] and image_fns[0][1], \
-            "A page requires OCR but no images have been extracted."
+    with extract_page_ocr_images(pdf_fn, start_page=1, end_page=1, pdf_password=pdf_password, dpi=DPI) \
+            as image_fns:
+        assert image_fns and image_fns[0], "A page requires OCR but no images have been extracted."
 
-        page_image_with_text_fn, page_image_without_text_fn = image_fns[0]
+        page_image_without_text_fn = image_fns[0]
         with open(pdf_fn, 'rb') as in_file:
             # build pdfminer page layout - used for detecting if the page requires OCR or not
             original_page_layout = get_first_page_layout(in_file)
@@ -207,22 +220,11 @@ def process_pdf_page(pdf_fn: str,
                                      timeout=ocr_timeout_sec,
                                      glyphless_text_only=True,
                                      tesseract_page_orientation_detection=True) as ocred_text_layer_pdf_fn:
-                    # We need fully merged PDF page here for the proper work of the table extraction by Camelot
-                    with merge_pdf_pages(original_pdf_fn=pdf_fn,
-                                         original_pdf_password=pdf_password) as ocred_pdf_for_tables:
-                        with open(ocred_pdf_for_tables, 'rb') as ocred_in_file:
-                            ocred_page_layout = get_first_page_layout(ocred_in_file)
-                            camelot_tables = extract_tables(page_num, ocred_page_layout,
-                                                            page_image_with_text_fn)
-
-                    # But we return only the transparent text layer PDF and not the merged page
+                    # we return only the transparent text layer PDF and not the merged page
                     # because in the final step we will need to merge these transparent layer in front
                     # of the pages in the original PDF file to keep its small size and structure/bookmarks.
                     yield PDFPageProcessingResults(page_requires_ocr=True,
-                                                   ocred_page_fn=ocred_text_layer_pdf_fn,
-                                                   camelot_tables=camelot_tables)
+                                                   ocred_page_fn=ocred_text_layer_pdf_fn)
             else:
-                # if we don't need OCR then execute Camelot on the original PDF page
-                camelot_tables = extract_tables(page_num, original_page_layout, page_image_with_text_fn)
-                yield PDFPageProcessingResults(page_requires_ocr=False,
-                                               camelot_tables=camelot_tables)
+                # if we don't need OCR then
+                yield PDFPageProcessingResults(page_requires_ocr=False)
