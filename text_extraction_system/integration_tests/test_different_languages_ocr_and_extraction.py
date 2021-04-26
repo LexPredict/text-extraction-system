@@ -45,7 +45,7 @@ def test_basic_api_call_back_with_2_languages_document():
         assert len(text_struct.paragraphs) == 1
         for i in text_struct.paragraphs:
             assert i.language == text_struct.language
-        assert len(text_struct.sentences) == 12
+        assert len(text_struct.sentences) == 3
         for i in text_struct.sentences:
             assert i.language == text_struct.language
 
