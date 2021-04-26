@@ -69,7 +69,7 @@ def extract_tables(pageno: int,
     return lattice.extract_tables(f'page-{pageno}.pdf', suppress_stdout=True)
 
 
-def extract_tables_from_pdf_file(pdf_fn: str, pdfminer_advanced_detection: bool = False) -> List[CamelotTable]:
+def extract_tables_from_pdf_file_lattice(pdf_fn: str, pdfminer_advanced_detection: bool = False) -> List[CamelotTable]:
     res: List[CamelotTable] = list()
     with extract_page_images(pdf_fn=pdf_fn) as image_fns:
         page_num = 0
@@ -79,6 +79,17 @@ def extract_tables_from_pdf_file(pdf_fn: str, pdfminer_advanced_detection: bool 
             if camelot_tables:
                 res += camelot_tables
             page_num += 1
+    return res or None
+
+
+def extract_tables_from_pdf_file(pdf_fn: str, pdfminer_advanced_detection: bool = False) -> List[CamelotTable]:
+    res: List[CamelotTable] = list()
+    page_num = 0
+    for ltpage in iterate_pages(pdf_fn, use_advanced_detection=pdfminer_advanced_detection):
+        camelot_tables: List[CamelotTable] = extract_tables_borderless(page_num, ltpage)
+        if camelot_tables:
+            res += camelot_tables
+        page_num += 1
     return res or None
 
 
