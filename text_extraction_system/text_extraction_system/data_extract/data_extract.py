@@ -163,23 +163,26 @@ def extract_text_pdfminer(pdf_fn: str) -> str:
         parser = PDFParser(in_file)
         doc = PDFDocument(parser)
         rsrcmgr = PDFResourceManager()
-        device = TextConverter(rsrcmgr, output_string, laparams=LAParams())
+        device = TextConverter(rsrcmgr, output_string)
         interpreter = PDFPageInterpreter(rsrcmgr, device)
         for page in PDFPage.create_pages(doc):
             interpreter.process_page(page)
     return output_string.getvalue()
 
 
-def get_first_page_layout(pdf_opened_file) -> LTPage:
+def get_first_page_layout(pdf_opened_file,
+                          use_advanced_detection: bool = True) -> LTPage:
     parser = PDFParser(pdf_opened_file)
     doc = PDFDocument(parser)
     rsrcmgr = PDFResourceManager()
-    laparams = LAParams(all_texts=True)
+    laparams = LAParams(all_texts=True) if use_advanced_detection else LAParams(all_texts=True, boxes_flow=None)
     device = PDFPageAggregator(rsrcmgr, laparams=laparams)
     interpreter = PDFPageInterpreter(rsrcmgr, device)
+
     for page in PDFPage.create_pages(doc):
         interpreter.process_page(page)
         return device.get_result()
+
     raise Exception('Unable to build LTPage from opened file')
 
 
@@ -210,7 +213,8 @@ def process_pdf_page(pdf_fn: str,
         page_image_without_text_fn = image_fns[0]
         with open(pdf_fn, 'rb') as in_file:
             # build pdfminer page layout - used for detecting if the page requires OCR or not
-            original_page_layout = get_first_page_layout(in_file)
+            original_page_layout = get_first_page_layout(
+                in_file, use_advanced_detection=True)
 
             if ocr_enabled and page_requires_ocr(original_page_layout):
                 # this returns a text-based PDF with glyph-less text only
