@@ -438,8 +438,11 @@ def extract_data_and_finish(req: RequestMetadata,
             req.pdf_file = req.corrected_pdf
             webdav_client.upload(f'{req.request_id}/{req.corrected_pdf}', orig_or_corrected_pdf_fn)
 
-        log.info(f'Extracting tables from {req.pdf_file}...')
-        camelot_tables = extract_tables_from_pdf_file(orig_or_corrected_pdf_fn)
+        if req.table_extraction_enable:
+            log.info(f'Extracting tables from {req.pdf_file}...')
+            camelot_tables = extract_tables_from_pdf_file(orig_or_corrected_pdf_fn)
+        else:
+            log.info(f'Table extraction is turned off.')
 
     if camelot_tables:
         tables = get_table_dtos_from_camelot_output(camelot_tables)

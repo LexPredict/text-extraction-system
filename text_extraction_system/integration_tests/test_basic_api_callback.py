@@ -73,7 +73,7 @@ def test_basic_api_call_back_tables_msgpack():
         assert rs.text_structure_extracted
 
         table_list_json: TableList = client.get_extracted_tables_as_msgpack(rs.request_id)
-        assert len(table_list_json.tables) == 6
+        assert len(table_list_json.tables) == 3
 
         log.info('Text extraction results look good. All assertions passed.')
 
@@ -83,6 +83,35 @@ def test_basic_api_call_back_tables_msgpack():
     client.schedule_data_extraction_task(fn,
                                          call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
                                          call_back_additional_info='hello world',
+                                         output_format=OutputFormat.msgpack)
+
+    srv.wait_for_test_results(60)
+
+
+def test_basic_api_call_back_tables_disabled_msgpack():
+    fn = os.path.join(os.path.dirname(__file__), 'data', 'tables.pdf')
+    client = TextExtractionSystemWebClient(test_settings.api_url)
+
+    def assert_func(rfile, headers):
+        log.info('Text extraction results are ready...')
+        rs: RequestStatus = RequestStatus.from_json(rfile)
+        assert rs.status == 'DONE'
+        assert os.path.basename(fn) == rs.original_file_name
+        assert rs.converted_cleaned_pdf is False
+        assert rs.searchable_pdf_created
+        assert not rs.tables_extracted
+        assert rs.plain_text_extracted
+        assert rs.text_structure_extracted
+
+        log.info('Text extraction results look good. All assertions passed.')
+
+    srv = DocumentCallbackServer(bind_host=test_settings.call_back_server_bind_host,
+                                 bind_port=test_settings.call_back_server_bind_port,
+                                 test_func=assert_func)
+    client.schedule_data_extraction_task(fn,
+                                         call_back_url=f'http://{srv.bind_host}:{srv.bind_port}',
+                                         call_back_additional_info='hello world',
+                                         table_extraction_enable=False,
                                          output_format=OutputFormat.msgpack)
 
     srv.wait_for_test_results(60)
