@@ -88,6 +88,7 @@ public class GetTextFromPDF {
             }
 
             if (correctedPDFOutput != null)
+                document.setAllSecurityToBeRemoved(true);
                 if (renderCharRects)
                     GetTextFromPDF.renderDebugPDF(document, res, correctedPDFOutput);
                 else
