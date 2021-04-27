@@ -50,6 +50,7 @@ class RequestMetadata:
     ocr_enable: bool = True
     deskew_enable: bool = True
     char_coords_debug_enable: bool = False
+    table_extraction_enable: bool = True
 
     status: str = STATUS_PENDING
 
