@@ -99,7 +99,6 @@ public class GetTextFromPDF {
     protected static void renderDebugPDF(PDDocument document, PDFPlainText res, String fn) throws IOException {
         int i = 0;
         for (PDPage page : document.getPages()) {
-            float urY = page.getCropBox().getUpperRightY();
             PDFPlainTextPage pageRes = res.pages.get(i);
             List<double[]> pageCoords = res.charBBoxes.subList(pageRes.location[0], pageRes.location[1]);
             String pageText = res.text.substring(pageRes.location[0], pageRes.location[1]);
@@ -110,7 +109,7 @@ public class GetTextFromPDF {
             for (double[] c : pageCoords) {
                 char ch = pageText.charAt(k);
                 contentStream.setStrokingColor(Color.BLUE);
-                contentStream.addRect((float) c[0], urY - (float) c[1], (float) c[2], (float) c[3]);
+                contentStream.addRect((float) c[0], (float) c[1], (float) c[2], (float) c[3]);
                 contentStream.stroke();
                 k++;
             }

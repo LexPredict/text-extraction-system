@@ -95,7 +95,18 @@ public class DebugTextExtraction {
         }
     }
 
+    public static void test_vertical1() throws Exception {
+        try (InputStream stream = TestPDF2Text.class
+                .getResourceAsStream("/bad_coords1.pdf")) {
+            try (PDDocument document = PDDocument.load(stream)) {
+                PDFPlainText res = PDFToTextWithCoordinates.process(document, true);
+                document.save("/tmp/000.pdf");
+                GetTextFromPDF.renderDebugPDF(document, res, "/tmp/111.pdf");
+            }
+        }
+    }
+
     public static void main(String[] args) throws Exception {
-        DebugTextExtraction.test_vertical_doc_deskew_x_90();
+        DebugTextExtraction.test_vertical_doc_deskew_90();
     }
 }

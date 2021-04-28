@@ -186,8 +186,9 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         StringBuilder sb = new StringBuilder();
         for (TextPosition pos : textPositions) {
 
-            double[] glyphBox = new double[]{r(pos.getX()),
-                    r(pos.getY()), r(pos.getWidth()), r(pos.getHeight())};
+            Matrix tm = pos.getTextMatrix();
+            double[] glyphBox = new double[]{r(tm.getTranslateX()),
+                    r(tm.getTranslateY()), r(pos.getWidth()), r(pos.getHeight())};
             String unicode = pos.getUnicode();
 
             if (removeNonPrintable && (glyphBox[2] == 0 || glyphBox[3] == 0))
@@ -212,18 +213,6 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             bbox[1] = r1.getY();
             bbox[2] = r1.getWidth();
             bbox[3] = r1.getHeight();
-
-            double a = Math.abs(this.curAngle);
-            a = a <= 180 ? a : 360 - a;
-            double b = this.curAngle;
-            b = b <= -90 ? -180 - b
-                    : b <= 0 ? b
-                    : b <= 90 ? b
-                    : 180 - b;
-
-
-            bbox[1] += bbox[3] * 2 * (a / 180);
-            bbox[0] += bbox[2] * (b / 90);
         }
 
     }
@@ -431,7 +420,8 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             int deskewSkewAngle = deskewFullAngleRotationSkewAngle[2];
             this.writePageStart();
             this.insideInternalPageProcessing = true;
-            for (Integer angle : angleCollector.sortedAngles) {
+            for (int ia = angleCollector.sortedAngles.length - 1; ia >=0; ia--) {
+                int angle = angleCollector.sortedAngles[ia];
                 this.curAngleLimits = angleCollector.getLimitsByAngle(angle);
                 this.curCharBackTransform = null;
                 this.curAngle = 0;
@@ -444,9 +434,9 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
                     Matrix charRestoreMatrix = null;
                     if (deskew) {
-                        charRestoreMatrix = rotateMatrix(page.getCropBox(), -angle + deskewSkewAngle);
+                        charRestoreMatrix = rotateMatrix(page.getCropBox(), angle - deskewSkewAngle);
                     } else {
-                        charRestoreMatrix = rotateMatrix(page.getCropBox(), -angle);
+                        charRestoreMatrix = rotateMatrix(page.getCropBox(), angle);
                     }
 
 
