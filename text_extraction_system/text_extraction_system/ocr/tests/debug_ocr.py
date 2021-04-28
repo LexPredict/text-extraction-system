@@ -23,8 +23,11 @@ def p2():
     from text_extraction_system.pdf.pdf import merge_pdf_pages, split_pdf_to_page_blocks
     from text_extraction_system.ocr.ocr import ocr_page_to_pdf
     import shutil
-    orig_pdf_fn = '/home/mikhail/lexpredict/misc/angles/realdoc__00121_orig.pdf'
-    page = 1
+    orig_pdf_fn = '/home/mikhail/Downloads/A3158584A790CAE893EEBA74066C36586.pdf'
+    page = 128
+
+    with split_pdf_to_page_blocks(orig_pdf_fn) as page_fns:
+        pass
 
     with extract_page_ocr_images(orig_pdf_fn, page, page, dpi=300) as images:
         with ocr_page_to_pdf(images[0][1],
