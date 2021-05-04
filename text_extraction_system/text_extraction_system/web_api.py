@@ -332,12 +332,13 @@ async def extract_all_data_from_document(
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
         full_extract_timeout_sec: int = Form(default=3600),
+        char_coords_debug_enable: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
 ):
     webdav_client = get_webdav_client()
     request_id = str(uuid4())
     _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
-                             pdf_to_images_timeout_sec, output_format)
+                             pdf_to_images_timeout_sec, char_coords_debug_enable, output_format)
 
     # Wait until celery finishes extracting else return TimeoutError
     if not _wait_for_pdf_extraction_finish(request_id, full_extract_timeout_sec):
@@ -365,12 +366,13 @@ async def extract_plain_text_from_document(
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
         full_extract_timeout_sec: int = Form(default=3600),
+        char_coords_debug_enable: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
 ):
     webdav_client = get_webdav_client()
     request_id = str(uuid4())
     _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
-                             pdf_to_images_timeout_sec, output_format)
+                             pdf_to_images_timeout_sec, char_coords_debug_enable, output_format)
 
     # Wait until celery finishes extracting else return TimeoutError
     if not _wait_for_pdf_extraction_finish(request_id, full_extract_timeout_sec):
@@ -392,12 +394,13 @@ async def extract_text_from_document_and_generate_searchable_pdf(
         convert_to_pdf_timeout_sec: int = Form(default=1800),
         pdf_to_images_timeout_sec: int = Form(default=1800),
         full_extract_timeout_sec: int = Form(default=3600),
+        char_coords_debug_enable: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
 ):
     webdav_client = get_webdav_client()
     request_id = str(uuid4())
     _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
-                             pdf_to_images_timeout_sec, output_format)
+                             pdf_to_images_timeout_sec, char_coords_debug_enable, output_format)
 
     # Wait until celery finishes extracting else return TimeoutError
     if not _wait_for_pdf_extraction_finish(request_id, full_extract_timeout_sec):
@@ -492,6 +495,7 @@ def _run_sync_pdf_processing(webdav_client, request_id: str,
                              doc_language: str,
                              convert_to_pdf_timeout_sec: int,
                              pdf_to_images_timeout_sec: int,
+                             char_coords_debug_enable: bool,
                              output_format: OutputFormat):
     """Run celery tasks to extract data from document
     """
@@ -503,6 +507,7 @@ def _run_sync_pdf_processing(webdav_client, request_id: str,
                           output_format=output_format,
                           convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
                           pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
+                          char_coords_debug_enable=char_coords_debug_enable,
                           request_callback_info=RequestCallbackInfo(
                               request_id=request_id,
                               original_file_name=file.filename))

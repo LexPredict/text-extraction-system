@@ -11,6 +11,8 @@ import org.apache.pdfbox.tools.imageio.ImageIOUtil;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Extracts the PDF page representations as the images ("prints" PDF pages to images).
@@ -72,17 +74,34 @@ public class GetOCRImages {
 
                 if (outputPrefixNoText != null) {
                     FindImages fi = new FindImages();
+                    FindTextElements ft = new FindTextElements();
                     fi.processPage(page);
-                    PDPageContentStream contentStream = new PDPageContentStream(document, page,
-                            PDPageContentStream.AppendMode.OVERWRITE, true);
-                    for (FindImages.FoundImage found : fi.found) {
-                        contentStream.drawImage(found.imageXObject, found.matrix);
+                    ft.processPage(page);
+
+                    List<FindImages.FoundImage> images = new ArrayList<>();
+                    for (FindImages.FoundImage img : fi.found) {
+                        boolean foundIntersect = false;
+                        for (FindTextElements.FoundTextElement ch : ft.found) {
+                            if (img.shape.intersects(ch.bounds)) {
+                                foundIntersect = true;
+                                break;
+                            }
+                        }
+                        if (!foundIntersect) images.add(img);
                     }
-                    contentStream.close();
-                    BufferedImage image = renderer.renderImageWithDPI(i - 1, dpi, ImageType.RGB);
-                    ImageIOUtil.writeImage(image,
-                            outputPrefixNoText + String.format("%05d", i) + "." + format.toLowerCase(),
-                            (int) dpi);
+
+                    if (!images.isEmpty()) {
+                        PDPageContentStream contentStream = new PDPageContentStream(document, page,
+                                PDPageContentStream.AppendMode.OVERWRITE, true);
+                        for (FindImages.FoundImage found : images) {
+                            contentStream.drawImage(found.imageXObject, found.matrix);
+                        }
+                        contentStream.close();
+                        BufferedImage image = renderer.renderImageWithDPI(i - 1, dpi, ImageType.RGB);
+                        ImageIOUtil.writeImage(image,
+                                outputPrefixNoText + String.format("%05d", i) + "." + format.toLowerCase(),
+                                (int) dpi);
+                    }
                 }
             }
 
