@@ -207,35 +207,28 @@ def process_pdf_page(pdf_fn: str,
                      ocr_language: str = None,
                      ocr_timeout_sec: int = 60,
                      pdf_password: str = None) -> Generator[PDFPageProcessingResults, None, None]:
-    # generate a pair of image representations of the PDF page:
-    # 1. image of the original page as is - to be used in Camelot for the optical detection of the table borders;
-    # 2. image of the layout of the original page with only image/picture elements left on it and
-    # all the text elements removed - to be used for OCR by Tesseract to avoid the text duplication.
-    #
-    # We extract both images in one step to decrease the number of times we parse the PDF.
-    with extract_page_ocr_images(pdf_fn, start_page=1, end_page=1, pdf_password=pdf_password, dpi=DPI) \
-            as image_fns:
-        assert image_fns and image_fns[0], "A page requires OCR but no images have been extracted."
-
-        page_image_without_text_fn = image_fns[0]
-        with open(pdf_fn, 'rb') as in_file:
-            # build pdfminer page layout - used for detecting if the page requires OCR or not
-            original_page_layout = get_first_page_layout(
-                in_file, use_advanced_detection=True)
-
-            if ocr_enabled and page_requires_ocr(original_page_layout):
-                # this returns a text-based PDF with glyph-less text only
-                # to be used for merging in front of the original PDF page layout
-                with ocr_page_to_pdf(page_image_fn=page_image_without_text_fn,
-                                     language=ocr_language,
-                                     timeout=ocr_timeout_sec,
-                                     glyphless_text_only=True,
-                                     tesseract_page_orientation_detection=True) as ocred_text_layer_pdf_fn:
-                    # we return only the transparent text layer PDF and not the merged page
-                    # because in the final step we will need to merge these transparent layer in front
-                    # of the pages in the original PDF file to keep its small size and structure/bookmarks.
-                    yield PDFPageProcessingResults(page_requires_ocr=True,
-                                                   ocred_page_fn=ocred_text_layer_pdf_fn)
-            else:
-                # if we don't need OCR then
-                yield PDFPageProcessingResults(page_requires_ocr=False)
+    with open(pdf_fn, 'rb') as in_file:
+        if ocr_enabled:
+            # Try extracting "no-text" image of the pdf page.
+            # It removes all elements from the page except images having no overlapping
+            # with any text element.
+            # This is used to avoid the text duplication by OCR.
+            with extract_page_ocr_images(pdf_fn, start_page=1, end_page=1, pdf_password=pdf_password, dpi=DPI) \
+                    as image_fns:
+                page_image_without_text_fn = image_fns.get(1) if image_fns else None
+                if page_image_without_text_fn:
+                    # this returns a text-based PDF with glyph-less text only
+                    # to be used for merging in front of the original PDF page layout
+                    with ocr_page_to_pdf(page_image_fn=page_image_without_text_fn,
+                                         language=ocr_language,
+                                         timeout=ocr_timeout_sec,
+                                         glyphless_text_only=True,
+                                         tesseract_page_orientation_detection=True) as ocred_text_layer_pdf_fn:
+                        # we return only the transparent text layer PDF and not the merged page
+                        # because in the final step we will need to merge these transparent layer in front
+                        # of the pages in the original PDF file to keep its small size and structure/bookmarks.
+                        yield PDFPageProcessingResults(page_requires_ocr=True,
+                                                       ocred_page_fn=ocred_text_layer_pdf_fn)
+                        return
+        # if we don't need OCR then
+        yield PDFPageProcessingResults(page_requires_ocr=False)

@@ -192,6 +192,7 @@ class TextExtractionSystemWebClient:
                                          pdf_to_images_timeout_sec: int = 1800,
                                          full_extract_timeout_sec: int = 300,
                                          glyph_enhancing: bool = False,
+                                         char_coords_debug_enable: bool = False,
                                          output_format: OutputFormat = OutputFormat.json) -> str:
         resp = requests.post(f'{self.base_url}/api/v1/extract/plain_text/',
                              files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
@@ -200,6 +201,7 @@ class TextExtractionSystemWebClient:
                                        full_extract_timeout_sec=full_extract_timeout_sec,
                                        doc_language=doc_language,
                                        glyph_enhancing=glyph_enhancing,
+                                       char_coords_debug_enable=char_coords_debug_enable,
                                        output_format=output_format.value))
         if resp.status_code not in {200, 201}:
             self.raise_for_status(resp)
@@ -213,6 +215,7 @@ class TextExtractionSystemWebClient:
             pdf_to_images_timeout_sec: int = 1800,
             full_extract_timeout_sec: int = 300,
             glyph_enhancing: bool = False,
+            char_coords_debug_enable: bool = False,
             output_format: OutputFormat = OutputFormat.json) -> Generator[str, None, None]:
         _fd, local_filename = tempfile.mkstemp(suffix='.pdf')
         try:
@@ -223,6 +226,7 @@ class TextExtractionSystemWebClient:
                                          full_extract_timeout_sec=full_extract_timeout_sec,
                                          doc_language=doc_language,
                                          glyph_enhancing=glyph_enhancing,
+                                         char_coords_debug_enable=char_coords_debug_enable,
                                          output_format=output_format.value), stream=True) as r:
                 if r.status_code not in {200, 201}:
                     self.raise_for_status(r)
@@ -241,6 +245,7 @@ class TextExtractionSystemWebClient:
             pdf_to_images_timeout_sec: int = 1800,
             full_extract_timeout_sec: int = 300,
             glyph_enhancing: bool = False,
+            char_coords_debug_enable: bool = False,
             output_format: OutputFormat = OutputFormat.json) -> Generator[str, None, None]:
         _fd, local_filename = tempfile.mkstemp(suffix='.zip')
         try:
@@ -251,6 +256,7 @@ class TextExtractionSystemWebClient:
                                          full_extract_timeout_sec=full_extract_timeout_sec,
                                          doc_language=doc_language,
                                          glyph_enhancing=glyph_enhancing,
+                                         char_coords_debug_enable=char_coords_debug_enable,
                                          output_format=output_format.value), stream=True) as r:
                 if r.status_code not in {200, 201}:
                     self.raise_for_status(r)

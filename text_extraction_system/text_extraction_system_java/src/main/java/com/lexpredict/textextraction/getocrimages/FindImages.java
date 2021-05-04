@@ -12,21 +12,30 @@ import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.util.Matrix;
 
+import java.awt.*;
+import java.awt.geom.Rectangle2D;
 import java.io.IOException;
 import java.util.LinkedList;
 import java.util.List;
 
 public class FindImages extends PDFStreamEngine {
 
-    public class FoundImage {
+    public static class FoundImage {
         public final PDImageXObject imageXObject;
 
         public final Matrix matrix;
+
+        public final Shape shape;
+
+        public final Rectangle2D bounds;
 
 
         public FoundImage(PDImageXObject imageXObject, Matrix matrix) {
             this.imageXObject = imageXObject;
             this.matrix = matrix;
+            Rectangle2D.Double origBounds = new Rectangle2D.Double(0, 0, 1, 1);
+            this.shape = matrix.createAffineTransform().createTransformedShape(origBounds);
+            this.bounds = this.shape.getBounds2D();
         }
     }
 
@@ -50,6 +59,7 @@ public class FindImages extends PDFStreamEngine {
             if (xobject instanceof PDImageXObject) {
                 PDImageXObject image = (PDImageXObject) xobject;
                 Matrix ctmNew = getGraphicsState().getCurrentTransformationMatrix();
+
                 this.found.add(new FoundImage(image, ctmNew));
             } else if (xobject instanceof PDFormXObject) {
                 PDFormXObject form = (PDFormXObject) xobject;
