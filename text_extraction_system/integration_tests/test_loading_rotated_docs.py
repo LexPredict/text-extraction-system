@@ -63,15 +63,15 @@ def test_extract_text_rotated6():
                 s = status_f.read()
                 req_status: RequestStatus = RequestStatus.from_json(s)
 
-                from tempfile import mkdtemp
-                from shutil import rmtree, copyfileobj
-                temp_dir = mkdtemp()
-                try:
-                    with archive.open('wrong_angle6_0097.ocred_corr.pdf', 'r') as pdf_processed:
-                        with open(os.path.join(temp_dir, 'output.pdf'), 'bw') as f_pdf_1st:
-                            copyfileobj(pdf_processed, f_pdf_1st)
-                finally:
-                    rmtree(temp_dir)
+                #from tempfile import mkdtemp
+                #from shutil import rmtree, copyfileobj
+                #temp_dir = mkdtemp()
+                #try:
+                #    with archive.open('wrong_angle6_0097.ocred_corr.pdf', 'r') as pdf_processed:
+                #        with open(os.path.join(temp_dir, 'output.pdf'), 'bw') as f_pdf_1st:
+                #            copyfileobj(pdf_processed, f_pdf_1st)
+                #finally:
+                #    rmtree(temp_dir)
 
                 assert req_status.page_rotate_angles[0] == 90
 
