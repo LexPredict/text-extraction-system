@@ -114,7 +114,7 @@ def extract_page_ocr_images(pdf_fn: str,
                             end_page: int = None,
                             pdf_password: str = None,
                             timeout_sec: int = 1800,
-                            dpi: int = 300) -> Generator[List[Tuple[str, str]], None, None]:
+                            dpi: int = 300) -> Generator[Dict[int, str], None, None]:
     java_modules_path = get_settings().java_modules_path
 
     temp_dir_no_text = mkdtemp(prefix='pdf_images_')
@@ -142,17 +142,20 @@ def extract_page_ocr_images(pdf_fn: str,
 
         raise_from_pdfbox_error_messages(completed_process)
 
-        # Output of PDFToImage is a set of files with the names generated as:
+        # Output of GetOCRImages is a set of files with the names generated as:
         # {prefix}+{page_num_1_based}.{ext}
         # We used "{temp_dir}/{basefn}__" as the prefix.
         # Now we need to get the page numbers from the filenames and return the list of file names
         # ordered by page number.
+        # For the "no-text" images: for the pages having no images which are not overlapped with
+        # any text element it stores no page image.
         page_by_num_no_text: Dict[int, str] = dict()
         for fn in os.listdir(temp_dir_no_text):
             page_num = PAGE_NUM_RE.search(os.path.splitext(fn)[0]).group(0)
-            page_by_num_no_text[int(page_num)] = os.path.join(temp_dir_no_text, fn)
+            page_no_text_fn = os.path.join(temp_dir_no_text, fn)
+            page_by_num_no_text[int(page_num)] = page_no_text_fn
 
-        yield [page_by_num_no_text[key] for key in sorted(page_by_num_no_text.keys())]
+        yield page_by_num_no_text
 
     finally:
         shutil.rmtree(temp_dir_no_text, ignore_errors=True)
