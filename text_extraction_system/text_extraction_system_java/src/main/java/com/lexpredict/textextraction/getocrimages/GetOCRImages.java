@@ -64,6 +64,21 @@ public class GetOCRImages {
 
             for (int i = startPage; i < endPage + 1; i++) {
                 PDPage page = document.getPage(i - 1);
+                /*
+                Setting page rotation to 0 to allow supporting the pre-rotated pages in further merging.
+                Example:
+                Original page has rotation = 90.
+                If we don't set it to 0 here then the extracted page image will be matching the rotation 90.
+                Here we loose the rotation info for the image.
+                Tesseract executes OCR and generates the text layer pdf matching the rotation 90.
+                Next it is merged in front of the original PDF page which has the rotation as its attribute.
+                When the rotation is applied both to the original page and its new text layer the text layer
+                gets rotation = 90+90.
+
+                If we de-rotate the OCR image right here then Tesseract gets the image matching the original page
+                before the rotation was applied and everything goes fine.
+                 */
+                page.setRotation(0);
                 if (outputPrefixWithText != null) {
                     BufferedImage image = renderer.renderImageWithDPI(i - 1, dpi, ImageType.RGB);
                     ImageIOUtil.writeImage(image,

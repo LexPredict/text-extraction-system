@@ -80,6 +80,38 @@ public class TestMergeInPageLayers extends TestCase {
         }
     }
 
+    /*public void testMergeWrongAngle() throws Exception {
+        Path tempDir = Files.createTempDirectory("t");
+        Path tempDirPages = Files.createTempDirectory("t");
+        try {
+            File fOrig = new File(tempDir.toFile(), "wrong_angle6_0097.pdf");
+            File fDst = new File(tempDir.toFile(), "wrong_angle6_0097_dst.pdf");
+            File fPage2 = new File(tempDirPages.toFile(), "00002.pdf");
+
+            try (InputStream isOrig = TestMergeInPageLayers.class
+                    .getResourceAsStream("/wrong_angle6_0097.pdf");
+                 InputStream isPage2 = TestMergeInPageLayers.class
+                         .getResourceAsStream("/wrong_angle6_0097__00001.pdf")) {
+                FileUtils.copyToFile(isOrig, fOrig);
+                FileUtils.copyToFile(isPage2, fPage2);
+            }
+
+            MergeInPageLayers.main(new String[]{
+                    "--original-pdf", fOrig.getAbsolutePath(),
+                    "--dst-pdf", fDst.getAbsolutePath(),
+                    "1=" + fPage2.getAbsolutePath()});
+
+            try (PDDocument document = PDDocument.load(fDst, (String) null)) {
+                PDFPlainText res = PDFToTextWithCoordinates
+                        .process(document, true);
+                //assertTrue(res.text.contains("Never in history has private"));
+            }
+
+        } finally {
+            FileUtils.deleteQuietly(tempDir.toFile());
+            FileUtils.deleteQuietly(tempDirPages.toFile());
+        }
+    }*/
 
     /*public void testMergePageWithRotation() throws Exception {
         Path tempDir = Files.createTempDirectory("t");
