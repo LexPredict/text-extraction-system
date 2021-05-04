@@ -162,8 +162,21 @@ public class MergeInPageLayers {
                     PDFormXObject textPageForm = layerUtility.importPageAsForm(mergePageDocument, 0);
                     layerUtility.wrapInSaveRestore(dstPage);
 
-                    layerUtility.appendFormAsLayer(dstPage, textPageForm, insertTransform,
-                            "Recognized Text for Page " + pageFn.getKey());
+                    int i = 0;
+                    boolean done = false;
+
+                    while (!done) {
+                        try {
+                            layerUtility.appendFormAsLayer(dstPage, textPageForm, insertTransform,
+                                    "Recognized Text for Page " + pageFn.getKey() + " " + i);
+                            done = true;
+                        } catch (IllegalArgumentException iae) {
+                            if (iae.getMessage().contains("exists"))
+                                i++;
+                            if (i >= 99)
+                                throw iae;
+                        }
+                    }
                 }
             }
             origDocument.setAllSecurityToBeRemoved(true);
