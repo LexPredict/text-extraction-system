@@ -23,20 +23,18 @@ def p2():
     from text_extraction_system.pdf.pdf import merge_pdf_pages, split_pdf_to_page_blocks
     from text_extraction_system.ocr.ocr import ocr_page_to_pdf
     import shutil
-    orig_pdf_fn = '/home/mikhail/Downloads/A3158584A790CAE893EEBA74066C36586.pdf'
-    page = 128
+    orig_pdf_fn = '/home/mikhail/lexpredict/misc/angles/20210504/wrong_angle6_0097.pdf'
+    page = 1
 
-    with split_pdf_to_page_blocks(orig_pdf_fn) as page_fns:
-        pass
+    #with split_pdf_to_page_blocks(orig_pdf_fn) as page_fns:
+    #    pass
 
     with extract_page_ocr_images(orig_pdf_fn, page, page, dpi=300) as images:
-        with ocr_page_to_pdf(images[0][1],
-                             glyphless_text_only=False,
+        with ocr_page_to_pdf(images.get(1),
+                             glyphless_text_only=True,
                              tesseract_page_orientation_detection=True) as ocred_page_pdf:  # type: str
             with merge_pdf_pages(orig_pdf_fn, single_page_merge_num_file_rotate=(1, ocred_page_pdf, None)) as final_pdf:
-                shutil.copy(final_pdf, '/home/mikhail/lexpredict/misc/angles/realdoc__00121_ocred.pdf')
-                with split_pdf_to_page_blocks(final_pdf, 1) as page_fns:
-                    shutil.copy(page_fns[page - 1], '/home/mikhail/lexpredict/misc/angles/wrong_angle5_ocred.pdf')
+                shutil.copy(final_pdf, '/home/mikhail/lexpredict/misc/angles/wrong_angle6.ocred.pdf')
 
 
 p2()

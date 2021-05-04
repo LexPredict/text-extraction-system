@@ -106,7 +106,18 @@ public class DebugTextExtraction {
         }
     }
 
+    public static void test_wrong_angle6() throws Exception {
+        try (InputStream stream = TestPDF2Text.class
+                .getResourceAsStream("/wrong_angle6.ocred.pdf")) {
+            try (PDDocument document = PDDocument.load(stream)) {
+                PDFPlainText res = PDFToTextWithCoordinates.process(document, true);
+                document.save("/tmp/000.pdf");
+                GetTextFromPDF.renderDebugPDF(document, res, "/tmp/111.pdf");
+            }
+        }
+    }
+
     public static void main(String[] args) throws Exception {
-        DebugTextExtraction.test_vertical_doc_deskew_90();
+        DebugTextExtraction.test_wrong_angle6();
     }
 }
