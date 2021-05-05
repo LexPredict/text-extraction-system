@@ -1,5 +1,7 @@
 package com.lexpredict.textextraction.getocrimages;
 
+import com.lexpredict.textextraction.TEUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.text.TextPosition;
 import org.apache.pdfbox.util.Matrix;
@@ -30,6 +32,8 @@ public class FindTextElements extends PDFTextStripper {
 
     @Override
     protected void processTextPosition(TextPosition pos) {
+        if (!TEUtils.containsAlphaNumeric(pos.getUnicode()))
+            return;
         Matrix tm = pos.getTextMatrix();
         Rectangle2D.Float bounds = new Rectangle2D.Float(tm.getTranslateX(),
                 tm.getTranslateY(), pos.getWidth(), pos.getHeight());
