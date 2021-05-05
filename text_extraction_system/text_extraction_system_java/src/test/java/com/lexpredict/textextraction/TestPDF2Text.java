@@ -122,4 +122,14 @@ public class TestPDF2Text extends TestCase {
         }
     }
 
+    public void test_house3() throws Exception {
+        try (InputStream stream = TestPDF2Text.class
+                .getResourceAsStream("/house_0003.ocred.pdf")) {
+            try (PDDocument document = PDDocument.load(stream)) {
+                PDFPlainText res = PDFToTextWithCoordinates.process(document, true);
+                assertEquals(0.0, res.pages.get(0).deskewAngle);
+            }
+        }
+    }
+
 }

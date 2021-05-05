@@ -2,6 +2,7 @@ package com.lexpredict.textextraction;
 
 import com.lexpredict.textextraction.dto.PDFPlainText;
 import com.lexpredict.textextraction.dto.PDFPlainTextPage;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.pdfbox.cos.COSArray;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -26,6 +27,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Extracts plain text from PDF together with the bounding boxes of each page and character.
@@ -359,8 +361,11 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
         }
 
+
         @Override
         protected void processTextPosition(TextPosition text) {
+            if (!StringUtils.isAlphanumeric(text.getUnicode()))
+                return;
             Matrix m = text.getTextMatrix();
             m.concatenate(text.getFont().getFontMatrix());
             double angle = Math.toDegrees(Math.atan2(m.getShearY(), m.getScaleY()));
@@ -385,6 +390,10 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             int angle = sortedAngles[this.sortedAngles.length - 1];
             int pageRotation = 90 * Math.round((float) angle / 90);
             int skewAngle = 0;
+
+            if (this.anglesToCharNum.get(angle) < 10)
+                return new int[] {0, 0, 0};
+
             return new int[]{angle, pageRotation, skewAngle};
         }
     }
