@@ -23,7 +23,7 @@ def p2():
     from text_extraction_system.pdf.pdf import merge_pdf_pages, split_pdf_to_page_blocks
     from text_extraction_system.ocr.ocr import ocr_page_to_pdf
     import shutil
-    orig_pdf_fn = '/home/mikhail/lexpredict/misc/angles/20210504/wrong_angle6_0097.pdf'
+    orig_pdf_fn = '/home/mikhail/lexpredict/misc/angles/house_0003.pdf'
     page = 1
 
     #with split_pdf_to_page_blocks(orig_pdf_fn) as page_fns:
@@ -34,7 +34,7 @@ def p2():
                              glyphless_text_only=True,
                              tesseract_page_orientation_detection=True) as ocred_page_pdf:  # type: str
             with merge_pdf_pages(orig_pdf_fn, single_page_merge_num_file_rotate=(1, ocred_page_pdf, None)) as final_pdf:
-                shutil.copy(final_pdf, '/home/mikhail/lexpredict/misc/angles/wrong_angle6.ocred.pdf')
+                shutil.copy(final_pdf, '/home/mikhail/lexpredict/misc/angles/house_0003.ocred.pdf')
 
 
 p2()
