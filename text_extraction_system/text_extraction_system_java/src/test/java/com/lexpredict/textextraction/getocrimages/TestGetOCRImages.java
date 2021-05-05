@@ -32,7 +32,7 @@ public class TestGetOCRImages extends TestCase {
         }
     }
 
-    public void test_2nd_ocr() throws IOException {
+    public void test2ndOcr() throws IOException {
         Path tempDir = Files.createTempDirectory("t");
         File f = new File(tempDir.toFile(), "image_text_overlap.pdf");
         try {
@@ -60,6 +60,28 @@ public class TestGetOCRImages extends TestCase {
 
             assertTrue(new File(tempDir.toFile(), "page_with_text_00005.png").isFile());
             assertFalse(new File(tempDir.toFile(), "page_no_text_00005.png").isFile());
+        } finally {
+            FileUtils.deleteQuietly(tempDir.toFile());
+        }
+    }
+
+
+    public void testMistakenlyNotOcred() throws IOException {
+        Path tempDir = Files.createTempDirectory("t");
+        File f = new File(tempDir.toFile(), "spaces_on_image.pdf");
+        try {
+            try (InputStream is = TestGetOCRImages.class.getResourceAsStream("/spaces_on_image.pdf")) {
+                FileUtils.copyToFile(is, f);
+            }
+            GetOCRImages.main(new String[]{f.getAbsolutePath(),
+                    "--format", "PNG",
+                    "--dpi", "300",
+                    "--start-page", "1",
+                    "--end-page", "1",
+                    "--output-prefix-no-text", tempDir.toString() + "/page_no_text_",
+                    "--output-prefix-with-text", tempDir.toString() + "/page_with_text_"});
+            assertTrue(new File(tempDir.toFile(), "page_with_text_00001.png").isFile());
+            assertTrue(new File(tempDir.toFile(), "page_no_text_00001.png").isFile());
         } finally {
             FileUtils.deleteQuietly(tempDir.toFile());
         }

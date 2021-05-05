@@ -2,7 +2,6 @@ package com.lexpredict.textextraction;
 
 import com.lexpredict.textextraction.dto.PDFPlainText;
 import com.lexpredict.textextraction.dto.PDFPlainTextPage;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pdfbox.cos.COSArray;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -27,7 +26,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 /**
  * Extracts plain text from PDF together with the bounding boxes of each page and character.
@@ -364,7 +362,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
         @Override
         protected void processTextPosition(TextPosition text) {
-            if (!StringUtils.isAlphanumeric(text.getUnicode()))
+            if (!TEUtils.containsAlphaNumeric(text.getUnicode()))
                 return;
             Matrix m = text.getTextMatrix();
             m.concatenate(text.getFont().getFontMatrix());
@@ -376,7 +374,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
         protected int[] selectDeskewAngle(int skewAngleAbsLimit) {
             if (sortedAngles == null || sortedAngles.length == 0) {
-                return new int[] {0, 0, 0};
+                return new int[]{0, 0, 0};
             }
 
             for (int i = this.sortedAngles.length - 1; i >= 0; i--) {
@@ -392,7 +390,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             int skewAngle = 0;
 
             if (this.anglesToCharNum.get(angle) < 10)
-                return new int[] {0, 0, 0};
+                return new int[]{0, 0, 0};
 
             return new int[]{angle, pageRotation, skewAngle};
         }
@@ -429,7 +427,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             int deskewSkewAngle = deskewFullAngleRotationSkewAngle[2];
             this.writePageStart();
             this.insideInternalPageProcessing = true;
-            for (int ia = angleCollector.sortedAngles.length - 1; ia >=0; ia--) {
+            for (int ia = angleCollector.sortedAngles.length - 1; ia >= 0; ia--) {
                 int angle = angleCollector.sortedAngles[ia];
                 this.curAngleLimits = angleCollector.getLimitsByAngle(angle);
                 this.curCharBackTransform = null;

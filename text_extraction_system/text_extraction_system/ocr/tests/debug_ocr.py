@@ -23,7 +23,7 @@ def p2():
     from text_extraction_system.pdf.pdf import merge_pdf_pages, split_pdf_to_page_blocks
     from text_extraction_system.ocr.ocr import ocr_page_to_pdf
     import shutil
-    orig_pdf_fn = '/home/mikhail/lexpredict/misc/angles/house_0003.pdf'
+    orig_pdf_fn = '/home/mikhail/Downloads/Archive_AOL_License_Example_orig.pdf'
     page = 1
 
     #with split_pdf_to_page_blocks(orig_pdf_fn) as page_fns:
