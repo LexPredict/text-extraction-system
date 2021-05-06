@@ -71,7 +71,7 @@ def extract_tables(pageno: int,
 
 def extract_tables_from_pdf_file(pdf_fn: str, pdfminer_advanced_detection: bool = False) -> List[CamelotTable]:
     res: List[CamelotTable] = list()
-    with extract_page_images(pdf_fn=pdf_fn) as image_fns:
+    with extract_page_images(pdf_fn=pdf_fn, dpi=71) as image_fns:
         page_num = 0
         for ltpage in iterate_pages(pdf_fn, use_advanced_detection=pdfminer_advanced_detection):
             page_image_fn = image_fns[page_num]
