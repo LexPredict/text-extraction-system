@@ -1,10 +1,9 @@
 import os
 
 from text_extraction_system.commons.tests.commons import with_default_settings
-from text_extraction_system.data_extract.data_extract import extract_text_pdfminer, extract_text_and_structure, DPI
-from text_extraction_system.ocr.ocr import ocr_page_to_pdf, orientation_and_script_detected, OSD, image_to_osd, \
-    orientation_and_script_detected_in_osd
-from text_extraction_system.pdf.pdf import extract_page_images, extract_page_ocr_images
+from text_extraction_system.data_extract.data_extract import extract_text_pdfminer, extract_text_and_structure
+from text_extraction_system.ocr.ocr import ocr_page_to_pdf, orientation_and_script_detected
+from text_extraction_system.pdf.pdf import extract_page_images
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
@@ -25,23 +24,12 @@ def test_ocr_page():
 
 
 @with_default_settings
-def test_ocr_blurry():
-    fn = os.path.join(data_dir, 'blurred_noisy_scan.pdf')
-    txt = ''
-    with extract_page_ocr_images(fn, 1, 1) as image_fns:
-        image_with_text, image_no_text = image_fns[0]
-        with ocr_page_to_pdf(image_with_text) as pdf_fn:
-            txt += '\n' + extract_text_pdfminer(pdf_fn)
-    assert 'Approved  For  Release' in txt
-
-
-@with_default_settings
 def test_ocr_rotated():
     fn = os.path.join(data_dir, 'rotated1.pdf')
     with extract_page_images(fn, 1, 1) as png_fns:
         with ocr_page_to_pdf(png_fns[0]) as pdf_fn:
-            txt, txt_struct = extract_text_and_structure(pdf_fn)
-    assert 'rotated' in txt
+            with extract_text_and_structure(pdf_fn) as (txt, txt_struct, _s, _d):
+                assert 'rotated' in txt
 
 
 @with_default_settings
@@ -49,8 +37,8 @@ def test_ocr_rotated_small_angle():
     fn = os.path.join(data_dir, 'rotated_small_angle.pdf')
     with extract_page_images(fn, 1, 1) as png_fns:
         with ocr_page_to_pdf(png_fns[0]) as pdf_fn:
-            txt, txt_struct = extract_text_and_structure(pdf_fn)
-    assert 'rotated' in txt
+            with extract_text_and_structure(pdf_fn) as (txt, txt_struct, _s, _d):
+                assert 'rotated' in txt
 
 
 def test_image_contains_text1():
@@ -58,21 +46,6 @@ def test_image_contains_text1():
     assert orientation_and_script_detected(fn)
 
 
-def test_image_contains_text2():
-    fn = os.path.join(data_dir, 'picture_angles__00002.png')
-    assert not orientation_and_script_detected(fn)
-
-
 def test_image_contains_text3():
     fn = os.path.join(data_dir, 'multi_angle_multi_lang.png')
     assert not orientation_and_script_detected(fn)
-
-
-def test_image_contains_text4():
-    fn = os.path.join(data_dir, 'picture_angles__00003.png')
-    assert not orientation_and_script_detected(fn)
-
-
-def test_image_contains_text5():
-    fn = os.path.join(data_dir, 'realdoc__00121.png')
-    assert orientation_and_script_detected(fn)

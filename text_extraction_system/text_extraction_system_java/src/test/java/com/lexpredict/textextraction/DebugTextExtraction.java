@@ -3,6 +3,7 @@ package com.lexpredict.textextraction;
 import com.lexpredict.textextraction.dto.PDFPlainText;
 import org.apache.pdfbox.pdmodel.PDDocument;
 
+import java.io.File;
 import java.io.InputStream;
 
 public class DebugTextExtraction {
@@ -21,17 +22,6 @@ public class DebugTextExtraction {
     public static void test_vertical_doc_deskew_270() throws Exception {
         try (InputStream stream = TestPDF2Text.class
                 .getResourceAsStream("/vertical_270.pdf")) {
-            try (PDDocument document = PDDocument.load(stream)) {
-                PDFPlainText res = PDFToTextWithCoordinates.process(document, true);
-                document.save("/tmp/000.pdf");
-                GetTextFromPDF.renderDebugPDF(document, res, "/tmp/111.pdf");
-            }
-        }
-    }
-
-    public static void test_vertical_doc_deskew2() throws Exception {
-        try (InputStream stream = TestPDF2Text.class
-                .getResourceAsStream("/realdoc__00121_ocred_merged.pdf")) {
             try (PDDocument document = PDDocument.load(stream)) {
                 PDFPlainText res = PDFToTextWithCoordinates.process(document, true);
                 document.save("/tmp/000.pdf");
@@ -95,16 +85,7 @@ public class DebugTextExtraction {
         }
     }
 
-    public static void test_vertical1() throws Exception {
-        try (InputStream stream = TestPDF2Text.class
-                .getResourceAsStream("/bad_coords1.pdf")) {
-            try (PDDocument document = PDDocument.load(stream)) {
-                PDFPlainText res = PDFToTextWithCoordinates.process(document, true);
-                document.save("/tmp/000.pdf");
-                GetTextFromPDF.renderDebugPDF(document, res, "/tmp/111.pdf");
-            }
-        }
-    }
+
 
     public static void test_wrong_angle6() throws Exception {
         try (InputStream stream = TestPDF2Text.class
@@ -118,6 +99,10 @@ public class DebugTextExtraction {
     }
 
     public static void main(String[] args) throws Exception {
-        DebugTextExtraction.test_wrong_angle6();
+        //DebugTextExtraction.test_wrong_angle6();
+        try (PDDocument document = PDDocument.load(new File("/home/mikhail/lexpredict/misc/angles/album_90_orig.pdf"))) {
+            document.getPage(0).setRotation(90);
+            document.save("/home/mikhail/lexpredict/misc/angles/album_90.pdf");
+        }
     }
 }

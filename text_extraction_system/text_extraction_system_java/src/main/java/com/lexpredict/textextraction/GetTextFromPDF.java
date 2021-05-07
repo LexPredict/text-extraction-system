@@ -87,12 +87,13 @@ public class GetTextFromPDF {
                 }
             }
 
-            if (correctedPDFOutput != null)
+            if (correctedPDFOutput != null) {
                 document.setAllSecurityToBeRemoved(true);
                 if (renderCharRects)
                     GetTextFromPDF.renderDebugPDF(document, res, correctedPDFOutput);
                 else
                     document.save(correctedPDFOutput);
+            }
         }
     }
 
