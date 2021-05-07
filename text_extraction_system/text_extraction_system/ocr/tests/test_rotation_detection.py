@@ -54,20 +54,6 @@ def test_angle3_dilated_rows():
 
 
 @with_default_settings
-def test_angle4():
-    fn = os.path.join(data_dir, 'realdoc__00121.png')
-    angle = determine_skew(fn)
-    assert int(angle) == -88
-
-
-@with_default_settings
-def test_angle4_dilated_rows():
-    fn = os.path.join(data_dir, 'realdoc__00121.png')
-    angle = detect_rotation_dilated_rows(fn, pre_calculated_orientation=None)
-    assert int(angle) == -88
-
-
-@with_default_settings
 def test_angle5():
     fn = os.path.join(data_dir, 'two_vertical_lines.png')
     angle = determine_skew(fn)
@@ -79,82 +65,4 @@ def test_angle5():
 def test_angle5_dilated_rows():
     fn = os.path.join(data_dir, 'two_vertical_lines.png')
     angle = detect_rotation_dilated_rows(fn, pre_calculated_orientation=None)
-    assert int(angle) == 0
-
-
-@with_default_settings
-def test_angle6():
-    from datetime import datetime
-    start = datetime.now()
-    fn = os.path.join(data_dir, 'not_rotated1.png')
-    angle = determine_skew(fn)
-    d = datetime.now() - start
-    print(f'Time: {d}')
-    assert int(angle) == -1
-
-
-@with_default_settings
-def test_angle6_dilated_rows():
-    from datetime import datetime
-    start = datetime.now()
-    fn = os.path.join(data_dir, 'not_rotated1.png')
-    angle = detect_rotation_dilated_rows(fn, pre_calculated_orientation=None)
-    d = datetime.now() - start
-    print(f'Time: {d}')
-    assert int(angle) == 0
-
-
-@with_default_settings
-def test_angle7():
-    fn = os.path.join(data_dir, 'wrong_angle1.png')
-    angle = determine_skew(fn)
-    assert int(angle) == 2
-
-
-@with_default_settings
-def test_angle7_dilated_rows():
-    fn = os.path.join(data_dir, 'wrong_angle1.png')
-    angle = detect_rotation_dilated_rows(fn, pre_calculated_orientation=None)
-    assert int(angle) == 1
-
-
-@with_default_settings
-def test_angle8():
-    fn = os.path.join(data_dir, 'wrong_angle3.png')
-    angle = determine_skew(fn)
-    assert int(angle) == 0
-
-
-@with_default_settings
-def test_angle8_dilated_rows():
-    fn = os.path.join(data_dir, 'wrong_angle3.png')
-    angle = detect_rotation_dilated_rows(fn, pre_calculated_orientation=None)
-    assert int(angle) == 0
-
-
-@with_default_settings
-def test_angle9():
-    fn = os.path.join(data_dir, 'wrong_angle4.png')
-    angle = determine_skew(fn)
-    assert int(angle) == 0
-
-
-@with_default_settings
-def test_angle9_dilated_rows():
-    fn = os.path.join(data_dir, 'wrong_angle4.png')
-    angle = detect_rotation_dilated_rows(fn, pre_calculated_orientation=None)
-    assert int(angle) == 0
-
-
-def test_angle10():
-    fn = os.path.join(data_dir, 'wrong_angle5.png')
-    angle = determine_skew(fn)
-    assert int(angle) == -89
-
-
-@with_default_settings
-def test_angle10_dilated_rows():
-    fn = os.path.join(data_dir, 'wrong_angle5.png')
-    angle = detect_rotation_dilated_rows(fn, pre_calculated_orientation=None)
-    # should be -89 but it crashes because tesseract is not sure there is text on the page
     assert int(angle) == 0

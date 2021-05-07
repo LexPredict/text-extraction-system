@@ -33,54 +33,8 @@ public class TestPDF2Text extends TestCase {
     }
 
 
-    public void test_paragraphs() throws Exception {
-        try (InputStream stream = TestPDF2Text.class
-                .getResourceAsStream("/RESO_20120828-01_Building_Remodel__1.pdf")) {
-            try (PDDocument document = PDDocument.load(stream)) {
-                PDFPlainText res = PDFToTextWithCoordinates.process(document, true);
-                System.out.println(res.text);
 
-                assertEquals("Test document contains 7 paragraphs starting with 'WHEREAS'.",
-                        StringUtils.countMatches(res.text, "\n\nWHEREAS"), 7);
 
-                assertTrue("It should not add obsolete empty line after each line of text " +
-                                "(paragraph false-positives). Tuned by PDFTextStripper.setDropThreshold().",
-                        res.text.contains("with \nthe powers"));
-            }
-        }
-    }
-
-    public void test_paragraphs1() throws Exception {
-        try (InputStream stream = TestPDF2Text.class
-                .getResourceAsStream("/RESO_20120828-01_Building_Remodel__54.pdf")) {
-            try (PDDocument document = PDDocument.load(stream)) {
-                PDFPlainText res = PDFToTextWithCoordinates.process(document, true);
-                assertEquals(57, res.text.chars().filter(ch -> ch == '\n').count());
-
-            }
-        }
-    }
-
-    public void test_paragraphs2() throws Exception {
-        try (InputStream stream = TestPDF2Text.class
-                .getResourceAsStream("/paragraphs2.pdf")) {
-            try (PDDocument document = PDDocument.load(stream)) {
-                PDFPlainText res = PDFToTextWithCoordinates.process(document, true);
-                assertEquals(40, res.text.chars().filter(ch -> ch == '\n').count());
-            }
-        }
-    }
-
-    public void test_duplication_in_rotated_text() throws Exception {
-        try (InputStream stream = TestPDF2Text.class
-                .getResourceAsStream("/rotated_duplicate_text.pdf")) {
-            try (PDDocument document = PDDocument.load(stream)) {
-                PDFPlainText res = PDFToTextWithCoordinates.process(document, true);
-                assertEquals(1, StringUtils.countMatches(res.text,
-                        "certain information in connection with the offering by City"));
-            }
-        }
-    }
 
     public void test_duplication_in_rotated_text2() throws Exception {
         try (InputStream stream = TestPDF2Text.class
@@ -118,16 +72,6 @@ public class TestPDF2Text extends TestCase {
                 String t = "certain angle 1";
 
                 assertTrue(res.text.contains(t));
-            }
-        }
-    }
-
-    public void test_house3() throws Exception {
-        try (InputStream stream = TestPDF2Text.class
-                .getResourceAsStream("/house_0003.ocred.pdf")) {
-            try (PDDocument document = PDDocument.load(stream)) {
-                PDFPlainText res = PDFToTextWithCoordinates.process(document, true);
-                assertEquals(0.0, res.pages.get(0).deskewAngle);
             }
         }
     }

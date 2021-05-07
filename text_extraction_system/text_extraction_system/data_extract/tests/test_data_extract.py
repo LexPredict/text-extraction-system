@@ -25,60 +25,6 @@ def test_text_structure_extraction():
     assert len(struct.sections) == 3
 
 
-@with_default_settings
-def test_recursion1():
-    from text_extraction_system.commons.sysutils import increase_recursion_limit
-    increase_recursion_limit()
-    fn = os.path.join(data_dir, 'recursion1.pdf')
-    text, struct = data_extract.extract_text_and_structure(fn)
-    assert len(struct.text_structure.pages) > 2
-
-
-@with_default_settings
-def test_recursion3():
-    fn = os.path.join(data_dir, 'recursion3.png')
-
-    from text_extraction_system.ocr.ocr import ocr_page_to_pdf
-
-    with ocr_page_to_pdf(fn) as pdf_fn:
-        text, struct = data_extract.extract_text_and_structure(pdf_fn)
-
-    for num, page in enumerate(struct.text_structure.pages):
-        assert num == page.number
-
-    assert len(struct.text_structure.pages) == 1
-
-
-@with_default_settings
-def test_multicolumn_no_ocr():
-    fn = os.path.join(data_dir, 'table-based-text_noocr.pdf')
-
-    text, struct = data_extract.extract_text_and_structure(fn)
-
-    s = '''Warren E. Agin, as Trustee of the bankruptcy estate of Variety Plus Real Estate Group, LLC (the “Debtor”) in 
-Chapter 7 proceedings pending in the United States Bankruptcy Court for the District of Massachusetts (the 
-“Bankruptcy Court”) as Case No. 19-11598 (the “Chapter 7 Case”), having an address at 50 Milk Street,16th 
-Floor, Boston, MA 02109'''
-
-    assert s in text
-
-
-@with_default_settings
-def test_multicolumn_ocr():
-    fn = os.path.join(data_dir, 'table-based-text_scan.png')
-
-    from text_extraction_system.ocr.ocr import ocr_page_to_pdf
-
-    with ocr_page_to_pdf(fn) as pdf_fn:
-        text, struct = data_extract.extract_text_and_structure(pdf_fn)
-
-    # In fact for the OCR-ed multi-column text we extract the text wrong right now
-    # because the OCR lib has no info in which order the text blocks should go.
-
-    s = ''''''
-
-    # assert s in text
-
 
 @with_default_settings
 def test_different_languages_extraction_with_no_ocr():
@@ -113,17 +59,3 @@ def test_table_ocr():
     warn_mock.assert_not_called()
 
 
-@with_default_settings
-def test_table_warnings():
-    fn = os.path.join(data_dir, 'camelot_warn.pdf')
-    warn_mock = MagicMock('warn')
-    warnings.warn = warn_mock
-
-    with extract_page_images(fn, 1, 1) as image_fns:
-        image_fn = image_fns[0]
-        with open(fn, 'rb') as ocred_in_file:
-            ocred_page_layout = data_extract.get_first_page_layout(ocred_in_file)
-            camelot_tables = extract_tables(1, ocred_page_layout, image_fn)
-
-        assert len(camelot_tables) == 1
-    warn_mock.assert_not_called()
