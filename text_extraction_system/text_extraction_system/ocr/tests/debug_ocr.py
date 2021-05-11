@@ -23,18 +23,25 @@ def p2():
     from text_extraction_system.pdf.pdf import merge_pdf_pages, split_pdf_to_page_blocks
     from text_extraction_system.ocr.ocr import ocr_page_to_pdf
     import shutil
-    orig_pdf_fn = '/home/mikhail/lexpredict/misc/annotations/A281C3251FF0A39D23312668623DE5790.pdf'
+    orig_pdf_fn = '/home/mikhail/lexpredict/misc/angles/A2A3E26061E43CD60156598713530D98C.pdf'
     page = 1
 
-#    with split_pdf_to_page_blocks(orig_pdf_fn) as page_fns:
-#        pass
+    with split_pdf_to_page_blocks(orig_pdf_fn) as page_fns:
+        page_fn = page_fns[49]
+        with extract_page_ocr_images(page_fn, 1, 1, dpi=300) as images:
+            with ocr_page_to_pdf(images.get(1),
+                                 glyphless_text_only=True,
+                                 tesseract_page_orientation_detection=True) as ocred_page_pdf:  # type: str
+                with merge_pdf_pages(orig_pdf_fn, single_page_merge_num_file_rotate=(1, ocred_page_pdf, None)) as final_pdf:
+                    shutil.copy(page_fn, '/home/mikhail/lexpredict/misc/angles/A2A3E26061E43CD60156598713530D98C__00050.ocred.pdf')
 
-    with extract_page_ocr_images(orig_pdf_fn, page, page, dpi=300) as images:
-        with ocr_page_to_pdf(images.get(1),
-                             glyphless_text_only=True,
-                             tesseract_page_orientation_detection=True) as ocred_page_pdf:  # type: str
-            with merge_pdf_pages(orig_pdf_fn, single_page_merge_num_file_rotate=(1, ocred_page_pdf, None)) as final_pdf:
-                shutil.copy(final_pdf, '/home/mikhail/lexpredict/misc/angles/house_0003.ocred.pdf')
 
+#p2()
 
-p2()
+@with_default_settings
+def p3():
+    from text_extraction_system.data_extract.camelot.camelot import extract_tables_from_pdf_file
+    dtos = extract_tables_from_pdf_file('/home/mikhail/lexpredict/misc/A1EF169FACD1DB087D14CE998EB47BEB8_processed.pdf')
+    print(len(dtos))
+
+p3()
