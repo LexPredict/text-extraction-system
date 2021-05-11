@@ -5,7 +5,6 @@ from unittest.mock import MagicMock
 from text_extraction_system.commons.tests.commons import with_default_settings
 from text_extraction_system.data_extract import data_extract
 from text_extraction_system.data_extract.tables import extract_tables
-from text_extraction_system.pdf.pdf import extract_page_images
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
@@ -13,33 +12,32 @@ data_dir = os.path.join(os.path.dirname(__file__), 'data')
 @with_default_settings
 def test_text_structure_extraction():
     fn = os.path.join(data_dir, 'structured_text.pdf')
-    text, full_struct = data_extract.extract_text_and_structure(fn)
-    struct = full_struct.text_structure
-    assert 'idea if it is really' in text
-    assert 'etect the sections' in text
-    assert len(struct.pages) == 2
-    assert len(struct.paragraphs) == 5
-    assert len(struct.sentences) == 15
+    with data_extract.extract_text_and_structure(fn) as (text, full_struct, _a, _b):
+        struct = full_struct.text_structure
+        assert 'idea if it is really' in text
+        assert 'etect the sections' in text
+        assert len(struct.pages) == 2
+        assert len(struct.paragraphs) == 5
+        assert len(struct.sentences) == 15
 
-    # should be 2 sections but its a problem of lexnlp
-    assert len(struct.sections) == 3
-
+        # should be 2 sections but its a problem of lexnlp
+        assert len(struct.sections) == 3
 
 
 @with_default_settings
 def test_different_languages_extraction_with_no_ocr():
     fn = os.path.join(data_dir, 'two_langs_no_ocr.pdf')
 
-    text, full_struct = data_extract.extract_text_and_structure(fn, language="en_US")
-    struct = full_struct.text_structure
-    assert 'This is top secret' in text
-    assert len(struct.pages) == 1
-    assert len(struct.paragraphs) == 1
-    for i in struct.paragraphs:
-        assert i.language == struct.language
-    assert len(struct.sentences) == 2
-    for i in struct.sentences:
-        assert i.language == struct.language
+    with data_extract.extract_text_and_structure(fn, language="en_US") as (text, full_struct, _a, _b):
+        struct = full_struct.text_structure
+        assert 'This is top secret' in text
+        assert len(struct.pages) == 1
+        assert len(struct.paragraphs) == 1
+        for i in struct.paragraphs:
+            assert i.language == struct.language
+        assert len(struct.sentences) == 2
+        for i in struct.sentences:
+            assert i.language == struct.language
 
 
 @with_default_settings
@@ -57,5 +55,3 @@ def test_table_ocr():
 
     assert len(camelot_tables) == 1
     warn_mock.assert_not_called()
-
-

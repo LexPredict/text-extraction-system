@@ -23,11 +23,11 @@ def p2():
     from text_extraction_system.pdf.pdf import merge_pdf_pages, split_pdf_to_page_blocks
     from text_extraction_system.ocr.ocr import ocr_page_to_pdf
     import shutil
-    orig_pdf_fn = '/home/mikhail/Downloads/Archive_AOL_License_Example_orig.pdf'
+    orig_pdf_fn = '/home/mikhail/lexpredict/misc/annotations/A281C3251FF0A39D23312668623DE5790.pdf'
     page = 1
 
-    #with split_pdf_to_page_blocks(orig_pdf_fn) as page_fns:
-    #    pass
+#    with split_pdf_to_page_blocks(orig_pdf_fn) as page_fns:
+#        pass
 
     with extract_page_ocr_images(orig_pdf_fn, page, page, dpi=300) as images:
         with ocr_page_to_pdf(images.get(1),
