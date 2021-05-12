@@ -16,7 +16,6 @@ import pandas
 from fastapi import FastAPI, File, UploadFile, Form, Response, APIRouter
 from fastapi.exceptions import HTTPException
 from starlette.requests import Request
-from starlette.responses import RedirectResponse
 from starlette.responses import StreamingResponse
 from starlette.staticfiles import StaticFiles
 from starlette.status import HTTP_404_NOT_FOUND, HTTP_400_BAD_REQUEST
@@ -26,7 +25,6 @@ from webdav3.exceptions import RemoteResourceNotFound
 from text_extraction_system import version
 from text_extraction_system.celery_log import HumanReadableTraceBackException
 from text_extraction_system.commons.escape_utils import get_valid_fn
-from text_extraction_system.config import get_settings
 from text_extraction_system.constants import task_ids
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
 from text_extraction_system.request_metadata import RequestMetadata, RequestCallbackInfo, save_request_metadata, \
@@ -53,22 +51,17 @@ templates = Jinja2Templates(directory="text_extraction_system/templates")
 
 @app.get("/", tags=['Others'])
 async def redirect_to_swagger_ui(request: Request):
-    root_path = get_settings().root_path
-    return RedirectResponse(url=f'{root_path}/docs')
-    # Disabling own UI until we get better design
-    # return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
-# @app.get("")
-# async def serve_spa_root(request: Request):
-#    return RedirectResponse(url='/api/docs')
-# Disabling own UI until we get better design
-# return templates.TemplateResponse("index.html", {"request": request})
+@app.get("")
+async def serve_spa_root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
-# @app.get("/page-{rest_of_path:path}")
-# async def serve_spa_rest(request: Request):
-#    return templates.TemplateResponse("index.html", {"request": request})
+@app.get("/page-{rest_of_path:path}")
+async def serve_spa_rest(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.post('/api/v1/data_extraction_tasks/', response_model=str, tags=["Asynchronous Data Extraction"])
