@@ -73,7 +73,7 @@ def test_basic_api_call_back_tables_msgpack():
         assert rs.text_structure_extracted
 
         table_list_json: TableList = client.get_extracted_tables_as_msgpack(rs.request_id)
-        assert len(table_list_json.tables) == 5
+        assert len(table_list_json.tables) == 6
 
         log.info('Text extraction results look good. All assertions passed.')
 
@@ -133,7 +133,7 @@ def test_basic_api_call_back_tables_json():
         assert rs.text_structure_extracted
 
         table_list_json: TableList = client.get_extracted_tables_as_json(rs.request_id)
-        assert len(table_list_json.tables) == 5
+        assert len(table_list_json.tables) == 6
 
         log.info('Text extraction results look good. All assertions passed.')
 
