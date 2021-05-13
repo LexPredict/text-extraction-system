@@ -36,7 +36,7 @@ def iterate_pages(pdf_fn: str, use_advanced_detection: bool = False) -> Generato
         doc = PDFDocument(parser)
         rsrcmgr = PDFResourceManager()
         laparams = LAParams(all_texts=True, grid_size=0) if use_advanced_detection \
-            else LAParams(all_texts=False, boxes_flow=0, grid_size=0)
+            else LAParams(all_texts=True, boxes_flow=None, grid_size=0)
         device = PDFPageAggregator(rsrcmgr, laparams=laparams)
         interpreter = PDFPageInterpreter(rsrcmgr, device)
         for page in PDFPage.create_pages(doc):

@@ -41,7 +41,7 @@ def p2():
 @with_default_settings
 def p3():
     from text_extraction_system.data_extract.camelot.camelot import extract_tables_from_pdf_file
-    dtos = extract_tables_from_pdf_file('/home/mikhail/lexpredict/misc/A1EF169FACD1DB087D14CE998EB47BEB8_processed.pdf')
+    dtos = extract_tables_from_pdf_file('/home/mikhail/lexpredict/misc/tables/problem2_oom.pdf')
     print(len(dtos))
 
 p3()
