@@ -1,3 +1,4 @@
+import math
 import os
 import re
 import shutil
@@ -34,8 +35,8 @@ def iterate_pages(pdf_fn: str, use_advanced_detection: bool = False) -> Generato
         parser = PDFParser(pdf_f)
         doc = PDFDocument(parser)
         rsrcmgr = PDFResourceManager()
-        laparams = LAParams(all_texts=True) if use_advanced_detection \
-            else LAParams(all_texts=False, boxes_flow=None)
+        laparams = LAParams(all_texts=True, grid_size=0) if use_advanced_detection \
+            else LAParams(all_texts=False, boxes_flow=0, grid_size=0)
         device = PDFPageAggregator(rsrcmgr, laparams=laparams)
         interpreter = PDFPageInterpreter(rsrcmgr, device)
         for page in PDFPage.create_pages(doc):

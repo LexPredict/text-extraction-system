@@ -22,7 +22,7 @@ numpy==1.19.4
 opencv-python==4.4.0.46
 pandas==1.1.5
 psutil==5.8.0
-pdfminer.six==20201018
+https://github.com/AndreyCorelli/pdfminer/archive/var-gridsize.zip
 pikepdf==1.19.3
 pycountry==20.7.3
 pydantic==1.6.1
