@@ -118,7 +118,7 @@ async def post_data_extraction_task(file: UploadFile = File(...),
     save_request_metadata(req)
     webdav_client.upload_to(file.file, f'{req.request_id}/{req.original_document}')
     async_task = process_document.apply_async(
-        (req.request_id, req.request_callback_info))
+        (req.request_id, req.request_callback_info.to_dict()))
 
     webdav_client.mkdir(f'{req.request_id}/{task_ids}')
     register_task_id(webdav_client, req.request_id, async_task.id)
@@ -508,6 +508,6 @@ def _run_sync_pdf_processing(webdav_client, request_id: str,
     save_request_metadata(req)
     webdav_client.upload_to(file.file, f'{req.request_id}/{req.original_document}')
     async_task = process_document.apply_async(
-        (req.request_id, req.request_callback_info))
+        (req.request_id, req.request_callback_info.to_dict()))
     webdav_client.mkdir(f'{req.request_id}/{task_ids}')
     register_task_id(webdav_client, req.request_id, async_task.id)
