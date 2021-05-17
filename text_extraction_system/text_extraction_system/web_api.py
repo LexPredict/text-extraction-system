@@ -54,7 +54,7 @@ async def redirect_to_swagger_ui(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 
-@app.get("")
+@app.get("", tags=['Others'])
 async def serve_spa_root(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
