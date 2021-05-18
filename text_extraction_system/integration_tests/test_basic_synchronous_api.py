@@ -22,6 +22,13 @@ def test_basic_api_extract_plain_text_from_document():
         assert f'This is page {i}' in resp
 
 
+def test_rotated_page_with_small_amount_of_text():
+    fn = os.path.join(os.path.dirname(__file__), 'data', 'finstat90_rotation_set.pdf')
+    client = TextExtractionSystemWebClient(test_settings.api_url)
+    resp = client.extract_plain_text_from_document(fn)
+    assert 'financial statements' in resp.lower()
+
+
 def test_basic_api_extract_plain_text_from_document_expired():
     fn = os.path.join(os.path.dirname(__file__), 'data', 'many_pages.odt')
     client = TextExtractionSystemWebClient(test_settings.api_url)
