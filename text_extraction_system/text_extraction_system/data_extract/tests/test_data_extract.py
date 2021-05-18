@@ -4,7 +4,9 @@ from unittest.mock import MagicMock
 
 from text_extraction_system.commons.tests.commons import with_default_settings
 from text_extraction_system.data_extract import data_extract
+from text_extraction_system.data_extract.data_extract import process_pdf_page, PDFPageProcessingResults
 from text_extraction_system.data_extract.tables import extract_tables
+from text_extraction_system.pdf.pdf import merge_pdf_pages
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 
@@ -55,3 +57,13 @@ def test_table_ocr():
 
     assert len(camelot_tables) == 1
     warn_mock.assert_not_called()
+
+
+@with_default_settings
+def test_text_too_short():
+    fn = os.path.join(data_dir, 'finstat90_rotation_set.pdf')
+
+    with process_pdf_page(fn, page_num=1) as res:  # type: PDFPageProcessingResults
+        with merge_pdf_pages(fn, single_page_merge_num_file_rotate=(1, res.ocred_page_fn, None)) as merged_pdf_fn:
+            with data_extract.extract_text_and_structure(merged_pdf_fn, language="en_US") as (text, full_struct, _a, _b):
+                assert 'financial statements' in text.lower()
