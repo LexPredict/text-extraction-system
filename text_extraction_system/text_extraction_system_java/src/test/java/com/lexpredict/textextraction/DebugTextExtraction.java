@@ -100,9 +100,9 @@ public class DebugTextExtraction {
 
     public static void main(String[] args) throws Exception {
         //DebugTextExtraction.test_wrong_angle6();
-        try (PDDocument document = PDDocument.load(new File("/home/mikhail/lexpredict/misc/angles/album_90_orig.pdf"))) {
+        try (PDDocument document = PDDocument.load(new File("/home/mikhail/lexpredict/misc/angles/finstat90.pdf"))) {
             document.getPage(0).setRotation(90);
-            document.save("/home/mikhail/lexpredict/misc/angles/album_90.pdf");
+            document.save("/home/mikhail/lexpredict/misc/angles/finstat90_rotation_set.pdf");
         }
     }
 }

@@ -29,17 +29,18 @@ def ocr_page_to_pdf(page_image_fn: str,
         dstfn = os.path.join(page_dir, os.path.splitext(basename)[0])
         args = ['tesseract',
                 '--psm', '1' if tesseract_page_orientation_detection else '3',
-                '-l', str(language),
                 '-c', 'tessedit_create_pdf=1',
-                '-c', f'textonly_pdf={"1" if glyphless_text_only else "0"}',
-                page_image_fn,
-                dstfn]
+                '-c', f'textonly_pdf={"1" if glyphless_text_only else "0"}']
+        if language:
+            args.extend(['-l', str(language)])
+
+        args.append(page_image_fn)
+        args.append(dstfn)
         env = os.environ.copy()
         log.debug(f'Executing tesseract: {args}')
         proc = Popen(args, env=env, stdout=PIPE, stderr=PIPE)
         try:
             data, err = proc.communicate(timeout=timeout)
-            yield dstfn + '.pdf'
         except TimeoutExpired as te:
             proc.kill()
             outs, errs = proc.communicate()
@@ -59,6 +60,7 @@ def ocr_page_to_pdf(page_image_fn: str,
                                f'{err}'
                                f'Process stderr:\n'
                                f'{err}')
+        yield dstfn + '.pdf'
     finally:
         if proc is not None:
             try:

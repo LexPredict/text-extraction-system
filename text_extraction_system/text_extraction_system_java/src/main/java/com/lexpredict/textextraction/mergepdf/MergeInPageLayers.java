@@ -110,56 +110,47 @@ public class MergeInPageLayers {
             }
         }
 
-        try (PDDocument origDocument = PDDocument.load(new File(pdf), password)) {
-            LayerUtility layerUtility = new LayerUtility(origDocument);
+        try (PDDocument dstDocument = PDDocument.load(new File(pdf), password)) {
+            LayerUtility layerUtility = new LayerUtility(dstDocument);
             for (Map.Entry<Integer, File> pageFn : pageToFn.entrySet()) {
                 int pageNumZeroBased = pageFn.getKey() - 1;
-                PDPage dstPage = origDocument.getPage(pageNumZeroBased);
-                try (PDDocument mergePageDocument = PDDocument.load(pageFn.getValue(), (String) null)) {
-                    PDPage mergeInPage = mergePageDocument.getPage(0);
-                    PDRectangle dstCropBox = dstPage.getBBox();
-                    PDRectangle mergeInCropBox = dstPage.getBBox();
+                PDPage dstPage = dstDocument.getPage(pageNumZeroBased);
+                try (PDDocument layerDocument = PDDocument.load(pageFn.getValue(), (String) null)) {
+                    PDPage layerPage = layerDocument.getPage(0);
+                    PDRectangle layerCropBox = layerPage.getCropBox();
+                    PDRectangle dstCropBox = dstPage.getCropBox();
 
                     AffineTransform insertTransform = new AffineTransform();
-                    double dstLeft = dstCropBox.getLowerLeftX();
-                    double dstBottom = dstCropBox.getLowerLeftY();
-                    double mergeInLeft = mergeInCropBox.getLowerLeftX();
-                    double mergeInBottom = mergeInCropBox.getLowerLeftY();
-                    double dstWidth = dstCropBox.getUpperRightX() - dstCropBox.getLowerLeftX();
-                    double dstHeight = dstCropBox.getUpperRightY() - dstCropBox.getLowerLeftY();
-                    double mergeInWidth = mergeInCropBox.getUpperRightX() - mergeInCropBox.getLowerLeftX();
-                    double mergeInHeight = mergeInCropBox.getUpperRightY() - mergeInCropBox.getLowerLeftY();
 
-                    double dstCenterX = dstLeft + dstWidth / 2;
-                    double dstCenterY = dstBottom + dstHeight / 2;
-                    double mergeInCenterX = mergeInLeft + mergeInWidth / 2;
-                    double mergeInCenterY = mergeInBottom + mergeInHeight / 2;
+                    int dstRotate = dstPage.getRotation();
 
-                    //insertTransform.translate(dstCenterX - mergeInWidth/2, dstCenterY - mergeInHeight/2);
+                    if (dstRotate != 0) {
+                        double tx = (layerCropBox.getLowerLeftX() + layerCropBox.getUpperRightX()) / 2;
+                        double ty = (layerCropBox.getLowerLeftY() + layerCropBox.getUpperRightY()) / 2;
+                        double tx1 = (dstCropBox.getLowerLeftX() + dstCropBox.getUpperRightX()) / 2;
+                        double ty1 = (dstCropBox.getLowerLeftY() + dstCropBox.getUpperRightY()) / 2;
+
+                        insertTransform.concatenate(AffineTransform.getTranslateInstance(tx1, ty1));
+                        insertTransform.concatenate(AffineTransform.getRotateInstance(Math.toRadians(dstRotate)));
+                        insertTransform.concatenate(AffineTransform.getTranslateInstance(-tx, -ty));
+                    }
 
 
                     // Rotate original page if requested
+                    // TODO: Not sure if this really works after rotating the layer being inserted (see above)
                     Double rotate = pageRotateAngles.get(pageFn.getKey());
 
                     if (rotate != null) {
                         int pageRotate = -90 * (int) Math.round(rotate / 90d);
                         double contentsRotate = rotate + pageRotate;
+
+                        pageRotate += dstRotate;
+
                         dstPage.setRotation(pageRotate);
-                        //mergeInPage.setRotation(-pageRotate);
-
-
-                        /*if (pageRotate % 180 == 90) {
-                            insertTransform.rotate(Math.toRadians(pageRotate), mergeInCenterY, mergeInCenterX);
-                        } else {
-                            insertTransform.rotate(Math.toRadians(pageRotate), mergeInCenterX, mergeInCenterY);
-                        }*/
-
-
-                        rotatePageContents(origDocument, dstPage, contentsRotate);
-                        //rotatePageContents(mergePageDocument, mergeInPage, pageRotate);
+                        rotatePageContents(dstDocument, dstPage, contentsRotate);
                     }
 
-                    PDFormXObject textPageForm = layerUtility.importPageAsForm(mergePageDocument, 0);
+                    PDFormXObject layerForm = layerUtility.importPageAsForm(layerDocument, 0);
                     layerUtility.wrapInSaveRestore(dstPage);
 
                     int i = 0;
@@ -167,7 +158,7 @@ public class MergeInPageLayers {
 
                     while (!done) {
                         try {
-                            layerUtility.appendFormAsLayer(dstPage, textPageForm, insertTransform,
+                            layerUtility.appendFormAsLayer(dstPage, layerForm, insertTransform,
                                     "Recognized Text for Page " + pageFn.getKey() + " " + i);
                             done = true;
                         } catch (IllegalArgumentException iae) {
@@ -179,8 +170,8 @@ public class MergeInPageLayers {
                     }
                 }
             }
-            origDocument.setAllSecurityToBeRemoved(true);
-            origDocument.save(dstPdf);
+            dstDocument.setAllSecurityToBeRemoved(true);
+            dstDocument.save(dstPdf);
         }
     }
 
