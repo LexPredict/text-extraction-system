@@ -36,6 +36,7 @@ public class GetOCRImages {
 
     private static final String ARG_FORMAT = "format";
     private static final String ARG_DPI = "dpi";
+    private static final String ARG_RESET_PAGE_ROTATION = "reset-page-rotation";
     private static final String ARG_PASSWORD = "password";
     private static final String ARG_PREF_NO_TEXT = "output-prefix-no-text";
     private static final String ARG_START_PAGE = "start-page";
@@ -53,7 +54,7 @@ public class GetOCRImages {
         String outputPrefixWithText = cmd.getOptionValue(ARG_OUTPUT_PREFIX_WITH_TEXT, null);
         String startPageStr = cmd.getOptionValue(ARG_START_PAGE, "1");
         String endPageStr = cmd.getOptionValue(ARG_END_PAGE, null);
-
+        boolean resetRotation = cmd.hasOption(ARG_RESET_PAGE_ROTATION);
 
         try (PDDocument document = PDDocument.load(new File(pdf), password)) {
             PDFRenderer renderer = new PDFRenderer(document);
@@ -78,7 +79,8 @@ public class GetOCRImages {
                 If we de-rotate the OCR image right here then Tesseract gets the image matching the original page
                 before the rotation was applied and everything goes fine.
                  */
-                page.setRotation(0);
+                if (resetRotation)
+                    page.setRotation(0);
                 if (outputPrefixWithText != null) {
                     BufferedImage image = renderer.renderImageWithDPI(i - 1, dpi, ImageType.RGB);
                     ImageIOUtil.writeImage(image,
@@ -136,6 +138,11 @@ public class GetOCRImages {
                 "Image resolution. Default: 300");
         output.setRequired(false);
         options.addOption(output);
+
+        Option resetPageRotation = new Option("reset_page_rotation", ARG_RESET_PAGE_ROTATION, false,
+                "Reset page rootation.");
+        resetPageRotation.setRequired(false);
+        options.addOption(resetPageRotation);
 
         Option startPage = new Option("start", "start-page", true,
                 "Start page (1-based). Default: 1");
