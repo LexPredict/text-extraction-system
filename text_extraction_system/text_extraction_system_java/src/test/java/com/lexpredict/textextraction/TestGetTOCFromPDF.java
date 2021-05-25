@@ -1,14 +1,10 @@
 package com.lexpredict.textextraction;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.lexpredict.textextraction.dto.PDFPlainText;
 import com.lexpredict.textextraction.dto.PDFTOCRef;
 import junit.framework.TestCase;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.pdfbox.pdmodel.PDDocument;
 
 import java.io.InputStream;
-import java.io.StringWriter;
 import java.util.List;
 
 

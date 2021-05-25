@@ -11,6 +11,7 @@ import org.apache.pdfbox.pdmodel.interactive.documentnavigation.destination.PDPa
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.destination.PDPageXYZDestination;
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDDocumentOutline;
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineItem;
+import org.msgpack.jackson.dataformat.Tuple;
 
 import java.io.IOException;
 import java.util.*;
@@ -19,8 +20,23 @@ import java.util.*;
 * This static class reads Table Of Contents and returns a list of PDFTOCRef records
 * */
 public class GetTOCFromPDF {
+    private static void readTOCRawItems(
+            Map<String, Tuple<Integer, PDAction>> map,
+            PDOutlineItem root,
+            int level) {
+        // populate a flat list of table of contents raw data that is
+        // actually a tree
+        map.put(root.getTitle(), new Tuple<>(level, root.getAction()));
+        PDOutlineItem child = root.getFirstChild();
+        while (child != null) {
+            readTOCRawItems(map, child, level + 1);
+            child = child.getNextSibling();
+        }
+    }
+
     public static List<PDFTOCRef> getTableOfContents(PDDocument document) throws IOException {
         List<PDFTOCRef> tocItems = new ArrayList<>();
+        // read pages into a flat list to find the page index later
         List<PDPage> pages = new ArrayList<>();
         for (PDPage page: document.getPages()) {
             pages.add(page);
@@ -30,20 +46,20 @@ public class GetTOCFromPDF {
         if (bookmarks == null)
             return tocItems;
 
-        Map<String, PDAction> actionsMap = new HashMap<String, PDAction>();
-        PDOutlineItem item = bookmarks.getFirstChild();
-        while (item != null) {
-            actionsMap.put(item.getTitle(), item.getAction());
-            item = item.getNextSibling();
+        Map<String, Tuple<Integer, PDAction>> map = new HashMap<>();
+        for (PDOutlineItem item: bookmarks.children()) {
+            readTOCRawItems(map, item, 1);
         }
 
+        // read all document references - we expect PDPageXYZDestination
+        // that just point to the certain location on the document "canvas"
         Map<String, PDPageDestination> dests = getAllNamedDestinations(document);
 
-        for (String key : actionsMap.keySet()) {
-            PDAction action = actionsMap.get(key);
-            if (!(action instanceof PDActionGoTo))
+        for (String key : map.keySet()) {
+            Tuple<Integer, PDAction> levelAction = map.get(key);
+            if (!(levelAction.second() instanceof PDActionGoTo))
                 continue;
-            PDActionGoTo goToAction = (PDActionGoTo) action;
+            PDActionGoTo goToAction = (PDActionGoTo) levelAction.second();
             PDDestination dest = goToAction.getDestination();
 
             if (!(dest instanceof PDNamedDestination))
@@ -53,7 +69,7 @@ public class GetTOCFromPDF {
             PDPageDestination pd = dests.get(destName);
             PDPage refPage = pd.getPage();
             int pageIndex = pages.indexOf(refPage);
-            PDFTOCRef tRef = new PDFTOCRef(key, 0, 0, pageIndex);
+            PDFTOCRef tRef = new PDFTOCRef(key, levelAction.first(), 0, 0, pageIndex);
             if (pd instanceof PDPageXYZDestination) {
                 PDPageXYZDestination pdXY = (PDPageXYZDestination) pd;
                 tRef.left = pdXY.getLeft();
@@ -66,6 +82,7 @@ public class GetTOCFromPDF {
     }
 
     private static Map<String, PDPageDestination> getAllNamedDestinations(PDDocument document) {
+        // returns { name: page_destination } map from the document's tree-like catalog
         Map<String, PDPageDestination> namedDestinations = new HashMap<>(10);
         PDDocumentCatalog documentCatalog = document.getDocumentCatalog();
         PDDocumentNameDictionary names = documentCatalog.getNames();
