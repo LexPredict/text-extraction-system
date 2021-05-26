@@ -1,5 +1,4 @@
 import os
-import os
 import shutil
 import subprocess
 from contextlib import contextmanager
@@ -23,16 +22,19 @@ from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
 from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfparser import PDFParser
+from text_extraction_system_api.pdf_coordinates.pdf_coords_common import PdfMarkup
 
 from text_extraction_system.config import get_settings
 from text_extraction_system.data_extract.lang import get_lang_detector
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf
-from text_extraction_system.pdf.pdf import page_requires_ocr, extract_page_ocr_images, \
+from text_extraction_system.pdf.pdf import extract_page_ocr_images, \
     raise_from_pdfbox_error_messages
 from text_extraction_system.processes import raise_from_process
 from text_extraction_system.utils import LanguageConverter
 from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, PlainTextStructure, \
     PlainTextSentence, TextAndPDFCoordinates, PDFCoordinates, PlainTableOfContentsRecord
+from text_extraction_system_api.pdf_coordinates.pdf_coords_common import find_page_by_smb_index
+from text_extraction_system_api.pdf_coordinates.coord_text_map import CoordTextMap
 
 log = getLogger(__name__)
 PAGE_SEPARATOR = '\n\n\f'
@@ -139,14 +141,23 @@ def extract_text_and_structure(pdf_fn: str,
                                          language=language or lang.predict_lang(segment))
                       for segment, start, end in get_paragraphs(text, return_spans=True)]
 
-        sections = [PlainTextSection(title=sect.title,
-                                     start=sect.start,
-                                     end=sect.end,
-                                     title_start=sect.title_start,
-                                     title_end=sect.title_end,
-                                     level=sect.level,
-                                     abs_level=sect.abs_level)
-                    for sect in get_document_sections_with_titles(text, sentence_list=sentence_spans)]
+        if table_of_contents:
+            sections = get_sections_from_table_of_contents(table_of_contents,
+                                                           pdfbox_res['charBBoxes'],
+                                                           pages)
+        else:
+            sections = [PlainTextSection(title=sect.title,
+                                         start=sect.start,
+                                         end=sect.end,
+                                         title_start=sect.title_start,
+                                         title_end=sect.title_end,
+                                         level=sect.level,
+                                         abs_level=sect.abs_level,
+                                         left=0,
+                                         top=0,
+                                         page=0)
+                        for sect in get_document_sections_with_titles(text, sentence_list=sentence_spans)]
+            set_section_coordinates(sections)
 
         try:
             title = next(get_titles(text))
@@ -170,6 +181,63 @@ def extract_text_and_structure(pdf_fn: str,
 
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
+
+
+def set_section_coordinates(sections: List[PlainTextSection],
+                            char_bboxes: List[List[float]],
+                            pages: List[PlainTextPage]):
+    # calculates left / top coordinates and the page number
+    # for each section found by ML in plain text
+    page_bounds = [(p.start, p.end) for p in pages]
+    for sect in sections:
+        char_index = sect.start if sect.start < len(char_bboxes) else len(char_bboxes) - 1
+        sect.left = char_bboxes[char_index][0]
+        sect.top = char_bboxes[char_index][1]
+        sect.page = find_page_by_smb_index(page_bounds, sect.start) or 0
+
+
+def get_sections_from_table_of_contents(
+        toc_items: List[PlainTableOfContentsRecord],
+        char_bboxes: List[List[float]],
+        pages: List[PlainTextPage]) -> List[PlainTextSection]:
+    """
+    """
+    sects: List[PlainTextSection] = []
+    for ti in toc_items:
+        sect = PlainTextSection(start=0,
+                                end=0,
+                                title=ti.title,
+                                title_start=0,
+                                title_end=0,
+                                level=ti.level,
+                                abs_level=ti.level,
+                                left=ti.left,
+                                top=ti.top,
+                                page=ti.page)
+        # find coordinates (start / end) by left and top
+        page = pages[ti.page]
+        top = ti.top  # NB: we don't invert Y-coordinate here
+        start = CoordTextMap.find_closest_symbol_pos(char_bboxes, ti.left, top, page.start, page.end)
+        sect.start = start
+        sect.end = start + 1
+        sects.append(sect)
+
+    # make the beginning of the next section the ending of the current one
+    for i, sect in enumerate(sects):
+        last_page = pages[-1]
+        sect.end = last_page.end
+        # find the next section on the same level
+        # or assume the section ends with the last document symbol
+        for j in range(i + 1, len(sects)):
+            if sects[j].level > sect.level:
+                continue
+            sect.end = sects[j].start
+            break
+
+        sect.title_start = sect.start
+        sect.title_end = sect.title_start + len(sect.title)
+        # TODO: detect title start - title end
+    return sects
 
 
 def extract_text_pdfminer(pdf_fn: str) -> str:
