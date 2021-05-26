@@ -126,6 +126,17 @@ class PlainTextSentence:
 @pydantic_dataclass
 @dataclass_json
 @dataclass
+class PlainTableOfContentsRecord:
+    title: str
+    level: int
+    left: int
+    top: int
+    page: int
+
+
+@pydantic_dataclass
+@dataclass_json
+@dataclass
 class PlainTextStructure:
     title: Optional[str]
     language: str
@@ -133,6 +144,7 @@ class PlainTextStructure:
     sentences: List[PlainTextSentence]
     paragraphs: List[PlainTextParagraph]
     sections: List[PlainTextSection]
+    table_of_contents: List[PlainTableOfContentsRecord]
 
 
 @pydantic_dataclass

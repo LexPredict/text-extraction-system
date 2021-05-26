@@ -9,8 +9,8 @@ import requests
 from requests.models import Response, HTTPError
 
 from text_extraction_system_api.dto import PlainTextStructure, PDFCoordinates, TableList, RequestStatus, \
-    TaskCancelResult, \
-    PlainTextPage, PlainTextSentence, PlainTextParagraph, PlainTextSection, Table, OutputFormat
+    PlainTextPage, PlainTextSentence, PlainTextParagraph, PlainTextSection, PlainTableOfContentsRecord, \
+    Table, OutputFormat, TaskCancelResult
 
 
 class TextExtractionSystemWebClient:
@@ -178,11 +178,13 @@ class TextExtractionSystemWebClient:
         shallow_structure = msgpack.unpackb(data, raw=False)
         ps = PlainTextStructure(title=shallow_structure.get('title'),
                                 language=shallow_structure.get('language'),
-                                pages=[], sentences=[], paragraphs=[], sections=[])
+                                pages=[], sentences=[], paragraphs=[], sections=[], table_of_contents=[])
         ps.pages = [PlainTextPage(**p) for p in shallow_structure.get('pages', [])]
         ps.sentences = [PlainTextSentence(**p) for p in shallow_structure.get('sentences', [])]
         ps.paragraphs = [PlainTextParagraph(**p) for p in shallow_structure.get('paragraphs', [])]
         ps.sections = [PlainTextSection(**p) for p in shallow_structure.get('sections', [])]
+        ps.table_of_contents = [PlainTableOfContentsRecord(**p) for p
+                                in shallow_structure.get('table_of_contents', [])]
         return ps
 
     def extract_plain_text_from_document(self,

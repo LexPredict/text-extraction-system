@@ -32,7 +32,7 @@ from text_extraction_system.pdf.pdf import page_requires_ocr, extract_page_ocr_i
 from text_extraction_system.processes import raise_from_process
 from text_extraction_system.utils import LanguageConverter
 from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, PlainTextStructure, \
-    PlainTextSentence, TextAndPDFCoordinates, PDFCoordinates
+    PlainTextSentence, TextAndPDFCoordinates, PDFCoordinates, PlainTableOfContentsRecord
 
 log = getLogger(__name__)
 PAGE_SEPARATOR = '\n\n\f'
@@ -99,7 +99,8 @@ def extract_text_and_structure(pdf_fn: str,
                                              pages=[],
                                              sentences=[],
                                              paragraphs=[],
-                                             sections=[])
+                                             sections=[],
+                                             table_of_contents=[])
             yield text, \
                   TextAndPDFCoordinates(text_structure=text_struct, pdf_coordinates=pdf_coordinates), \
                   out_pdf_fn, \
@@ -115,6 +116,12 @@ def extract_text_and_structure(pdf_fn: str,
             p_res = PlainTextPage(number=num, start=p['location'][0], end=p['location'][1], bbox=p['bbox'])
             pages.append(p_res)
             num += 1
+
+        table_of_contents = []
+        for p in pdfbox_res['tableOfContents']:
+            tc = PlainTableOfContentsRecord(
+                title=p['title'], level=p['level'], left=p['left'], top=p['top'], page=p['page'])
+            table_of_contents.append(tc)
 
         sentence_spans = get_sentence_span_list(text)
 
@@ -152,7 +159,8 @@ def extract_text_and_structure(pdf_fn: str,
             pages=pages,
             sentences=sentences,
             paragraphs=paragraphs,
-            sections=sections)
+            sections=sections,
+            table_of_contents=table_of_contents)
 
         char_bboxes = pdfbox_res['charBBoxes']
         pdf_coordinates = PDFCoordinates(char_bboxes=char_bboxes)

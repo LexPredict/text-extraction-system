@@ -61,12 +61,21 @@ public class GetTOCFromPDF {
                 continue;
             PDActionGoTo goToAction = (PDActionGoTo) levelAction.second();
             PDDestination dest = goToAction.getDestination();
+            PDPageDestination pd = null;
+            // action's destination might be a PDPageDestination (probably
+            // PDPageXYZDestination) or a PDNamedDestination - probably a reference to a
+            // PDPageDestination - or something else
+            if (dest instanceof PDPageDestination)
+                pd = (PDPageDestination) dest;
 
-            if (!(dest instanceof PDNamedDestination))
-                continue;
-            PDNamedDestination namedDest = (PDNamedDestination) dest;
-            String destName = namedDest.getNamedDestination();
-            PDPageDestination pd = dests.get(destName);
+            if (pd == null) {
+                if (!(dest instanceof PDNamedDestination))
+                    continue;
+                PDNamedDestination namedDest = (PDNamedDestination) dest;
+                String destName = namedDest.getNamedDestination();
+                pd = dests.get(destName);
+            }
+
             PDPage refPage = pd.getPage();
             int pageIndex = pages.indexOf(refPage);
             PDFTOCRef tRef = new PDFTOCRef(key, levelAction.first(), 0, 0, pageIndex);
@@ -91,6 +100,7 @@ public class GetTOCFromPDF {
             return namedDestinations;
 
         PDDestinationNameTreeNode dests = names.getDests();
+        if (dests == null) return namedDestinations;
 
         try {
             if (dests.getNames() != null)
