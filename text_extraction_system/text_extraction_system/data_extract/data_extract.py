@@ -22,7 +22,6 @@ from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
 from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfparser import PDFParser
-from text_extraction_system_api.pdf_coordinates.pdf_coords_common import PdfMarkup
 
 from text_extraction_system.config import get_settings
 from text_extraction_system.data_extract.lang import get_lang_detector
@@ -47,7 +46,8 @@ def extract_text_and_structure(pdf_fn: str,
                                timeout_sec: int = 3600,
                                language: str = "",
                                correct_pdf: bool = False,
-                               render_coords_debug: bool = False) \
+                               render_coords_debug: bool = False,
+                               read_sections_from_toc: bool = True) \
         -> Tuple[
             str, TextAndPDFCoordinates, str, Dict[int, float]]:  # text, structure, corrected_pdf_fn, page_rotate_angles
 
@@ -141,7 +141,7 @@ def extract_text_and_structure(pdf_fn: str,
                                          language=language or lang.predict_lang(segment))
                       for segment, start, end in get_paragraphs(text, return_spans=True)]
 
-        if table_of_contents:
+        if read_sections_from_toc and table_of_contents:
             sections = get_sections_from_table_of_contents(table_of_contents,
                                                            pdfbox_res['charBBoxes'],
                                                            pages)
@@ -157,7 +157,7 @@ def extract_text_and_structure(pdf_fn: str,
                                          top=0,
                                          page=0)
                         for sect in get_document_sections_with_titles(text, sentence_list=sentence_spans)]
-            set_section_coordinates(sections)
+            set_section_coordinates(sections, pdfbox_res['charBBoxes'], pages)
 
         try:
             title = next(get_titles(text))

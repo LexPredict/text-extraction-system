@@ -64,7 +64,7 @@ def find_page_by_smb_index(pages: List[Tuple[int, int]], char_index: int) -> int
         if char_index < pages[o][0]:
             b = o
             continue
-        if char_index > pages[o][1]:
+        if char_index > pages[o][1] - 1:
             a = o
             continue
         return o
