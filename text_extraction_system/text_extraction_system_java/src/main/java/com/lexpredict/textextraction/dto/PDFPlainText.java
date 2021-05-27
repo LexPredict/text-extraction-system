@@ -10,4 +10,5 @@ public class PDFPlainText {
 
     public List<PDFPlainTextPage> pages;
 
+    public List<PDFTOCRef> tableOfContents;
 }

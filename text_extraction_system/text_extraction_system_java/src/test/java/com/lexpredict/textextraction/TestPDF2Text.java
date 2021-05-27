@@ -12,7 +12,7 @@ import java.io.StringWriter;
 
 public class TestPDF2Text extends TestCase {
 
-    public void test1() throws Exception {
+    public void test_structured_text() throws Exception {
         try (InputStream stream = TestPDF2Text.class.getResourceAsStream("/structured_text.pdf")) {
             try (PDDocument document = PDDocument.load(stream)) {
                 PDFPlainText res = PDFToTextWithCoordinates.process(document, true);
@@ -32,10 +32,6 @@ public class TestPDF2Text extends TestCase {
         }
     }
 
-
-
-
-
     public void test_duplication_in_rotated_text2() throws Exception {
         try (InputStream stream = TestPDF2Text.class
                 .getResourceAsStream("/vertical_page_rotated.pdf")) {
@@ -46,7 +42,6 @@ public class TestPDF2Text extends TestCase {
             }
         }
     }
-
 
     public void test_duplication_in_rotated_text3() throws Exception {
         try (InputStream stream = TestPDF2Text.class

@@ -501,7 +501,9 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     }
 
     public static PDFPlainText process(PDDocument document, boolean deskew) throws Exception {
-        return process(document, -1, Integer.MAX_VALUE, deskew);
+        PDFPlainText data = process(document, -1, Integer.MAX_VALUE, deskew);
+        data.tableOfContents = GetTOCFromPDF.getTableOfContents(document);
+        return data;
     }
 
     public static PDFPlainText process(PDDocument document,
