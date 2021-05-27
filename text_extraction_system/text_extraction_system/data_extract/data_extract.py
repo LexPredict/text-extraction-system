@@ -213,7 +213,12 @@ def process_pdf_page(pdf_fn: str,
             # It removes all elements from the page except images having no overlapping
             # with any text element.
             # This is used to avoid the text duplication by OCR.
-            with extract_page_ocr_images(pdf_fn, start_page=1, end_page=1, pdf_password=pdf_password, dpi=DPI) \
+            with extract_page_ocr_images(pdf_fn,
+                                         start_page=1,
+                                         end_page=1,
+                                         pdf_password=pdf_password,
+                                         dpi=DPI,
+                                         reset_page_rotation=False) \
                     as image_fns:
                 page_image_without_text_fn = image_fns.get(1) if image_fns else None
                 if page_image_without_text_fn:

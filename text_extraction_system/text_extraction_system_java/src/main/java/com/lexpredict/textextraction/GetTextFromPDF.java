@@ -97,7 +97,7 @@ public class GetTextFromPDF {
         }
     }
 
-    protected static void renderDebugPDF(PDDocument document, PDFPlainText res, String fn) throws IOException {
+    public static void renderDebugPDF(PDDocument document, PDFPlainText res, String fn) throws IOException {
         int i = 0;
         for (PDPage page : document.getPages()) {
             PDFPlainTextPage pageRes = res.pages.get(i);
