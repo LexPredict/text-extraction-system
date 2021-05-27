@@ -4,7 +4,7 @@ import os
 import shutil
 import tempfile
 from contextlib import contextmanager
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 
 import msgpack
 import requests
@@ -207,7 +207,8 @@ def handle_errors(request_id: str, request_callback_info: RequestCallbackInfo):
 @celery_app.task(acks_late=True, bind=True)
 def process_document(task,
                      request_id: str,
-                     request_callback_info: RequestCallbackInfo) -> bool:
+                     request_callback_info: Dict[str, Any]) -> bool:
+    request_callback_info = RequestCallbackInfo(**request_callback_info)
     with handle_errors(request_id, request_callback_info):
         webdav_client: WebDavClient = get_webdav_client()
         req: RequestMetadata = load_request_metadata(request_id)
@@ -262,11 +263,12 @@ def process_pdf(pdf_fn: str,
                                                            req.request_callback_info.log_extra))
 
         log.info(f'{req.original_file_name} | Scheduling {len(task_signatures)} sub-tasks...')
+        request_callback_info_dict = req.request_callback_info.to_dict()
         c = chord(task_signatures)(finish_pdf_processing
                                    .s(req.request_id, req.original_file_name,
-                                      req.request_callback_info)
+                                      request_callback_info_dict)
                                    .set(link_error=[ocr_error_callback.s(req.request_id,
-                                                                         req.request_callback_info)]))
+                                                                         request_callback_info_dict)]))
         register_task_id(webdav_client, req.request_id, c.id)
         for ar in c.parent.children:
             register_task_id(webdav_client, req.request_id, ar.id)
@@ -322,7 +324,8 @@ def process_pdf_page_task(_task,
 
 
 @celery_app.task(bind=True)
-def ocr_error_callback(task, some_id: str, request_id: str, req_callback_info: RequestCallbackInfo):
+def ocr_error_callback(task, some_id: str, request_id: str, req_callback_info: Dict[str, Any]):
+    req_callback_info = RequestCallbackInfo(**req_callback_info)
     set_log_extra(req_callback_info.log_extra)
     deliver_error(request_id, req_callback_info)
 
@@ -332,7 +335,8 @@ def finish_pdf_processing(task,
                           ocred_page_nums: List[int],
                           request_id: str,
                           original_file_name: str,
-                          req_callback_info: RequestCallbackInfo):
+                          req_callback_info: Dict[str, Any]):
+    req_callback_info = RequestCallbackInfo(**req_callback_info)
     with handle_errors(request_id, req_callback_info):
         req: RequestMetadata = load_request_metadata(request_id)
         if not req:

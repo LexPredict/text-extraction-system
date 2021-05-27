@@ -34,8 +34,8 @@ def iterate_pages(pdf_fn: str, use_advanced_detection: bool = False) -> Generato
         parser = PDFParser(pdf_f)
         doc = PDFDocument(parser)
         rsrcmgr = PDFResourceManager()
-        laparams = LAParams(all_texts=True) if use_advanced_detection \
-            else LAParams(all_texts=True, boxes_flow=None)
+        laparams = LAParams(all_texts=True, grid_size=0) if use_advanced_detection \
+            else LAParams(all_texts=True, boxes_flow=None, grid_size=0)
         device = PDFPageAggregator(rsrcmgr, laparams=laparams)
         interpreter = PDFPageInterpreter(rsrcmgr, device)
         for page in PDFPage.create_pages(doc):
@@ -114,6 +114,7 @@ def extract_page_ocr_images(pdf_fn: str,
                             end_page: int = None,
                             pdf_password: str = None,
                             timeout_sec: int = 1800,
+                            reset_page_rotation: bool = False,
                             dpi: int = 300) -> Generator[Dict[int, str], None, None]:
     java_modules_path = get_settings().java_modules_path
 
@@ -134,6 +135,9 @@ def extract_page_ocr_images(pdf_fn: str,
 
         if end_page is not None:
             args += ['--end-page', str(end_page)]
+
+        if reset_page_rotation:
+            args += ['--reset-page-rotation']
 
         completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=timeout_sec,
                                                              universal_newlines=True, stderr=PIPE, stdout=PIPE)
