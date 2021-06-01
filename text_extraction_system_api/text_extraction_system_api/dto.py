@@ -1,7 +1,7 @@
 import datetime
 from dataclasses import dataclass
 from enum import Enum
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 
 from dataclasses_json import dataclass_json
 from pandas import DataFrame
@@ -82,6 +82,12 @@ class PlainTextPage:
     end: int
     bbox: List[float]
 
+    def to_dictionary(self) -> Dict[str, Any]:
+        # returns: {'number': 0, 'start': 0, 'end': 1109,
+        #            'bbox': [0.0, 0.0, 595.2999877929688, 841.8900146484375]}
+        return {'number': self.number, 'start': self.start, 'end': self.end,
+                'bbox': self.bbox}
+
 
 @pydantic_dataclass
 @dataclass_json
@@ -94,6 +100,9 @@ class PlainTextSection:
     title_end: Optional[int]
     level: int
     abs_level: int
+    left: float
+    top: float
+    page: int
 
 
 @pydantic_dataclass
@@ -126,6 +135,17 @@ class PlainTextSentence:
 @pydantic_dataclass
 @dataclass_json
 @dataclass
+class PlainTableOfContentsRecord:
+    title: str
+    level: int
+    left: int
+    top: int
+    page: int
+
+
+@pydantic_dataclass
+@dataclass_json
+@dataclass
 class PlainTextStructure:
     title: Optional[str]
     language: str
@@ -133,6 +153,7 @@ class PlainTextStructure:
     sentences: List[PlainTextSentence]
     paragraphs: List[PlainTextParagraph]
     sections: List[PlainTextSection]
+    table_of_contents: List[PlainTableOfContentsRecord]
 
 
 @pydantic_dataclass

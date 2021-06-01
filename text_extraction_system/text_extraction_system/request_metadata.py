@@ -70,9 +70,12 @@ class RequestMetadata:
     pdf_to_images_timeout_sec: int = 1800
 
     page_rotate_angles: Optional[List[float]] = None
+    read_sections_from_toc: bool = True
 
     def append_error(self, problem: str, exc: Exception):
         error_message: List[str] = list()
+        if problem:
+            error_message.append(self.problem)
         if self.error_message:
             error_message.append(self.error_message)
 

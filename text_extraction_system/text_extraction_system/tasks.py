@@ -402,13 +402,15 @@ def extract_data_and_finish(req: RequestMetadata,
                             local_pdf_fn: str):
     req.pdf_file = req.ocred_pdf or req.converted_to_pdf or req.original_document
     pdf_fn_in_storage_base = os.path.splitext(req.original_document)[0]
-    camelot_tables: List[CamelotTable] = None
+    camelot_tables: Optional[List[CamelotTable]] = None
 
     log.info(f'Extracting plain text and structure from {req.pdf_file} '
              + ' and de-skewing pdf...' if req.deskew_enable else '...')
-    with extract_text_and_structure(local_pdf_fn, language=req.doc_language,
+    with extract_text_and_structure(local_pdf_fn,
+                                    language=req.doc_language,
                                     correct_pdf=req.deskew_enable,
-                                    render_coords_debug=req.char_coords_debug_enable) \
+                                    render_coords_debug=req.char_coords_debug_enable,
+                                    read_sections_from_toc=req.read_sections_from_toc) \
             as (text, text_structure, orig_or_corrected_pdf_fn, page_rotate_angles):
         log.info(f'Extracted {len(text)} characters from {pdf_fn_in_storage_base}')
 
