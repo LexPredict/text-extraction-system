@@ -56,26 +56,34 @@ class CustomizedStream(Stream):
 
 def extract_tables(pageno: int,
                    page_layout: LTPage,
-                   pdf_page_image_fn: str) -> List[CamelotTable]:
-    lattice: CustomizedLattice = CustomizedLattice()
-    lattice.imagename = pdf_page_image_fn
-    lattice.layout = page_layout
+                   pdf_page_image_fn: str,
+                   extract_method: str = 'lattice',
+                   min_accuracy: int = 90) -> List[CamelotTable]:
+    extractor = CustomizedLattice() if extract_method == 'lattice' \
+        else CustomizedStream(split_text=False, edge_tol=1500)
+    extractor.imagename = pdf_page_image_fn
+    extractor.layout = page_layout
     width = page_layout.bbox[2]
     height = page_layout.bbox[3]
     dim = (width, height)
-    lattice.dimensions = dim
+    extractor.dimensions = dim
     # putting a dummy file name to avoid Camelot arguing
     # Camelot extracts the page number from the file name.
-    return lattice.extract_tables(f'page-{pageno}.pdf', suppress_stdout=True)
+    tables = extractor.extract_tables(f'page-{pageno}.pdf', suppress_stdout=True)
+    return [t for t in tables if t.accuracy >= min_accuracy]
 
 
-def extract_tables_from_pdf_file(pdf_fn: str, pdfminer_advanced_detection: bool = False) -> List[CamelotTable]:
+def extract_tables_from_pdf_file(pdf_fn: str,
+                                 pdfminer_advanced_detection: bool = False,
+                                 extract_method: str = 'lattice',
+                                 min_accuracy: int = 90) -> List[CamelotTable]:
     res: List[CamelotTable] = list()
     with extract_page_images(pdf_fn=pdf_fn, dpi=71) as image_fns:
         page_num = 0
         for ltpage in iterate_pages(pdf_fn, use_advanced_detection=pdfminer_advanced_detection):
             page_image_fn = image_fns[page_num]
-            camelot_tables: List[CamelotTable] = extract_tables(page_num, ltpage, page_image_fn)
+            camelot_tables: List[CamelotTable] = extract_tables(
+                page_num, ltpage, page_image_fn, extract_method, min_accuracy)
             if camelot_tables:
                 res += camelot_tables
             page_num += 1
