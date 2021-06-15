@@ -21,7 +21,7 @@ class TableLocationCell:
 
     def get_coord(self, pivot: str) -> float:
         return self.x if pivot == 'l' else self.x + self.w if pivot == 'r' \
-            else self.x + self.w / 2 if pivot == 'm' else self.y
+            else self.x + self.w / 2 if pivot == 'm' else self.y + self.h
 
 
 class TableLocationCluster:
