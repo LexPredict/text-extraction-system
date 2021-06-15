@@ -158,8 +158,11 @@ class TableLocation:
 
 
 class TableDetector:
+    MAX_DIMENSION = 1200
+
     def __init__(self,
                  debug_image_path: str = ''):
+        self.scale = 1.0
         self.blur_radius_paragraph = 11
         self.column_tolerance = 5
         self.gray_image = None
@@ -173,9 +176,24 @@ class TableDetector:
         self.detect_paragraphs()
         return self.detect_tables_in_blocks()
 
+    def find_table_regions(self, image_fn: str) -> List[str]:
+        tables = self.find_tables(image_fn)
+        im_ht = self.gray_image.shape[1]
+        regions = [(t.x * self.scale, (im_ht - t.y) * self.scale,
+                    (t.x + t.w) * self.scale, t.h * self.scale)
+                   for t in tables]
+        return [f'{round(x1)},{round(y1)},{round(x2)},{round(y2)}' for x1, y1, x2, y2 in regions]
+
     def read_image(self, image_fn: str):
         image = cv2.imread(image_fn)
         self.gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+        max_dim = max(image.shape[0], image.shape[1])
+        if max_dim > self.MAX_DIMENSION:
+            self.scale = max_dim / self.MAX_DIMENSION
+            w = round(image.shape[0] / self.scale)
+            h = round(image.shape[1] / self.scale)
+            self.gray_image = cv2.resize(self.gray_image, (w, h))
 
     def detect_paragraphs(self):
         blur = cv2.GaussianBlur(self.gray_image, (self.blur_radius_paragraph, self.blur_radius_paragraph), 0)

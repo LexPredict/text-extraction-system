@@ -129,3 +129,10 @@ def test_mixed_tables_2():
     fn = '/home/andrey/Pictures/no_tables'
     from text_extraction_system.ocr.tables.table_detection import TableDetector
     TableDetector(fn).find_tables(fn + '.png')
+
+
+@with_default_settings
+def test_mixed_tables_3():
+    fn = '/home/andrey/Pictures/table1'
+    from text_extraction_system.ocr.tables.table_detection import TableDetector
+    TableDetector(fn).find_tables(fn + '.png')

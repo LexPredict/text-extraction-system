@@ -7,6 +7,7 @@ from camelot.parsers.stream import Stream
 from camelot.utils import get_text_objects
 from pdfminer.layout import LTPage
 
+from text_extraction_system.ocr.tables.table_detection import TableDetector
 from text_extraction_system.pdf.pdf import extract_page_images, iterate_pages
 
 
@@ -58,9 +59,9 @@ def extract_tables(pageno: int,
                    page_layout: LTPage,
                    pdf_page_image_fn: str,
                    extract_method: str = 'lattice',
-                   min_accuracy: int = 90) -> List[CamelotTable]:
-    extractor = CustomizedLattice() if extract_method == 'lattice' \
-        else CustomizedStream(split_text=False, edge_tol=1500)
+                   min_accuracy: int = 90,
+                   detect_areas: bool = False) -> List[CamelotTable]:
+    extractor = get_extractor(pdf_page_image_fn, extract_method, detect_areas)
     extractor.imagename = pdf_page_image_fn
     extractor.layout = page_layout
     width = page_layout.bbox[2]
@@ -71,6 +72,20 @@ def extract_tables(pageno: int,
     # Camelot extracts the page number from the file name.
     tables = extractor.extract_tables(f'page-{pageno}.pdf', suppress_stdout=True)
     return [t for t in tables if t.accuracy >= min_accuracy]
+
+
+def get_extractor(pdf_page_image_fn: str,
+                  extract_method: str = 'lattice',
+                  detect_areas: bool = False):
+    areas = None
+    if detect_areas:
+        detector = TableDetector()
+        areas = detector.find_table_regions(pdf_page_image_fn)
+        if not areas:
+            return
+    extractor = CustomizedLattice(table_regions=areas) if extract_method == 'lattice' \
+        else CustomizedStream(split_text=False, edge_tol=1500, table_regions=areas)
+    return extractor
 
 
 def extract_tables_from_pdf_file(pdf_fn: str,

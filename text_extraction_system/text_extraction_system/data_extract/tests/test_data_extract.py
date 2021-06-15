@@ -57,7 +57,8 @@ def test_table_ocr():
     with ocr_page_to_pdf(fn) as pdf_fn:
         with open(pdf_fn, 'rb') as ocred_in_file:
             ocred_page_layout = data_extract.get_first_page_layout(ocred_in_file)
-            camelot_tables = extract_tables(1, ocred_page_layout, fn)
+            camelot_tables = extract_tables(1, ocred_page_layout, fn,
+                                            extract_method='lattice', detect_areas=False)
 
     assert len(camelot_tables) == 1
     warn_mock.assert_not_called()
