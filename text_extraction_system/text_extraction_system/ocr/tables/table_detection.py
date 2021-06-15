@@ -10,6 +10,12 @@ class TableLocationRow:
         self.y = y
         self.cells = 1
 
+    def __str__(self):
+        return f'x{self.cells} Y={self.y}'
+
+    def __repr__(self):
+        return self.__str__()
+
 
 class TableLocation:
     ROW_Y_TOLERANCE = 10
@@ -26,7 +32,8 @@ class TableLocation:
         self.rows: List[TableLocationRow] = []
 
     def __str__(self):
-        return f'[{self.x}, {self.y}, {self.w}, {self.h}]'
+        rows_str = f', {len(self.rows)} rows' if self.rows else ''
+        return f'[{self.x}, {self.y}, {self.w}, {self.h}]{rows_str}'
 
     def __repr__(self):
         return self.__str__()
@@ -35,12 +42,12 @@ class TableLocation:
         return (self.x <= x <= (self.x + self.w)) and \
                (self.y <= y <= (self.y + self.h))
 
-    def try_add_cell(self, c_x: float, c_y: float):
+    def try_add_cell(self, c_x: float, c_y: float) -> bool:
         if not self.point_inside(c_x, c_y):
-            return
+            return False
         if not self.rows:
             self.rows.append(TableLocationRow(c_y))
-            return
+            return True
 
         row_exists = False
         for row in self.rows:
@@ -51,6 +58,7 @@ class TableLocation:
                 break
         if not row_exists:
             self.rows.append(TableLocationRow(c_y))
+        return True
 
 
 class TableDetector:
@@ -97,19 +105,17 @@ class TableDetector:
         for c in cnts:
             area = cv2.contourArea(c)
             if area < 4000:
+                # "erase" small contours
                 cv2.drawContours(thresh, [c], -1, 0, -1)
 
         # Invert image
         invert = 255 - thresh
-        offset, old_c_y, first = 10, 0, True
-        visualize = cv2.cvtColor(invert, cv2.COLOR_GRAY2BGR)
 
         # Find contours, sort from top-to-bottom and then sum up column/rows
         cnts = cv2.findContours(invert, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         cnts = cnts[0] if len(cnts) == 2 else cnts[1]
+        cnts = [c for c in cnts if cv2.contourArea(c) > 200]
         (cnts, _) = contours.sort_contours(cnts, method="top-to-bottom")
-        tables: List[TableLocation] = []
-        table, row = None, None
 
         # VISUALIZE
         image_copy = self.gray_image.copy()
@@ -118,25 +124,29 @@ class TableDetector:
         cv2.imwrite('/home/andrey/Pictures/mix_tables_rendered.png', image_copy)
         # VISUALIZE
 
+        cell_contours = []
         for c in cnts:
+            if c.shape[0] > 14:
+                # this shape is too complex for a table cell
+                continue
             # Find centroid
             center_moment = cv2.moments(c)
             c_x = int(center_moment["m10"] / center_moment["m00"])
             c_y = int(center_moment["m01"] / center_moment["m00"])
 
             for t in blocks:
-                t.try_add_cell(c_x, c_y)
+                if t.try_add_cell(c_x, c_y):
+                    cell_contours.append(c)
 
             # VISUALIZE
-            cv2.circle(visualize, (c_x, c_y), 10, (36, 255, 12), -1)
-            cv2.imwrite('/home/andrey/Pictures/mix_tables_circles.png', visualize)
+            cv2.circle(image_copy, (c_x, c_y), 10, (36, 180, 12), -1)
             # VISUALIZE
 
         # VISUALIZE
-        image_copy = self.gray_image.copy()
         for t in blocks:
             cv2.rectangle(image_copy, (t.x, t.y), (t.x + t.w, t.y + t.h), (192, 36, 12),
-                          10 if t.rows else 1)
+                          5 if t.rows else 1)
+        cv2.drawContours(image_copy, cell_contours, -1, (0, 0, 0), 10)
         cv2.imwrite('/home/andrey/Pictures/mix_selected_table.png', image_copy)
         # VISUALIZE
 
