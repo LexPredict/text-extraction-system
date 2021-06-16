@@ -12,7 +12,7 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='1.0.0',
+    version='1.1.0',
 
     description='LexPredict Text Extraction System API',
     long_description='''LexPredict Text Extraction System: a tool for extracting the document text and structure ' \
@@ -76,9 +76,6 @@ from any document type. This package contains DTO classes and an API client impl
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
     install_requires=[
-        'dataclasses==0.6',
-        'dataclasses-json==0.5.1',
-        'pydantic==1.6.1',
     ],
     dependency_links=[
     ],
