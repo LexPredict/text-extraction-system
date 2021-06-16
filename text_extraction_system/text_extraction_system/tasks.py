@@ -446,7 +446,7 @@ def extract_data_and_finish(req: RequestMetadata,
 
         if req.table_extraction_enable:
             log.info(f'Extracting tables from {req.pdf_file}...')
-            camelot_tables = extract_tables_from_pdf_file(orig_or_corrected_pdf_fn)
+            camelot_tables = extract_tables_from_pdf_file(orig_or_corrected_pdf_fn, table_parser=req.table_parser)
         else:
             log.info(f'Table extraction is turned off.')
 

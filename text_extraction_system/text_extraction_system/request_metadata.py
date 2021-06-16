@@ -6,7 +6,7 @@ import dateutil.parser
 
 from dataclasses_json import dataclass_json, config
 from marshmallow import fields
-from text_extraction_system_api.dto import OutputFormat
+from text_extraction_system_api.dto import OutputFormat, TableParser
 from webdav3.exceptions import RemoteResourceNotFound, RemoteParentNotFound
 
 from text_extraction_system.constants import metadata_fn
@@ -71,6 +71,7 @@ class RequestMetadata:
 
     page_rotate_angles: Optional[List[float]] = None
     read_sections_from_toc: bool = True
+    table_parser: TableParser = TableParser.area_stream
 
     def append_error(self, problem: str, exc: Exception):
         error_message: List[str] = list()

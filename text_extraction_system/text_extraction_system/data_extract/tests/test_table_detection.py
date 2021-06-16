@@ -118,21 +118,7 @@ def test_clear_clusters():
 
 
 @with_default_settings
-def test_mixed_tables():
-    fn = '/home/andrey/Pictures/skewed_borderless'
-    from text_extraction_system.ocr.tables.table_detection import TableDetector
-    TableDetector(fn).find_tables(fn + '.png')
-
-
-@with_default_settings
-def test_mixed_tables_2():
-    fn = '/home/andrey/Pictures/no_tables'
-    from text_extraction_system.ocr.tables.table_detection import TableDetector
-    TableDetector(fn).find_tables(fn + '.png')
-
-
-@with_default_settings
-def test_mixed_tables_3():
-    fn = '/home/andrey/Pictures/table1'
+def debug_mixed_tables():
+    fn = ''  # page image file path without dot and extension
     from text_extraction_system.ocr.tables.table_detection import TableDetector
     TableDetector(fn).find_tables(fn + '.png')
