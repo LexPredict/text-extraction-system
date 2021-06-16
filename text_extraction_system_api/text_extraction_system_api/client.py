@@ -11,7 +11,7 @@ from requests.models import Response, HTTPError
 
 from text_extraction_system_api.dto import PlainTextStructure, PDFCoordinates, TableList, RequestStatus, \
     PlainTextPage, PlainTextSentence, PlainTextParagraph, PlainTextSection, PlainTableOfContentsRecord, \
-    Table, OutputFormat, TaskCancelResult
+    Table, OutputFormat, TaskCancelResult, TableParser
 
 
 class TextExtractionSystemWebClient:
@@ -135,7 +135,8 @@ class TextExtractionSystemWebClient:
                                       glyph_enhancing: bool = False,
                                       remove_non_printable: bool = False,
                                       output_format: OutputFormat = OutputFormat.json,
-                                      read_sections_from_toc: bool = True) -> str:
+                                      read_sections_from_toc: bool = True,
+                                      table_parser: TableParser = TableParser.area_stream) -> str:
         resp = requests.post(f'{self.base_url}/api/v1/data_extraction_tasks/',
                              files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
                              data=dict(call_back_url=call_back_url,
@@ -159,7 +160,8 @@ class TextExtractionSystemWebClient:
                                        glyph_enhancing=glyph_enhancing,
                                        remove_non_printable=remove_non_printable,
                                        output_format=output_format.value,
-                                       read_sections_from_toc=read_sections_from_toc))
+                                       read_sections_from_toc=read_sections_from_toc,
+                                       table_parser=table_parser.value))
         if resp.status_code not in {200, 201}:
             self.raise_for_status(resp)
         return json.loads(resp.content)

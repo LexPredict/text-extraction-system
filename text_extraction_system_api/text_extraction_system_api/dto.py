@@ -16,6 +16,13 @@ STATUS_FAILURE = 'FAILURE'
 class OutputFormat(str, Enum):
     msgpack = 'msgpack'
     json = 'json'
+    
+    
+class TableParser(str, Enum):
+    lattice = 'lattice'
+    stream = 'stream'
+    area_lattice = 'area_lattice'
+    area_stream = 'area_stream'
 
 
 @pydantic_dataclass
