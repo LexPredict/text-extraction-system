@@ -6,13 +6,13 @@ from numpy import ndarray
 class TableDetectorSettings:
     def __init__(self,
                  blur_radius_paragraph: int = 11,
-                 column_tolerance: int = 5,
                  max_point_in_cell_contour: int = 9,
                  pivot_tolerance: int = 5,
                  row_y_tolerance: int = 10,
                  max_image_dimension: int = 1200,
+                 min_image_dimension: int = 950,
                  contour_square_area_share: float = 0.75,
-                 paragraph_morph_shape_sz: Tuple[int, int] = (80, 4),
+                 paragraph_morph_shape_sz: Tuple[int, int] = (80, 3),
                  cell_morph_shape_sz: Tuple[int, int] = (33, 2),
                  paragraph_dilate_iterations: int = 5,
                  cell_dilate_iterations: int = 1,
@@ -24,7 +24,6 @@ class TableDetectorSettings:
         # we make original image grayscale and then blur before making the image contrast (black and white)
         # and then we detect contours by cv2 library functions
         self.blur_radius_paragraph = blur_radius_paragraph
-        self.column_tolerance = column_tolerance
         self.max_point_in_cell_contour = max_point_in_cell_contour
         # we join cell contours in a column / a row (candidate) if the cells' coordinate
         # (left or middle or right for columns, bottom for rows) vary within the provided range (pixels)
@@ -32,6 +31,8 @@ class TableDetectorSettings:
         self.row_y_tolerance = row_y_tolerance
         # if one of the source image's dimensions larger than N the image is scaled down
         self.max_image_dimension = max_image_dimension
+        # if one of the source image's dimensions less than N the image is scaled down
+        self.min_image_dimension = min_image_dimension
         # a contour is considered "rectangle" if its area size is not less than k * box_size,
         # where box_size is the area size for the surrounding box
         self.contour_square_area_share = contour_square_area_share
@@ -339,8 +340,12 @@ class TableDetector:
         max_dim = max(image.shape[0], image.shape[1])
         if max_dim > self.settings.max_image_dimension:
             self.scale = max_dim / self.settings.max_image_dimension
-            w = round(image.shape[0] / self.scale)
-            h = round(image.shape[1] / self.scale)
+        if max_dim < self.settings.min_image_dimension:
+            self.scale = max_dim / self.settings.min_image_dimension
+
+        if self.scale != 1:
+            w = round(image.shape[1] / self.scale)
+            h = round(image.shape[0] / self.scale)
             self.gray_image = cv2.resize(self.gray_image, (w, h))
 
     def detect_paragraphs(self):
