@@ -100,6 +100,15 @@ def test_clusters_span():
 
 
 @with_default_settings
+def test_get_clusters_border():
+    a = TableLocationCluster(TableLocationCell(15, 100, 30, 20), 'm', DS)
+    b = TableLocationCluster(TableLocationCell(30, 100, 30, 20), 'm', DS)
+    assert a.get_clusters_border(b) == -1
+    a.cells[0].y = 150
+    assert a.get_clusters_border(b) == (150 + 100 + 20) / 2
+
+
+@with_default_settings
 def test_consume_overlapping_clusters():
     sets = TableDetectorSettings(max_column_span_part=0.3)
     a = TableLocationCluster(TableLocationCell(15, 100, 35, 20), 'm', sets)

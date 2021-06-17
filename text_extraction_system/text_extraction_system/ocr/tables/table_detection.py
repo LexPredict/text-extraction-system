@@ -12,7 +12,7 @@ class TableDetectorSettings:
                  row_y_tolerance: int = 10,
                  max_image_dimension: int = 1200,
                  contour_square_area_share: float = 0.75,
-                 paragraph_morph_shape_sz: Tuple[int, int] = (80, 5),
+                 paragraph_morph_shape_sz: Tuple[int, int] = (80, 4),
                  cell_morph_shape_sz: Tuple[int, int] = (33, 2),
                  paragraph_dilate_iterations: int = 5,
                  cell_dilate_iterations: int = 1,
@@ -166,6 +166,21 @@ class TableLocationCluster:
             span_part = self.get_span_part(ay, ay + ah, by, by + bh)
         return span_part > min_size * self.settings.max_column_span_part
 
+    def get_clusters_border(self, c: 'TableLocationCluster') -> float:
+        # if the clusters don't intersect - get a coordinate (Y for columns, X for rows)
+        # that defines a line between the clusters
+        _ax, ay, _aw, ah = self.bounding_rect
+        _bx, by, _bw, bh = c.bounding_rect
+        if ay < by:
+            ab = ay + ah
+            if ab < by:
+                return (ab + by) / 2
+        else:
+            bb = by + bh
+            if bb < ay:
+                return (bb + ay) / 2
+        return -1
+
     @classmethod
     def get_span_part(cls, al: float, ar: float, bl: float, br: float) -> float:
         # (al, ar) and (bl, br) are two spans
@@ -199,10 +214,9 @@ class TableLocation:
         self.settings = settings
 
         self.clusters_by_pivot: Dict[str, List[TableLocationCluster]] = {
-            'l': [], 'm': [], 'r': [], 'b': []
+            'l': [], 'm': [], 'r': []
         }
         self.column_clusters: List[TableLocationCluster] = []
-        self.row_clusters: List[TableLocationCluster] = []
 
     def __str__(self):
         return f'[{self.x}, {self.y}, {self.w}, {self.h}]'
@@ -258,13 +272,10 @@ class TableLocation:
                     for j in range(i + 1, len(clusters)):
                         clusters[j].remove_cell(cell)
 
-        # leave the biggest column cluster list ('l' for left, 'm' for middle and 'r' for right)
-        self.row_clusters = self.clusters_by_pivot['b']  # 'b' for bottom as all the cells should be bottomline
-                                                         # (or baseline) aligned
-
         # columns shouldn' intersect. If two columns intersects we remove the one with less cells
         self.consume_overlapping_clusters()
 
+        # leave the biggest column cluster list ('l' for left, 'm' for middle and 'r' for right)
         col_cl = [
             self.clusters_by_pivot['l'],
             self.clusters_by_pivot['m'],
@@ -286,8 +297,8 @@ class TableLocation:
                         continue
                     if not a.clusters_span(b):
                         continue
-                    # one clusters consumes another. We remove the smallest
-                    if len(a.cells) < len(b.cells):
+                    # one clusters consumes another. We remove the smallest (by area)
+                    if a.area < b.area:
                         a.cells = []
                         break
                     else:
@@ -405,7 +416,7 @@ class TableDetector:
         for block in self.page_blocks:
             total_cells = 0
             total_area = 0.0
-            row_col = [block.column_clusters, block.row_clusters]
+            row_col = [block.column_clusters]
             for clusters in row_col:
                 cells = sum([len(cl.cells) for cl in clusters])
                 total_cells = max(cells, total_cells)
@@ -455,7 +466,7 @@ class TableDetector:
         for table in tables:
             cv2.rectangle(image_copy, (table.x, table.y), (table.x + table.w, table.y + table.h),
                           (40, 180, 40), 5)
-            clusters = table.column_clusters + table.row_clusters
+            clusters = table.column_clusters
             for cluster in clusters:
                 for cell in cluster.cells:
                     cv2.rectangle(image_copy, (cell.x, cell.y), (cell.x + cell.w, cell.y + cell.h),
