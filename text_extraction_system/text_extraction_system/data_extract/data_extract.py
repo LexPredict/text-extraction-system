@@ -225,8 +225,6 @@ def get_sections_from_table_of_contents(
 
     # make the beginning of the next section the ending of the current one
     for i, sect in enumerate(sects):
-        if sect.title.startswith("Purpose "):
-            a = 1
         last_page = pages[-1]
         sect.end = last_page.end
         # find the next section on the same level
