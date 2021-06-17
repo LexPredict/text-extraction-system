@@ -1,5 +1,6 @@
 from typing import Tuple, List, Dict, Any, Optional
 import cv2
+from numpy import ndarray
 
 
 class TableDetectorSettings:
@@ -12,13 +13,14 @@ class TableDetectorSettings:
                  max_image_dimension: int = 1200,
                  contour_square_area_share: float = 0.75,
                  paragraph_morph_shape_sz: Tuple[int, int] = (80, 5),
-                 cell_morph_shape_sz: Tuple[int, int] = (50, 2),
+                 cell_morph_shape_sz: Tuple[int, int] = (33, 2),
                  paragraph_dilate_iterations: int = 5,
                  cell_dilate_iterations: int = 1,
                  min_columns_in_table: int = 2,
                  cell_area_to_table_area: float = 0.15,
                  min_total_cells_in_table: int = 5,
-                 max_column_span_part: float = 0.3):
+                 max_column_span_part: float = 0.3,
+                 remove_horz_lines: bool = True):
         # we make original image grayscale and then blur before making the image contrast (black and white)
         # and then we detect contours by cv2 library functions
         self.blur_radius_paragraph = blur_radius_paragraph
@@ -50,12 +52,16 @@ class TableDetectorSettings:
         # two columns overlap if their common X-projection part is greater than k * min_c_w
         # where min_c_w is the width of the narrower column
         self.max_column_span_part = max_column_span_part
+        # should we remove horizontal lines from original (grayscale) image for rows not to stick
+        # together?
+        self.remove_horz_lines = remove_horz_lines
 
 
 DEFAULT_DETECTING_SETTINGS = TableDetectorSettings()
 
 
 class TableLocationCell:
+    # detected area that could be a table cell
     def __init__(self, x: float, y: float, w: float, h: float):
         self.x = x
         self.y = y
@@ -78,6 +84,7 @@ class TableLocationCell:
 
 
 class TableLocationCluster:
+    # a column (or a row) of several cells aligned by left, right, middle or bottom (for rows)
     def __init__(self,
                  cell: TableLocationCell,
                  pivot: str,
@@ -175,6 +182,10 @@ class TableLocationCluster:
 
 
 class TableLocation:
+    # an area that may contain a table
+    # the area stores collections of possible columns and rows -
+    # - lists of TableLocationCluster. Each collection has 'l' (left), 'm' (middle),
+    # 'r' (right) or 'b' (bottom, for rows) alignment
     def __init__(self,
                  x: float,
                  y: float,
@@ -322,13 +333,16 @@ class TableDetector:
             self.gray_image = cv2.resize(self.gray_image, (w, h))
 
     def detect_paragraphs(self):
+        self.gray_image = self.remove_thin_lines(self.gray_image)
         blur_rad = self.settings.blur_radius_paragraph
         blur = cv2.GaussianBlur(self.gray_image, (blur_rad, blur_rad), 0)
         thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT,
-                                           self.settings.cell_morph_shape_sz)
+
+        # remove thin lines that actually may make the cells "join" in larger clusters
+        #thresh = self.remove_thin_lines(thresh)
 
         # find cell contours
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, self.settings.cell_morph_shape_sz)
         dilate = cv2.dilate(thresh, kernel, iterations=self.settings.cell_dilate_iterations)
         cell_contours, _hr = cv2.findContours(dilate, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
         self.build_cell_rects_from_contours(cell_contours)
@@ -349,6 +363,19 @@ class TableDetector:
         for contour in contours:  # type: Tuple[float, float, float, float]
             x, y, w, h = cv2.boundingRect(contour)
             self.page_blocks.append(TableLocation(x, y, w, h, self.settings))
+
+    def remove_thin_lines(self, img: ndarray) -> ndarray:
+        # remove thin horizontal lines that may make table row contours stick together
+        if not self.settings.remove_horz_lines:
+            return img
+        thresh = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+        horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 1))
+        detected_lines = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, horizontal_kernel, iterations=2)
+        cnts = cv2.findContours(detected_lines, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cnts = cnts[0] if len(cnts) == 2 else cnts[1]
+        for c in cnts:
+            cv2.drawContours(img, [c], -1, (255, 255, 255), 2)
+        return img
 
     def build_cell_rects_from_contours(self, cell_contours: List[Any]):
         selected = []

@@ -172,10 +172,8 @@ def test_clear_clusters():
 
 
 @with_default_settings
-def test_mixed_tables():
-    #fn = '/home/andrey/Pictures/test/arc_p_17'  # page image file path without dot and extension
-    fn = '/home/andrey/Pictures/test/mix_tables'
+def debug_mixed_tables():
+    fn = ''  # page image file path without dot and extension
     from text_extraction_system.ocr.tables.table_detection import TableDetector
     sets = TableDetectorSettings()
-    sets.paragraph_morph_shape_sz = (80, 5)
     TableDetector(fn, sets).find_tables(fn + '.png')
