@@ -86,8 +86,6 @@ def get_extractor(pdf_page_image_fn: str,
     extract_method = 'lattice' if table_parser == TableParser.lattice or table_parser == TableParser.area_lattice \
         else 'stream'
     if detect_areas:
-        if '_17.' in pdf_page_image_fn:
-            a = 1
         detector = TableDetector()
         areas = detector.find_table_regions(pdf_page_image_fn)
         if not areas:
