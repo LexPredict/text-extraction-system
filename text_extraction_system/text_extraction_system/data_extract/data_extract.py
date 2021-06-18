@@ -221,6 +221,7 @@ def get_sections_from_table_of_contents(
         sect.start = start
         sect.end = start + 1
         sects.append(sect)
+    sects.sort(key=lambda s: s.start)
 
     # make the beginning of the next section the ending of the current one
     for i, sect in enumerate(sects):
@@ -237,6 +238,7 @@ def get_sections_from_table_of_contents(
         sect.title_start = sect.start
         sect.title_end = sect.title_start + len(sect.title)
         # TODO: detect title start - title end
+
     return sects
 
 

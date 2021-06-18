@@ -22,4 +22,15 @@ public class PDFTOCRef {
         this.top = top;
         this.page = page;
     }
+
+    @Override
+    public String toString() {
+        return "PDFTOCRef{" +
+                "title='" + title + '\'' +
+                ", level=" + level +
+                ", left=" + left +
+                ", top=" + top +
+                ", page=" + page +
+                '}';
+    }
 }

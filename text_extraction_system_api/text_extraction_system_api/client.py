@@ -1,8 +1,9 @@
 import json
 import os
 import tempfile
+from io import BufferedReader, BytesIO
 from contextlib import contextmanager
-from typing import Generator, Optional, Dict, List
+from typing import Generator, Optional, Dict, List, Union
 
 import msgpack
 import requests
@@ -10,7 +11,7 @@ from requests.models import Response, HTTPError
 
 from text_extraction_system_api.dto import PlainTextStructure, PDFCoordinates, TableList, RequestStatus, \
     PlainTextPage, PlainTextSentence, PlainTextParagraph, PlainTextSection, PlainTableOfContentsRecord, \
-    Table, OutputFormat, TaskCancelResult
+    Table, OutputFormat, TaskCancelResult, TableParser
 
 
 class TextExtractionSystemWebClient:
@@ -19,7 +20,8 @@ class TextExtractionSystemWebClient:
         super().__init__()
         self.base_url = base_url
 
-    def raise_for_status(self, resp: Response):
+    @staticmethod
+    def raise_for_status(resp: Response):
         try:
             resp.raise_for_status()
         except HTTPError as e:
@@ -34,6 +36,81 @@ class TextExtractionSystemWebClient:
                        f'\n' \
                        f'\nResponse body:\n{resp_body}\n'
             raise HTTPError(message, response=resp)
+
+    def schedule_data_extraction_task_from_bytes(
+            self,
+            file_name: str,
+            file_bytes: Union[bytes, BytesIO, BufferedReader],
+            call_back_url: Optional[str] = None,
+            call_back_celery_broker: Optional[str] = None,
+            call_back_celery_queue: Optional[str] = None,
+            call_back_celery_task_name: Optional[str] = None,
+            call_back_celery_task_id: Optional[str] = None,
+            call_back_celery_root_task_id: Optional[str] = None,
+            call_back_celery_parent_task_id: Optional[str] = None,
+            call_back_additional_info: Optional[str] = None,
+            doc_language: Optional[str] = None,
+            convert_to_pdf_timeout_sec: int = 1800,
+            pdf_to_images_timeout_sec: int = 1800,
+            ocr_enable: bool = True,
+            table_extraction_enable: bool = True,
+            deskew_enable: bool = True,
+            char_coords_debug_enable: bool = False,
+            call_back_celery_version: int = 4,
+            request_id: str = None,
+            log_extra: Dict[str, str] = None,
+            glyph_enhancing: bool = False,
+            remove_non_printable: bool = False,
+            output_format: OutputFormat = OutputFormat.json,
+            read_sections_from_toc: bool = True
+    ) -> str:
+        """
+        Takes bytes, BytesIO, or a BufferedReader in as input and
+        schedules a data extraction task.
+        """
+        if isinstance(file_bytes, bytes):
+            buffered_reader: BufferedReader = BufferedReader(BytesIO(file_bytes))
+        elif isinstance(file_bytes, BytesIO):
+            buffered_reader: BufferedReader = BufferedReader(file_bytes)
+        elif isinstance(file_bytes, BufferedReader):
+            buffered_reader: BufferedReader = file_bytes
+        else:
+            raise TypeError(
+                'Argument `file_bytes` must be one of'
+                'bytes, BytesIO, or BufferedReader.'
+                f' Received: {type(file_bytes)}.'
+            )
+        resp: Response = requests.post(
+            url=f'{self.base_url}/api/v1/data_extraction_tasks/',
+            files={'file': (os.path.basename(file_name), buffered_reader)},
+            data={
+                'call_back_url': call_back_url,
+                'call_back_celery_broker': call_back_celery_broker,
+                'call_back_celery_queue': call_back_celery_queue,
+                'call_back_celery_task_name': call_back_celery_task_name,
+                'call_back_celery_task_id': call_back_celery_task_id,
+                'call_back_celery_root_task_id': call_back_celery_root_task_id,
+                'call_back_celery_parent_task_id': call_back_celery_parent_task_id,
+                'call_back_additional_info': call_back_additional_info,
+                'call_back_celery_version': call_back_celery_version,
+                'convert_to_pdf_timeout_sec': convert_to_pdf_timeout_sec,
+                'pdf_to_images_timeout_sec': pdf_to_images_timeout_sec,
+                'doc_language': doc_language,
+                'ocr_enable': ocr_enable,
+                'table_extraction_enable': table_extraction_enable,
+                'deskew_enable': deskew_enable,
+                'char_coords_debug_enable': char_coords_debug_enable,
+                'request_id': request_id,
+                'log_extra_json_key_value': json.dumps(log_extra) if log_extra else None,
+                'glyph_enhancing': glyph_enhancing,
+                'remove_non_printable': remove_non_printable,
+                'output_format': output_format.value,
+                'read_sections_from_toc': read_sections_from_toc,
+            }
+        )
+        if resp.status_code not in {200, 201}:
+            self.raise_for_status(resp)
+        return json.loads(resp.content)
 
     def schedule_data_extraction_task(self,
                                       fn: str,
@@ -58,7 +135,8 @@ class TextExtractionSystemWebClient:
                                       glyph_enhancing: bool = False,
                                       remove_non_printable: bool = False,
                                       output_format: OutputFormat = OutputFormat.json,
-                                      read_sections_from_toc: bool = True) -> str:
+                                      read_sections_from_toc: bool = True,
+                                      table_parser: TableParser = TableParser.area_stream) -> str:
         resp = requests.post(f'{self.base_url}/api/v1/data_extraction_tasks/',
                              files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
                              data=dict(call_back_url=call_back_url,
@@ -82,7 +160,8 @@ class TextExtractionSystemWebClient:
                                        glyph_enhancing=glyph_enhancing,
                                        remove_non_printable=remove_non_printable,
                                        output_format=output_format.value,
-                                       read_sections_from_toc=read_sections_from_toc))
+                                       read_sections_from_toc=read_sections_from_toc,
+                                       table_parser=table_parser.value))
         if resp.status_code not in {200, 201}:
             self.raise_for_status(resp)
         return json.loads(resp.content)
