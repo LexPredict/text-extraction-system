@@ -327,9 +327,9 @@ class TableDetector:
     def find_table_regions(self, image_fn: str) -> List[str]:
         # returns table regions in format that Camelot understands
         tables = self.find_tables(image_fn)
-        im_ht = self.gray_image.shape[1]
+        im_ht = self.gray_image.shape[0]
         regions = [(t.x * self.scale, (im_ht - t.y) * self.scale,
-                    (t.x + t.w) * self.scale, t.h * self.scale)
+                    (t.x + t.w) * self.scale, (im_ht - t.h - t.y) * self.scale)
                    for t in tables]
         return [f'{round(x1)},{round(y1)},{round(x2)},{round(y2)}' for x1, y1, x2, y2 in regions]
 
