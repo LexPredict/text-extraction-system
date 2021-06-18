@@ -114,8 +114,10 @@ def extract_text_and_structure(pdf_fn: str,
 
         pages = []
         num: int = 0
-        for p in pdfbox_res['pages']:
-            p_res = PlainTextPage(number=num, start=p['location'][0], end=p['location'][1], bbox=p['bbox'])
+        for i, p in enumerate(pdfbox_res['pages']):
+            rotation = int(round(page_rotate_angles[i]))
+            p_res = PlainTextPage(number=num, start=p['location'][0], end=p['location'][1],
+                                  bbox=p['bbox'], rotation=rotation)
             pages.append(p_res)
             num += 1
 

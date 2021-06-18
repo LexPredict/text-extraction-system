@@ -99,9 +99,9 @@ def test_get_sections_from_table_of_contents():
         [80, 540, 20, 40],
     ]
     pages: List[PlainTextPage] = []
-    pages.append(PlainTextPage(number=0, start=0, end=4, bbox=[0, 0, 440, 600]))
-    pages.append(PlainTextPage(number=1, start=4, end=8, bbox=[0, 0, 440, 600]))
-    pages.append(PlainTextPage(number=2, start=8, end=11, bbox=[0, 0, 440, 600]))
+    pages.append(PlainTextPage(number=0, start=0, end=4, bbox=[0, 0, 440, 600], rotation=0))
+    pages.append(PlainTextPage(number=1, start=4, end=8, bbox=[0, 0, 440, 600], rotation=0))
+    pages.append(PlainTextPage(number=2, start=8, end=11, bbox=[0, 0, 440, 600], rotation=0))
     sections = get_sections_from_table_of_contents(toc_items, boxes, pages)
     assert len(sections) == len(toc_items)
     assert sections[1].title == 'Heading 1.1'
