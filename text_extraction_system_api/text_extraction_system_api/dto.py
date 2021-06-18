@@ -88,12 +88,13 @@ class PlainTextPage:
     start: int
     end: int
     bbox: List[float]
+    rotation: int
 
     def to_dictionary(self) -> Dict[str, Any]:
         # returns: {'number': 0, 'start': 0, 'end': 1109,
         #            'bbox': [0.0, 0.0, 595.2999877929688, 841.8900146484375]}
         return {'number': self.number, 'start': self.start, 'end': self.end,
-                'bbox': self.bbox}
+                'bbox': self.bbox, 'rot': self.rotation}
 
 
 @pydantic_dataclass

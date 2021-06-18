@@ -349,13 +349,11 @@ class TableDetector:
             self.gray_image = cv2.resize(self.gray_image, (w, h))
 
     def detect_paragraphs(self):
+        # remove thin lines that actually may make the cells "join" in larger clusters
         self.gray_image = self.remove_thin_lines(self.gray_image)
         blur_rad = self.settings.blur_radius_paragraph
         blur = cv2.GaussianBlur(self.gray_image, (blur_rad, blur_rad), 0)
         thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-
-        # remove thin lines that actually may make the cells "join" in larger clusters
-        #thresh = self.remove_thin_lines(thresh)
 
         # find cell contours
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, self.settings.cell_morph_shape_sz)
