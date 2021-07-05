@@ -2,6 +2,8 @@ import os
 import shutil
 import subprocess
 from contextlib import contextmanager
+
+from PIL import Image
 from dataclasses import dataclass
 from io import StringIO
 from logging import getLogger
@@ -26,6 +28,7 @@ from pdfminer.pdfparser import PDFParser
 from text_extraction_system.config import get_settings
 from text_extraction_system.data_extract.lang import get_lang_detector
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf
+from text_extraction_system.ocr.rotation_detection import determine_skew, RotationDetectionMethod
 from text_extraction_system.pdf.pdf import extract_page_ocr_images, \
     raise_from_pdfbox_error_messages
 from text_extraction_system.processes import raise_from_process
@@ -278,6 +281,7 @@ class PDFPageProcessingResults:
     page_requires_ocr: bool
     ocred_page_fn: Optional[str] = None
     ocred_page_rotation_angle: Optional[float] = None
+    rotation_angle: Optional[float] = None
 
 
 @contextmanager
@@ -301,6 +305,15 @@ def process_pdf_page(pdf_fn: str,
                                          reset_page_rotation=False) \
                     as image_fns:
                 page_image_without_text_fn = image_fns.get(1) if image_fns else None
+
+                rot_angle = determine_skew(page_image_without_text_fn,
+                                           RotationDetectionMethod.DILATED_ROWS)
+                if rot_angle:
+                    img = Image.open(page_image_without_text_fn)
+                    img = img.convert('RGB')
+                    img = img.rotate(rot_angle, fillcolor=(255, 255, 255), expand=True)
+                    img.save(page_image_without_text_fn)
+
                 if page_image_without_text_fn:
                     # this returns a text-based PDF with glyph-less text only
                     # to be used for merging in front of the original PDF page layout
@@ -313,7 +326,8 @@ def process_pdf_page(pdf_fn: str,
                         # because in the final step we will need to merge these transparent layer in front
                         # of the pages in the original PDF file to keep its small size and structure/bookmarks.
                         yield PDFPageProcessingResults(page_requires_ocr=True,
-                                                       ocred_page_fn=ocred_text_layer_pdf_fn)
+                                                       ocred_page_fn=ocred_text_layer_pdf_fn,
+                                                       rotation_angle=rot_angle)
                         return
         # if we don't need OCR then
         yield PDFPageProcessingResults(page_requires_ocr=False)
