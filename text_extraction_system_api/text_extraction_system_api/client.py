@@ -8,6 +8,7 @@ from typing import Generator, Optional, Dict, List, Union
 import msgpack
 import requests
 from requests.models import Response, HTTPError
+from requests.auth import HTTPBasicAuth
 
 from text_extraction_system_api.dto import PlainTextStructure, PDFCoordinates, TableList, RequestStatus, \
     PlainTextPage, PlainTextSentence, PlainTextParagraph, PlainTextSection, PlainTableOfContentsRecord, \
@@ -16,9 +17,15 @@ from text_extraction_system_api.dto import PlainTextStructure, PDFCoordinates, T
 
 class TextExtractionSystemWebClient:
 
-    def __init__(self, base_url: str) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        username: str = None,
+        password: str = None,
+    ) -> None:
         super().__init__()
-        self.base_url = base_url
+        self.base_url: str = base_url
+        self.auth: HTTPBasicAuth = HTTPBasicAuth(username, password)
 
     @staticmethod
     def raise_for_status(resp: Response):
@@ -38,31 +45,31 @@ class TextExtractionSystemWebClient:
             raise HTTPError(message, response=resp)
 
     def schedule_data_extraction_task_from_bytes(
-            self,
-            file_name: str,
-            file_bytes: Union[bytes, BytesIO, BufferedReader],
-            call_back_url: Optional[str] = None,
-            call_back_celery_broker: Optional[str] = None,
-            call_back_celery_queue: Optional[str] = None,
-            call_back_celery_task_name: Optional[str] = None,
-            call_back_celery_task_id: Optional[str] = None,
-            call_back_celery_root_task_id: Optional[str] = None,
-            call_back_celery_parent_task_id: Optional[str] = None,
-            call_back_additional_info: Optional[str] = None,
-            doc_language: Optional[str] = None,
-            convert_to_pdf_timeout_sec: int = 1800,
-            pdf_to_images_timeout_sec: int = 1800,
-            ocr_enable: bool = True,
-            table_extraction_enable: bool = True,
-            deskew_enable: bool = True,
-            char_coords_debug_enable: bool = False,
-            call_back_celery_version: int = 4,
-            request_id: str = None,
-            log_extra: Dict[str, str] = None,
-            glyph_enhancing: bool = False,
-            remove_non_printable: bool = False,
-            output_format: OutputFormat = OutputFormat.json,
-            read_sections_from_toc: bool = True
+        self,
+        file_name: str,
+        file_bytes: Union[bytes, BytesIO, BufferedReader],
+        call_back_url: Optional[str] = None,
+        call_back_celery_broker: Optional[str] = None,
+        call_back_celery_queue: Optional[str] = None,
+        call_back_celery_task_name: Optional[str] = None,
+        call_back_celery_task_id: Optional[str] = None,
+        call_back_celery_root_task_id: Optional[str] = None,
+        call_back_celery_parent_task_id: Optional[str] = None,
+        call_back_additional_info: Optional[str] = None,
+        doc_language: Optional[str] = None,
+        convert_to_pdf_timeout_sec: int = 1800,
+        pdf_to_images_timeout_sec: int = 1800,
+        ocr_enable: bool = True,
+        table_extraction_enable: bool = True,
+        deskew_enable: bool = True,
+        char_coords_debug_enable: bool = False,
+        call_back_celery_version: int = 4,
+        request_id: str = None,
+        log_extra: Dict[str, str] = None,
+        glyph_enhancing: bool = False,
+        remove_non_printable: bool = False,
+        output_format: OutputFormat = OutputFormat.json,
+        read_sections_from_toc: bool = True
     ) -> str:
         """
         Takes bytes, BytesIO, or a BufferedReader in as input and
@@ -82,6 +89,7 @@ class TextExtractionSystemWebClient:
             )
         resp: Response = requests.post(
             url=f'{self.base_url}/api/v1/data_extraction_tasks/',
+            auth=self.auth,
             files={'file': (os.path.basename(file_name), buffered_reader)},
             data={
                 'call_back_url': call_back_url,
@@ -138,6 +146,7 @@ class TextExtractionSystemWebClient:
                                       read_sections_from_toc: bool = True,
                                       table_parser: TableParser = TableParser.area_stream) -> str:
         resp = requests.post(f'{self.base_url}/api/v1/data_extraction_tasks/',
+                             auth=self.auth,
                              files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
                              data=dict(call_back_url=call_back_url,
                                        call_back_celery_broker=call_back_celery_broker,
@@ -168,7 +177,7 @@ class TextExtractionSystemWebClient:
 
     def get_data_extraction_task_status(self, request_id: str) -> RequestStatus:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/status.json'
-        resp = requests.get(url)
+        resp = requests.get(url, auth=self.auth)
         self.raise_for_status(resp)
         return RequestStatus.from_json(resp.content)
 
@@ -177,7 +186,7 @@ class TextExtractionSystemWebClient:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/searchable_pdf.pdf'
         _fd, local_filename = tempfile.mkstemp(suffix='.pdf')
         try:
-            with requests.get(url, stream=True) as r:
+            with requests.get(url, stream=True, auth=self.auth) as r:
                 self.raise_for_status(r)
                 with open(local_filename, 'wb') as f:
                     for chunk in r.iter_content(chunk_size=8192):
@@ -188,52 +197,50 @@ class TextExtractionSystemWebClient:
 
     def get_plain_text(self, request_id: str) -> str:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/extracted_plain_text.txt'
-        resp = requests.get(url)
+        resp = requests.get(url, auth=self.auth)
         self.raise_for_status(resp)
         return resp.text
 
     def get_extracted_text_structure_as_json(self, request_id: str) -> PlainTextStructure:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/document_structure.json'
-        resp = requests.get(url)
+        resp = requests.get(url, auth=self.auth)
         self.raise_for_status(resp)
         return PlainTextStructure.from_json(resp.content)
 
     def get_extracted_text_structure_as_msgpack(self, request_id: str) -> PlainTextStructure:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/document_structure.msgpack'
-        resp = requests.get(url)
+        resp = requests.get(url, auth=self.auth)
         self.raise_for_status(resp)
         return self._unpack_msgpack_text_structure(resp.content)
 
     def get_extracted_pdf_coordinates_as_json(self, request_id: str) -> PDFCoordinates:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/pdf_coordinates.json'
-        resp = requests.get(url)
+        resp = requests.get(url, auth=self.auth)
         self.raise_for_status(resp)
         return PDFCoordinates.from_json(resp.content)
 
-    def get_extracted_pdf_coordinates_as_msgpack(self, request_id: str) \
-            -> PDFCoordinates:
+    def get_extracted_pdf_coordinates_as_msgpack(self, request_id: str) -> PDFCoordinates:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/pdf_coordinates.msgpack'
-        resp = requests.get(url)
+        resp = requests.get(url, auth=self.auth)
         self.raise_for_status(resp)
         data = msgpack.unpackb(resp.content, raw=False)
         return PDFCoordinates(**data)
 
-    def get_extracted_pdf_coordinates_as_msgpack_raw(self, request_id: str) \
-            -> Optional[bytes]:
+    def get_extracted_pdf_coordinates_as_msgpack_raw(self, request_id: str) -> Optional[bytes]:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/pdf_coordinates.msgpack'
-        resp = requests.get(url)
+        resp = requests.get(url, auth=self.auth)
         self.raise_for_status(resp)
         return resp.content
 
     def get_extracted_tables_as_json(self, request_id: str) -> TableList:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.json'
-        resp = requests.get(url)
+        resp = requests.get(url, auth=self.auth)
         self.raise_for_status(resp)
         return TableList.from_json(resp.content)
 
     def get_extracted_tables_as_msgpack(self, request_id: str) -> TableList:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.msgpack'
-        resp = requests.get(url)
+        resp = requests.get(url, auth=self.auth)
         self.raise_for_status(resp)
         data = msgpack.unpackb(resp.content, raw=False)
         tab_list: List[Table] = list()
@@ -243,12 +250,12 @@ class TextExtractionSystemWebClient:
 
     def delete_data_extraction_task_files(self, request_id: str):
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/results/'
-        resp = requests.delete(url)
+        resp = requests.delete(url, auth=self.auth)
         self.raise_for_status(resp)
 
     def purge_data_extraction_task(self, request_id: str) -> TaskCancelResult:
         url = f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/'
-        resp = requests.delete(url)
+        resp = requests.delete(url, auth=self.auth)
         self.raise_for_status(resp)
         return TaskCancelResult.from_json(resp.content)
 
@@ -278,6 +285,7 @@ class TextExtractionSystemWebClient:
                                          char_coords_debug_enable: bool = False,
                                          output_format: OutputFormat = OutputFormat.json) -> str:
         resp = requests.post(f'{self.base_url}/api/v1/extract/plain_text/',
+                             auth=self.auth,
                              files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
                              data=dict(convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
                                        pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
@@ -303,6 +311,7 @@ class TextExtractionSystemWebClient:
         _fd, local_filename = tempfile.mkstemp(suffix='.pdf')
         try:
             with requests.post(f'{self.base_url}/api/v1/extract/searchable_pdf/',
+                               auth=self.auth,
                                files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
                                data=dict(convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
                                          pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
@@ -333,6 +342,7 @@ class TextExtractionSystemWebClient:
         _fd, local_filename = tempfile.mkstemp(suffix='.zip')
         try:
             with requests.post(f'{self.base_url}/api/v1/extract/text_and_structure/',
+                               auth=self.auth,
                                files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
                                data=dict(convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
                                          pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,

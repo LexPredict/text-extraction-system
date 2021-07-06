@@ -327,9 +327,9 @@ class TableDetector:
     def find_table_regions(self, image_fn: str) -> List[str]:
         # returns table regions in format that Camelot understands
         tables = self.find_tables(image_fn)
-        im_ht = self.gray_image.shape[1]
+        im_ht = self.gray_image.shape[0]
         regions = [(t.x * self.scale, (im_ht - t.y) * self.scale,
-                    (t.x + t.w) * self.scale, t.h * self.scale)
+                    (t.x + t.w) * self.scale, (im_ht - t.h - t.y) * self.scale)
                    for t in tables]
         return [f'{round(x1)},{round(y1)},{round(x2)},{round(y2)}' for x1, y1, x2, y2 in regions]
 
@@ -349,13 +349,11 @@ class TableDetector:
             self.gray_image = cv2.resize(self.gray_image, (w, h))
 
     def detect_paragraphs(self):
+        # remove thin lines that actually may make the cells "join" in larger clusters
         self.gray_image = self.remove_thin_lines(self.gray_image)
         blur_rad = self.settings.blur_radius_paragraph
         blur = cv2.GaussianBlur(self.gray_image, (blur_rad, blur_rad), 0)
         thresh = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-
-        # remove thin lines that actually may make the cells "join" in larger clusters
-        #thresh = self.remove_thin_lines(thresh)
 
         # find cell contours
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, self.settings.cell_morph_shape_sz)

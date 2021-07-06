@@ -241,7 +241,7 @@ def test_proper_page_merge_in():
         assert len(text_struct.pages) == 4
         assert 'REPRODUCTION, AND DISTRIBUTION' in text  # page 1
         assert 'subsequently incorporated' in text  # page 2
-        assert 'conditions stated in this License. ' in text  # page 3
+        assert 'conditions stated in this License.' in text  # page 3
         assert 'See the License for the specific language governing' in text  # page 4
 
         log.info('Text extraction results look good. All assertions passed.')
