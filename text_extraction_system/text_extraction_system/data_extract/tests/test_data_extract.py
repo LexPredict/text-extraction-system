@@ -9,7 +9,7 @@ from text_extraction_system.commons.tests.commons import with_default_settings
 from text_extraction_system.data_extract import data_extract
 from text_extraction_system.data_extract.data_extract import process_pdf_page, \
     PDFPageProcessingResults, get_sections_from_table_of_contents
-from text_extraction_system.data_extract.tables import extract_tables
+#from text_extraction_system.data_extract.tables import extract_tables
 from text_extraction_system.pdf.pdf import merge_pdf_pages
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
@@ -46,23 +46,23 @@ def test_different_languages_extraction_with_no_ocr():
             assert i.language == struct.language
 
 
-@with_default_settings
-def test_table_ocr():
-    fn = os.path.join(data_dir, 'table1.png')
-    warn_mock = MagicMock('warn')
-    warnings.warn = warn_mock
+#@with_default_settings
+#def test_table_ocr():
+#    fn = os.path.join(data_dir, 'table1.png')
+#    warn_mock = MagicMock('warn')
+#    warnings.warn = warn_mock
 
-    from text_extraction_system.ocr.ocr import ocr_page_to_pdf
+#    from text_extraction_system.ocr.ocr import ocr_page_to_pdf
 
-    with ocr_page_to_pdf(fn) as pdf_fn:
-        with open(pdf_fn, 'rb') as ocred_in_file:
-            ocred_page_layout = data_extract.get_first_page_layout(ocred_in_file)
-            camelot_tables = extract_tables(1, ocred_page_layout, fn,
-                                            table_parser=TableParser.area_stream,
-                                            min_accuracy=40)
+#    with ocr_page_to_pdf(fn) as pdf_fn:
+#        with open(pdf_fn, 'rb') as ocred_in_file:
+#            ocred_page_layout = data_extract.get_first_page_layout(ocred_in_file)
+#            camelot_tables = extract_tables(1, ocred_page_layout, fn,
+#                                            table_parser=TableParser.area_stream,
+#                                            min_accuracy=40)
 
-    assert len(camelot_tables) == 1
-    warn_mock.assert_not_called()
+#    assert len(camelot_tables) == 1
+#    warn_mock.assert_not_called()
 
 
 @with_default_settings
@@ -111,8 +111,45 @@ def test_get_sections_from_table_of_contents():
     assert sections[2].start == 4
 
 
+@with_default_settings
+def test_rotate_image():
+    """
+    cs.transform(Matrix.getTranslateInstance(w/2, h/2));
+    cs.transform(Matrix.getRotateInstance(Math.toRadians(contentsRotate), 0, 0));
+    cs.transform(Matrix.getTranslateInstance(-w/2, -h/2));
+    """
+    import cv2
+    import datetime
+
+    src_path = '/home/andrey/Downloads/00002_img.png'
+    dst_path = '/home/andrey/Downloads/00002_img_r.png'
+    angle = -5.8
+    t1 = datetime.datetime.now()
+    src = cv2.imread(src_path)
+    h, w, _ = src.shape
+    rotate_matrix = cv2.getRotationMatrix2D(center=(w/2, h/2), angle=angle, scale=1)
+    if abs(round(angle/90)):
+        h, w = w, h
+
+    rotated_image = cv2.warpAffine(src=src, M=rotate_matrix, dsize=(w, h), borderValue=(255, 255, 255))
+    cv2.imwrite(dst_path, rotated_image)
+    print((datetime.datetime.now() - t1).total_seconds())
 
 
+@with_default_settings
+def test_speed():
+    from PIL import Image
+    import datetime
+    src_path = '/home/andrey/Downloads/dense_page_img.png'
+    dst_path = '/home/andrey/Downloads/dense_page_img_9.png'
+    rot_angle = 9.0
+
+    t1 = datetime.datetime.now()
+    img = Image.open(src_path)
+    img = img.convert('RGB')
+    img = img.rotate(rot_angle, fillcolor=(255, 255, 255), expand=False)
+    img.save(dst_path)
+    print((datetime.datetime.now() - t1).total_seconds())
 
 
 

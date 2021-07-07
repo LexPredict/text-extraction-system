@@ -1,6 +1,7 @@
 package com.lexpredict.textextraction.mergepdf;
 
 import com.lexpredict.textextraction.PDFToTextWithCoordinates;
+import com.lexpredict.textextraction.RotatePdf;
 import com.lexpredict.textextraction.dto.PDFPlainText;
 import junit.framework.TestCase;
 import org.apache.commons.io.FileUtils;
@@ -80,4 +81,31 @@ public class TestMergeInPageLayers extends TestCase {
         }
     }
 
+    public void testMergeRotatedPage() throws Exception {
+        String destFname = "/home/andrey/Downloads/00002_merged.pdf";
+        try {
+
+            MergeInPageLayers.main(new String[]{
+                    "--original-pdf", "/home/andrey/Downloads/pdf/doc_2/00001.pdf",
+                    "--dst-pdf", destFname,
+                    "--page-dir", "/home/andrey/Downloads/pdf/doc_2/pages"});
+
+            File fDst = new File(destFname);
+            try (PDDocument document = PDDocument.load(fDst, (String) null)) {
+                PDFPlainText res = PDFToTextWithCoordinates
+                        .process(document, true);
+                // assertTrue(res.text.contains("This is a text"));
+            }
+
+        } finally {
+        }
+    }
+
+    public void testRotatePage() throws Exception {
+        String destFname = "/home/andrey/Downloads/00002_merged_2.pdf";
+        RotatePdf.main(new String[]{
+                "--original-pdf", "/home/andrey/Downloads/pdf/doc_2/00001.pdf",
+                "--dst-pdf", destFname,
+                "--rot-angle", "-9"});
+    }
 }

@@ -273,3 +273,25 @@ def merge_pdf_pages(original_pdf_fn: str,
         yield dst_pdf_fn
     finally:
         shutil.rmtree(temp_dir)
+
+
+@contextmanager
+def rotate_pdf_pages(original_pdf_fn: str,
+                     resulted_pdf_fn: str,
+                     rotation_angle: float,
+                     timeout_sec: int = 3000):
+    java_modules_path = get_settings().java_modules_path
+    args = ['java', '-cp', f'{java_modules_path}/*',
+            'com.lexpredict.textextraction.RotatePdf',
+            '--original-pdf', original_pdf_fn,
+            '--dst-pdf', resulted_pdf_fn,
+            '--rot-angle', str(rotation_angle)]
+
+    completed_process: CompletedProcess = subprocess.run(args,
+                                                         check=False,
+                                                         timeout=timeout_sec,
+                                                         universal_newlines=True, stderr=PIPE, stdout=PIPE)
+    raise_from_process(log, completed_process,
+                       process_title=lambda: f'Rotate PDF pages for {original_pdf_fn}')
+
+    raise_from_pdfbox_error_messages(completed_process)
