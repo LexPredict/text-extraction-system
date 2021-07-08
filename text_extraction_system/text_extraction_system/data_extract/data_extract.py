@@ -3,7 +3,6 @@ import shutil
 import subprocess
 from contextlib import contextmanager
 
-import cv2
 from PIL import Image
 from dataclasses import dataclass
 from io import StringIO

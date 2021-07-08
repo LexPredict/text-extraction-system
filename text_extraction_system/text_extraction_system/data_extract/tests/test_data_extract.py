@@ -9,7 +9,6 @@ from text_extraction_system.commons.tests.commons import with_default_settings
 from text_extraction_system.data_extract import data_extract
 from text_extraction_system.data_extract.data_extract import process_pdf_page, \
     PDFPageProcessingResults, get_sections_from_table_of_contents, normalize_angle_90
-#from text_extraction_system.data_extract.tables import extract_tables
 from text_extraction_system.pdf.pdf import merge_pdf_pages
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
@@ -44,25 +43,6 @@ def test_different_languages_extraction_with_no_ocr():
         assert len(struct.sentences) == 2
         for i in struct.sentences:
             assert i.language == struct.language
-
-
-#@with_default_settings
-#def test_table_ocr():
-#    fn = os.path.join(data_dir, 'table1.png')
-#    warn_mock = MagicMock('warn')
-#    warnings.warn = warn_mock
-
-#    from text_extraction_system.ocr.ocr import ocr_page_to_pdf
-
-#    with ocr_page_to_pdf(fn) as pdf_fn:
-#        with open(pdf_fn, 'rb') as ocred_in_file:
-#            ocred_page_layout = data_extract.get_first_page_layout(ocred_in_file)
-#            camelot_tables = extract_tables(1, ocred_page_layout, fn,
-#                                            table_parser=TableParser.area_stream,
-#                                            min_accuracy=40)
-
-#    assert len(camelot_tables) == 1
-#    warn_mock.assert_not_called()
 
 
 @with_default_settings
