@@ -10,6 +10,7 @@ import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
 import org.apache.pdfbox.util.Matrix;
 
+import java.awt.*;
 import java.awt.geom.AffineTransform;
 import java.io.File;
 import java.io.FileFilter;
@@ -121,7 +122,13 @@ public class MergeInPageLayers {
                     PDRectangle dstCropBox = dstPage.getCropBox();
 
                     AffineTransform insertTransform = new AffineTransform();
-
+                    float origW = dstCropBox.getUpperRightX();
+                    float layerW = layerCropBox.getUpperRightX();
+                    if (layerW > 0) {
+                        float k = origW / layerW;
+                        insertTransform.concatenate(AffineTransform.getScaleInstance(k, k));
+                        layerCropBox = dstCropBox;
+                    }
                     int dstRotate = dstPage.getRotation();
 
                     if (dstRotate != 0) {
@@ -134,7 +141,6 @@ public class MergeInPageLayers {
                         insertTransform.concatenate(AffineTransform.getRotateInstance(Math.toRadians(dstRotate)));
                         insertTransform.concatenate(AffineTransform.getTranslateInstance(-tx, -ty));
                     }
-
 
                     // Rotate original page if requested
                     // TODO: Not sure if this really works after rotating the layer being inserted (see above)
@@ -200,12 +206,14 @@ public class MergeInPageLayers {
         PDRectangle cropBox = dstPage.getCropBox();
         float tx = (cropBox.getLowerLeftX() + cropBox.getUpperRightX()) / 2;
         float ty = (cropBox.getLowerLeftY() + cropBox.getUpperRightY()) / 2;
-        cs.transform(Matrix.getTranslateInstance(tx, ty));
-        cs.transform(Matrix.getRotateInstance(Math.toRadians(contentsRotate), 0, 0));
-        cs.transform(Matrix.getTranslateInstance(-tx, -ty));
+
+        FullAffineMatrix transform = FullAffineMatrix.getTranslateMatrix(tx, ty);
+        transform = transform.multiply(FullAffineMatrix.getRotateMatrix(-(float)contentsRotate));
+        transform = transform.multiply(FullAffineMatrix.getTranslateMatrix(-tx, -ty));
+        Matrix ft = transform.toCvMatrix();
+        cs.transform(ft);
         cs.close();
     }
-
 
     protected static CommandLine parseCliArgs(String[] args) {
         Options options = new Options();
@@ -242,4 +250,51 @@ public class MergeInPageLayers {
         return null;
     }
 
+}
+
+
+class FullAffineMatrix {
+    public double m[][];
+
+    public FullAffineMatrix() {
+        m = new double[][]{{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+    }
+
+    public FullAffineMatrix(double _m[][]) {
+        m = _m;
+    }
+
+    public Matrix toCvMatrix() {
+        return new Matrix((float)m[0][0], (float)m[1][0],
+                          (float)m[0][1], (float)m[1][1],
+                          (float)m[0][2], (float)m[1][2]);
+    }
+
+    public FullAffineMatrix multiply(FullAffineMatrix b) {
+        double[][] c = new double[][]{{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+        for(int i=0; i<3; i++) {
+            for (int j = 0; j < 3; j++) {
+                c[i][j] = 0;
+                for (int k = 0; k < 3; k++) {
+                    c[i][j] += m[i][k] * b.m[k][j];
+                } //end of k loop
+            } //end of j loop
+        } //end of i loop
+        return new FullAffineMatrix(c);
+    }
+
+    public static FullAffineMatrix getTranslateMatrix(float tx, float ty) {
+        return new FullAffineMatrix(new double[][]{{1, 0, tx}, {0, 1, ty}, {0, 0, 1}});
+    }
+
+    public static FullAffineMatrix getScaleMatrix(float sx, float sy) {
+        return new FullAffineMatrix(new double[][]{{sx, 0, 0}, {0, sy, 0}, {0, 0, 1}});
+    }
+
+    public static FullAffineMatrix getRotateMatrix(float angleDegrees) {
+        double a = Math.toRadians(angleDegrees);
+        float sin = (float)Math.sin(a);
+        float cos = (float)Math.cos(a);
+        return new FullAffineMatrix(new double[][]{{cos, sin, 0}, {-sin, cos, 0}, {0, 0, 1}});
+    }
 }
