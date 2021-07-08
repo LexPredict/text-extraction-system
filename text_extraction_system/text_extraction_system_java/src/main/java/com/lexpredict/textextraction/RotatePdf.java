@@ -45,6 +45,7 @@ public class RotatePdf {
         cs.transform(Matrix.getTranslateInstance(tx, ty));
         cs.transform(Matrix.getRotateInstance(Math.toRadians(contentsRotate), 0, 0));
         cs.transform(Matrix.getTranslateInstance(-tx, -ty));
+
         cs.close();
     }
 

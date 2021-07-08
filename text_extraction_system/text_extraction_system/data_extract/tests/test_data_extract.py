@@ -8,7 +8,7 @@ from text_extraction_system_api.dto import PlainTableOfContentsRecord, PlainText
 from text_extraction_system.commons.tests.commons import with_default_settings
 from text_extraction_system.data_extract import data_extract
 from text_extraction_system.data_extract.data_extract import process_pdf_page, \
-    PDFPageProcessingResults, get_sections_from_table_of_contents
+    PDFPageProcessingResults, get_sections_from_table_of_contents, normalize_angle_90
 #from text_extraction_system.data_extract.tables import extract_tables
 from text_extraction_system.pdf.pdf import merge_pdf_pages
 
@@ -152,5 +152,11 @@ def test_speed():
     print((datetime.datetime.now() - t1).total_seconds())
 
 
-
-
+@with_default_settings
+def test_normalize_angle_90():
+    assert normalize_angle_90(-5.8) == -5.8
+    assert normalize_angle_90(0.8) == 0.8
+    assert round(normalize_angle_90(90.8), 1) == 0.8
+    assert normalize_angle_90(88) == -2
+    assert normalize_angle_90(-88) == 2
+    assert normalize_angle_90(-92) == -2

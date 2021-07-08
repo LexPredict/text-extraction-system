@@ -142,7 +142,6 @@ public class MergeInPageLayers {
                         insertTransform.concatenate(AffineTransform.getTranslateInstance(-tx, -ty));
                     }
 
-
                     // Rotate original page if requested
                     // TODO: Not sure if this really works after rotating the layer being inserted (see above)
                     Double rotate = pageRotateAngles.get(pageFn.getKey());
@@ -207,19 +206,14 @@ public class MergeInPageLayers {
         PDRectangle cropBox = dstPage.getCropBox();
         float tx = (cropBox.getLowerLeftX() + cropBox.getUpperRightX()) / 2;
         float ty = (cropBox.getLowerLeftY() + cropBox.getUpperRightY()) / 2;
-        /*cs.transform(Matrix.getTranslateInstance(tx, ty));
-        cs.transform(Matrix.getRotateInstance(Math.toRadians(contentsRotate), 0, 0));
-        cs.transform(Matrix.getTranslateInstance(-tx, -ty));*/
 
         FullAffineMatrix transform = FullAffineMatrix.getTranslateMatrix(tx, ty);
         transform = transform.multiply(FullAffineMatrix.getRotateMatrix(-(float)contentsRotate));
         transform = transform.multiply(FullAffineMatrix.getTranslateMatrix(-tx, -ty));
-        //transform = transform.multiply(FullAffineMatrix.getTranslateMatrix(-8, 0));
         Matrix ft = transform.toCvMatrix();
         cs.transform(ft);
         cs.close();
     }
-
 
     protected static CommandLine parseCliArgs(String[] args) {
         Options options = new Options();

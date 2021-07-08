@@ -311,6 +311,9 @@ def process_pdf_page(pdf_fn: str,
                     rot_angle = determine_skew(page_image_without_text_fn,
                                                RotationDetectionMethod.DILATED_ROWS)
                     if rot_angle:
+                        # we don't rotate images by more than 45 degree angle
+                        rot_angle = normalize_angle_90(rot_angle)
+
                         # rotate the document
                         rotate_pdf_pages(pdf_fn, pdf_fn, rot_angle)
                         # extract the image again
@@ -342,6 +345,17 @@ def process_pdf_page(pdf_fn: str,
                         return
         # if we don't need OCR then
         yield PDFPageProcessingResults(page_requires_ocr=False)
+
+
+def normalize_angle_90(rot_angle: float) -> float:
+    rot_sign = -1 if rot_angle < 0 else 1
+    rot_angle = abs(rot_angle)
+    if rot_angle > 45:
+        rot_angle = rot_angle - 90
+        rot_angle = rot_sign * rot_angle
+    else:
+        rot_angle = rot_sign * rot_angle
+    return rot_angle
 
 
 def rotate_page_back(page_image_without_text_fn: str, rot_angle: float):

@@ -1,6 +1,5 @@
 package com.lexpredict.textextraction;
 
-import com.lexpredict.textextraction.mergepdf.TestMergeInPageLayers;
 import junit.framework.TestCase;
 import org.apache.commons.io.FileUtils;
 
@@ -16,7 +15,7 @@ public class TestRotatePdf extends TestCase {
             File fOrig = new File(tempDir.toFile(), "nine_degree_page.pdf");
             File fDst = new File(tempDir.toFile(), "nine_degree_page_dst.pdf");
 
-            try (InputStream isPage2 = TestMergeInPageLayers.class
+            try (InputStream isPage2 = TestRotatePdf.class
                     .getResourceAsStream("/nine_degree_page.pdf")) {
                 FileUtils.copyToFile(isPage2, fOrig);
             }
@@ -24,7 +23,7 @@ public class TestRotatePdf extends TestCase {
             RotatePdf.main(new String[]{
                     "--original-pdf", fOrig.getAbsolutePath(),
                     "--dst-pdf", fDst.getAbsolutePath(),
-                    "--rot-angle", "-9"});
+                    "--rot-angle", "-89"});
 
             // check the PDF exists and it's size slightly differs
             TestCase.assertTrue(fDst.isFile());
