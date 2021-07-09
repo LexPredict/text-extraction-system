@@ -417,7 +417,8 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             pageRotation = 90 * Math.round(angle / 90F);
             skewAngle = 0;
 
-            if (this.anglesToCharNum.get(angle) < 10)
+            Integer weightedAngle = this.anglesToCharNum.get(angle);
+            if (weightedAngle == null || weightedAngle < 10)
                 return new float[]{0, 0, 0};
 
             return new float[]{angle, pageRotation, skewAngle};
