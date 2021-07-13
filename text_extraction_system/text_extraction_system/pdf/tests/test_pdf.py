@@ -1,5 +1,4 @@
 import os
-import tempfile
 import time
 
 import pikepdf
@@ -130,7 +129,6 @@ def test_split_pdf_file_names5():
 
 def test_split_pdf_file_names6():
     fn = os.path.join(data_dir, 'pdf_9_pages.pdf')
-    temp_dir = tempfile.mkdtemp()
     with split_pdf_to_page_blocks(fn, 11, page_block_base_name='aaa.pdf') as block_files:
         assert len(block_files) == 1
         assert os.path.basename(block_files[0]) == 'pdf_9_pages.pdf'
