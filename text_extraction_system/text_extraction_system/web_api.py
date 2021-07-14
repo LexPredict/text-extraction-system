@@ -140,8 +140,8 @@ def load_request_metadata_or_raise(request_id: str) -> RequestMetadata:
 @app.delete('/api/v1/data_extraction_tasks/{request_id}/', response_model=TaskCancelResult,
             tags=["Asynchronous Data Extraction"])
 async def purge_data_extraction_task(request_id: str):
-    problems = dict()
-    success = list()
+    problems: dict = {}
+    success: list = []
     celery_task_ids: List[str] = get_request_task_ids(get_webdav_client(), request_id)
     for task_id in celery_task_ids:
         try:
@@ -393,7 +393,7 @@ async def extract_text_from_document_and_generate_searchable_pdf(
         full_extract_timeout_sec: int = Form(default=3600),
         char_coords_debug_enable: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
-):
+) -> Response:
     webdav_client = get_webdav_client()
     request_id = str(uuid4())
     _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
@@ -405,7 +405,16 @@ async def extract_text_from_document_and_generate_searchable_pdf(
         raise HTTPException(status_code=504, detail="Input file is too big")
 
     # Get extracted text-based pdf file and clean temp data
-    pdf_file = _proxy_request(webdav_client, request_id, load_request_metadata(request_id).pdf_file)
+    filename: str = load_request_metadata(request_id).pdf_file
+    pdf_file: Response = _proxy_request(
+        webdav_client=webdav_client,
+        request_id=request_id,
+        fn=filename,
+        headers={
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': f'attachment; filename={filename}'
+        }
+    )
     webdav_client.clean(f'{request_id}/')
     return pdf_file
 
