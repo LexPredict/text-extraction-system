@@ -119,14 +119,14 @@ def extract_page_ocr_images(pdf_fn: str,
     java_modules_path = get_settings().java_modules_path
 
     temp_dir_no_text = mkdtemp(prefix='pdf_images_')
-    basefn = os.path.splitext(os.path.basename(pdf_fn))[0]
+    base_fn = os.path.splitext(os.path.basename(pdf_fn))[0]
     try:
         args = ['java', '-cp', f'{java_modules_path}/*',
                 'com.lexpredict.textextraction.getocrimages.GetOCRImages',
                 pdf_fn,
                 '--format', 'png',
                 '--dpi', f'{dpi}',
-                '--output-prefix-no-text', f'{temp_dir_no_text}/{basefn}__']
+                '--output-prefix-no-text', f'{temp_dir_no_text}/{base_fn}__']
         if pdf_password:
             args += ['--password', pdf_password]
 
