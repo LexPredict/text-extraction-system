@@ -326,7 +326,8 @@ def process_pdf_page(pdf_fn: str,
                             new_page_image_without_text_fn = rot_image_fns.get(1) if rot_image_fns else None
                             if new_page_image_without_text_fn:
                                 shutil.move(new_page_image_without_text_fn, page_image_without_text_fn)
-
+                            else:
+                                page_image_without_text_fn = ''
                 if page_image_without_text_fn:
                     # this returns a text-based PDF with glyph-less text only
                     # to be used for merging in front of the original PDF page layout
