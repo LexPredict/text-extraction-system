@@ -53,6 +53,7 @@ def extract_text_and_structure(pdf_fn: str,
                                read_sections_from_toc: bool = True) \
         -> Tuple[
             str, TextAndPDFCoordinates, str, Dict[int, float]]:  # text, structure, corrected_pdf_fn, page_rotate_angles
+    # pdf_fn file already contains text, no OCR is required at this step
 
     if render_coords_debug:
         correct_pdf = True
@@ -113,6 +114,7 @@ def extract_text_and_structure(pdf_fn: str,
 
             return
 
+        # we store the rotation angles for each of the pages
         page_rotate_angles: List[float] = [pdfpage['deskewAngle'] for pdfpage in pdfbox_res['pages']]
 
         pages = []
@@ -248,6 +250,7 @@ def get_sections_from_table_of_contents(
 
 
 def extract_text_pdfminer(pdf_fn: str) -> str:
+    # TODO: this method is for testing purposes only
     output_string = StringIO()
     with open(pdf_fn, 'rb') as in_file:
         parser = PDFParser(in_file)
@@ -262,6 +265,7 @@ def extract_text_pdfminer(pdf_fn: str) -> str:
 
 def get_first_page_layout(pdf_opened_file,
                           use_advanced_detection: bool = True) -> LTPage:
+    # TODO: this method is for testing purposes only
     parser = PDFParser(pdf_opened_file)
     doc = PDFDocument(parser)
     rsrcmgr = PDFResourceManager()
@@ -304,9 +308,15 @@ def process_pdf_page(pdf_fn: str,
                                          dpi=DPI,
                                          reset_page_rotation=False) \
                     as image_fns:
+                # note: extract_page_ocr_images method might have returned nothing
+                # (extraction fails) or an image w/o any text
                 page_image_without_text_fn = image_fns.get(1) if image_fns else None
 
                 if page_image_without_text_fn:
+                    # the image might be rotated. Then we try to determine the image rotation angle
+                    # based on opencv algorithms and rotate the image back.
+                    # Even if the image is still rotated, OCR will extract the text. That's fine
+                    # if the image rotation angle is a multiple of 90 degree.
                     rot_angle = determine_skew(page_image_without_text_fn,
                                                RotationDetectionMethod.DILATED_ROWS)
                     if rot_angle:
@@ -348,6 +358,7 @@ def process_pdf_page(pdf_fn: str,
 
 
 def normalize_angle_90(rot_angle: float) -> float:
+    # inscribe the angle in -45 ... 45 degrees
     rot_sign = -1 if rot_angle < 0 else 1
     rot_angle = abs(rot_angle)
     if rot_angle > 45:
@@ -359,16 +370,9 @@ def normalize_angle_90(rot_angle: float) -> float:
 
 
 def rotate_page_back(page_image_without_text_fn: str, rot_angle: float):
-    # NB: PIL - load, rotate and save take 0.064s
+    # NB: we use PIL because it's faster: PIL - load, rotate and save take 0.064s
     # cv2 - load, rotate and save take 0.236s
     img = Image.open(page_image_without_text_fn)
     img = img.convert('RGB')
     img = img.rotate(rot_angle, fillcolor=(255, 255, 255), expand=True)
     img.save(page_image_without_text_fn)
-    # src = cv2.imread(page_image_without_text_fn)
-    # h, w, _ = src.shape
-    # rotate_matrix = cv2.getRotationMatrix2D(center=(w / 2, h / 2), angle=rot_angle, scale=1)
-    # if abs(round(rot_angle / 90)):
-    #    h, w = w, h
-    # rotated_image = cv2.warpAffine(src=src, M=rotate_matrix, dsize=(w, h), borderValue=(255, 255, 255))
-    # cv2.imwrite(page_image_without_text_fn, rotated_image)
