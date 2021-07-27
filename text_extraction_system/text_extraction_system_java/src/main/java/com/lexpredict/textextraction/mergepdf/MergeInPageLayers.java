@@ -9,6 +9,7 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
 import org.apache.pdfbox.util.Matrix;
+import org.apache.xpath.operations.Bool;
 
 import java.awt.*;
 import java.awt.geom.AffineTransform;
@@ -122,14 +123,20 @@ public class MergeInPageLayers {
                     PDRectangle dstCropBox = dstPage.getCropBox();
 
                     AffineTransform insertTransform = new AffineTransform();
+                    int dstRotate = dstPage.getRotation();
                     float origW = dstCropBox.getUpperRightX();
                     float layerW = layerCropBox.getUpperRightX();
+                    // if rotation angle is 90 or 270 or -90 or ...
+                    // swap W and H
+                    if (doSidesChange(dstRotate))
+                        layerW = layerCropBox.getUpperRightY();
                     if (layerW > 0) {
                         float k = origW / layerW;
-                        insertTransform.concatenate(AffineTransform.getScaleInstance(k, k));
-                        layerCropBox = dstCropBox;
+                        if (k < 0.998 || k > 1.002) {
+                            insertTransform.concatenate(AffineTransform.getScaleInstance(k, k));
+                            layerCropBox = dstCropBox;
+                        }
                     }
-                    int dstRotate = dstPage.getRotation();
 
                     if (dstRotate != 0) {
                         double tx = (layerCropBox.getLowerLeftX() + layerCropBox.getUpperRightX()) / 2;
@@ -250,6 +257,11 @@ public class MergeInPageLayers {
         return null;
     }
 
+    private static Boolean doSidesChange(float angle) {
+        int a = Math.abs(Math.round(angle));
+        a = a % 180;
+        return a > 45 && a < 135;
+    }
 }
 
 
