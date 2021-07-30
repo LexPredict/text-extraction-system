@@ -49,7 +49,7 @@ def test_different_languages_extraction_with_no_ocr():
 def test_text_too_short():
     fn = os.path.join(data_dir, 'finstat90_rotation_set.pdf')
 
-    with process_pdf_page(fn, page_num=1) as res:  # type: PDFPageProcessingResults
+    with process_pdf_page(fn) as res:  # type: PDFPageProcessingResults
         with merge_pdf_pages(fn, single_page_merge_num_file_rotate=(1, res.ocred_page_fn, None)) as merged_pdf_fn:
             with data_extract.extract_text_and_structure(merged_pdf_fn, language="en_US") as (text, full_struct, _a, _b):
                 assert 'financial statements' in text.lower()

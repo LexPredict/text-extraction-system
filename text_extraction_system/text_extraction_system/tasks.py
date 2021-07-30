@@ -307,7 +307,6 @@ def process_pdf_page_task(_task,
         with webdav_client.get_as_local_fn(f'{req.request_id}/{pages_for_processing}/{pdf_page_base_fn}') \
                 as (local_pdf_page_fn, _remote_path):
             with process_pdf_page(local_pdf_page_fn,
-                                  page_num=page_number,
                                   ocr_enabled=req.ocr_enable,
                                   ocr_language=ocr_language) as page_proc_res:  # type: PDFPageProcessingResults
                 file_name = page_num_to_fn(page_number)
