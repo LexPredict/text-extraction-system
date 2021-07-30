@@ -24,7 +24,18 @@ MIN_IMAGE_DIMENSION = 200
 IMAGE_PART_SIZE = 500
 
 
-def detect_rotation_dilated_rows(image_fn: str, pre_calculated_orientation: Optional[int] = None) -> Optional[float]:
+class PageRotationStatus:
+    def __init__(self,
+                 angle: float = 0,
+                 occupied_area_percent: Optional[float] = None):
+        self.angle = angle
+        self.occupied_area_percent = occupied_area_percent
+
+    def __str__(self):
+        return f'{self.angle:.2f} grad, {self.occupied_area_percent:.2f}% area'
+
+
+def detect_rotation_dilated_rows(image_fn: str, pre_calculated_orientation: Optional[int] = None) -> PageRotationStatus:
     filename = None
     try:
         if pre_calculated_orientation is not None:
@@ -59,8 +70,10 @@ def detect_rotation_dilated_rows(image_fn: str, pre_calculated_orientation: Opti
         angles_to_areas = dict()
         max_area = -1
         max_area_angle = 0
+        total_cont_area = 0
         for c in contours:
             r = cv2.minAreaRect(c)
+            total_cont_area += r[1][0] * r[1][1]
             angle = r[-1]
             if angle < -45:
                 angle = angle + 90
@@ -73,18 +86,21 @@ def detect_rotation_dilated_rows(image_fn: str, pre_calculated_orientation: Opti
                 max_area = area
                 max_area_angle = angle
 
-        return max_area_angle
+        img_size = gray.shape[1] * gray.shape[0]
+        text_share = round(100 * total_cont_area / img_size, 2)
+        return PageRotationStatus(max_area_angle, text_share)
     finally:
         if filename:
             os.remove(filename)
 
 
-def detect_rotation_using_skewlib(image_fn: str) -> Optional[float]:
+def detect_rotation_using_skewlib(image_fn: str) -> PageRotationStatus:
     proc = cv2.imread(image_fn, 0)
-    return deskew.determine_skew(proc)
+    angle = deskew.determine_skew(proc)
+    return PageRotationStatus(angle)
 
 
-def detect_rotation_most_frequent(image_fn: str) -> Optional[float]:
+def detect_rotation_most_frequent(image_fn: str) -> PageRotationStatus:
     proc = cv2.imread(image_fn, 0)
     height, width = proc.shape
     part_size: int = IMAGE_PART_SIZE
@@ -109,10 +125,10 @@ def detect_rotation_most_frequent(image_fn: str) -> Optional[float]:
     most_frequent = sorted(freqs.items(), key=lambda it: it[1], reverse=True)[0]
     if most_frequent[1] > 1:
         # if at least some angle repeats - return the one with the max frequency
-        return most_frequent[0]
+        return PageRotationStatus(most_frequent[0])
     else:
         # otherwise use median angle - which is usually good but not the best
-        return median(angles)
+        return PageRotationStatus(median(angles))
 
 
 def norm_angle(angle_degrees: Optional[float]) -> Optional[float]:
@@ -136,17 +152,16 @@ _methods = {
 }
 
 
-def determine_skew(image_fn: str,
-                   detecting_method: RotationDetectionMethod
-                   = RotationDetectionMethod.DESKEW,
-                   max_diff_from_closest_90: float = 10) -> Optional[float]:
+def determine_rotation(image_fn: str,
+                       detecting_method: RotationDetectionMethod = RotationDetectionMethod.DESKEW,
+                       max_diff_from_closest_90: float = 10) -> PageRotationStatus:
     # default method is set to DESKEW (plain deskew lib) because it works on
     # larger amount of cases including images rotated on ~~90 degrees
     # (but is slower)
-    angle = _methods[detecting_method](image_fn)
-    angle = norm_angle(angle)
+    rs = _methods[detecting_method](image_fn)
+    angle = norm_angle(rs.angle)
 
-    if abs(angle - 90 * round(angle / 90)) <= max_diff_from_closest_90:
-        return angle
-    else:
-        return None
+    if abs(angle - 90 * round(angle / 90)) > max_diff_from_closest_90:
+        angle = 0
+    rs.angle = angle
+    return rs
