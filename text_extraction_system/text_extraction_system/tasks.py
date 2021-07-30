@@ -310,11 +310,14 @@ def process_pdf_page_task(_task,
                                   page_num=page_number,
                                   ocr_enabled=req.ocr_enable,
                                   ocr_language=ocr_language) as page_proc_res:  # type: PDFPageProcessingResults
+                file_name = page_num_to_fn(page_number)
+                if page_proc_res.rotation_angle:
+                    file_name = f'{file_name}.{page_proc_res.rotation_angle}'
+                remote_path = f'{req.request_id}/{pages_ocred}/{file_name}.pdf'
+
                 if page_proc_res.page_requires_ocr:
                     webdav_client.upload_file(
-                        remote_path=f'{req.request_id}'
-                                    f'/{pages_ocred}'
-                                    f'/{page_num_to_fn(page_number)}.pdf',
+                        remote_path=remote_path,
                         local_path=page_proc_res.ocred_page_fn)
     except Exception as e:
         raise Exception(f'{original_file_name} |  Exception caught while processing '
@@ -361,14 +364,21 @@ def finish_pdf_processing(task,
             # each page contains a transparent layer (glyphless font) with the recognized text
             # file names of the pages at webdav are generated in process_pdf_page_task(..) as:
             # <page_num>.pdf
-
             pdf_pages_ocred: List[int] = list()
 
             for remote_base_fn in webdav_client.list(f'{request_id}/{pages_ocred}'):
                 remote_page_pdf_fn = f'{req.request_id}/{pages_ocred}/{remote_base_fn}'
                 local_page_pdf_fn = os.path.join(pages_dir, remote_base_fn)
                 webdav_client.download_file(remote_page_pdf_fn, local_page_pdf_fn)
-                pdf_pages_ocred.append(int(os.path.splitext(remote_base_fn)[0]))
+                page_name = os.path.splitext(remote_base_fn)[0]
+                # page_name is either '00004' or '00004.-0.75' where the part after the first dot
+                # is the detected page rotation angle
+                if '.' in page_name:
+                    page_num = int(page_name[:5])
+                else:
+                    page_num = int(page_name)
+
+                pdf_pages_ocred.append(page_num)
                 requires_page_merge = True
 
             if requires_page_merge:

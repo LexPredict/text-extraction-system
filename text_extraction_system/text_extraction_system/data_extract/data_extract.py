@@ -2,6 +2,8 @@ import os
 import shutil
 import subprocess
 from contextlib import contextmanager
+
+from PIL import Image
 from dataclasses import dataclass
 from io import StringIO
 from logging import getLogger
@@ -26,8 +28,9 @@ from pdfminer.pdfparser import PDFParser
 from text_extraction_system.config import get_settings
 from text_extraction_system.data_extract.lang import get_lang_detector
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf
+from text_extraction_system.ocr.rotation_detection import determine_skew, RotationDetectionMethod
 from text_extraction_system.pdf.pdf import extract_page_ocr_images, \
-    raise_from_pdfbox_error_messages
+    raise_from_pdfbox_error_messages, rotate_pdf_pages
 from text_extraction_system.processes import raise_from_process
 from text_extraction_system.utils import LanguageConverter
 from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, PlainTextStructure, \
@@ -50,6 +53,7 @@ def extract_text_and_structure(pdf_fn: str,
                                read_sections_from_toc: bool = True) \
         -> Tuple[
             str, TextAndPDFCoordinates, str, Dict[int, float]]:  # text, structure, corrected_pdf_fn, page_rotate_angles
+    # pdf_fn file already contains text, no OCR is required at this step
 
     if render_coords_debug:
         correct_pdf = True
@@ -110,6 +114,7 @@ def extract_text_and_structure(pdf_fn: str,
 
             return
 
+        # we store the rotation angles for each of the pages
         page_rotate_angles: List[float] = [pdfpage['deskewAngle'] for pdfpage in pdfbox_res['pages']]
 
         pages = []
@@ -245,6 +250,7 @@ def get_sections_from_table_of_contents(
 
 
 def extract_text_pdfminer(pdf_fn: str) -> str:
+    # TODO: this method is for testing purposes only
     output_string = StringIO()
     with open(pdf_fn, 'rb') as in_file:
         parser = PDFParser(in_file)
@@ -259,6 +265,7 @@ def extract_text_pdfminer(pdf_fn: str) -> str:
 
 def get_first_page_layout(pdf_opened_file,
                           use_advanced_detection: bool = True) -> LTPage:
+    # TODO: this method is for testing purposes only
     parser = PDFParser(pdf_opened_file)
     doc = PDFDocument(parser)
     rsrcmgr = PDFResourceManager()
@@ -278,6 +285,7 @@ class PDFPageProcessingResults:
     page_requires_ocr: bool
     ocred_page_fn: Optional[str] = None
     ocred_page_rotation_angle: Optional[float] = None
+    rotation_angle: Optional[float] = None
 
 
 @contextmanager
@@ -300,7 +308,36 @@ def process_pdf_page(pdf_fn: str,
                                          dpi=DPI,
                                          reset_page_rotation=False) \
                     as image_fns:
+                # note: extract_page_ocr_images method might have returned nothing
+                # (extraction fails) or an image w/o any text
                 page_image_without_text_fn = image_fns.get(1) if image_fns else None
+
+                if page_image_without_text_fn:
+                    # the image might be rotated. Then we try to determine the image rotation angle
+                    # based on opencv algorithms and rotate the image back.
+                    # Even if the image is still rotated, OCR will extract the text. That's fine
+                    # if the image rotation angle is a multiple of 90 degree.
+                    rot_angle = determine_skew(page_image_without_text_fn,
+                                               RotationDetectionMethod.DILATED_ROWS)
+                    if rot_angle:
+                        # we don't rotate images by more than 45 degree angle
+                        rot_angle = normalize_angle_90(rot_angle)
+
+                        # rotate the document
+                        rotate_pdf_pages(pdf_fn, pdf_fn, rot_angle)
+                        # extract the image again
+                        with extract_page_ocr_images(pdf_fn,
+                                                     start_page=1,
+                                                     end_page=1,
+                                                     pdf_password=pdf_password,
+                                                     dpi=DPI,
+                                                     reset_page_rotation=False) as rot_image_fns:
+                            os.remove(page_image_without_text_fn)
+                            new_page_image_without_text_fn = rot_image_fns.get(1) if rot_image_fns else None
+                            if new_page_image_without_text_fn:
+                                shutil.move(new_page_image_without_text_fn, page_image_without_text_fn)
+                            else:
+                                page_image_without_text_fn = ''
                 if page_image_without_text_fn:
                     # this returns a text-based PDF with glyph-less text only
                     # to be used for merging in front of the original PDF page layout
@@ -313,7 +350,29 @@ def process_pdf_page(pdf_fn: str,
                         # because in the final step we will need to merge these transparent layer in front
                         # of the pages in the original PDF file to keep its small size and structure/bookmarks.
                         yield PDFPageProcessingResults(page_requires_ocr=True,
-                                                       ocred_page_fn=ocred_text_layer_pdf_fn)
+                                                       ocred_page_fn=ocred_text_layer_pdf_fn,
+                                                       rotation_angle=rot_angle)
                         return
         # if we don't need OCR then
         yield PDFPageProcessingResults(page_requires_ocr=False)
+
+
+def normalize_angle_90(rot_angle: float) -> float:
+    # inscribe the angle in -45 ... 45 degrees
+    rot_sign = -1 if rot_angle < 0 else 1
+    rot_angle = abs(rot_angle)
+    if rot_angle > 45:
+        rot_angle = rot_angle - 90
+        rot_angle = rot_sign * rot_angle
+    else:
+        rot_angle = rot_sign * rot_angle
+    return rot_angle
+
+
+def rotate_page_back(page_image_without_text_fn: str, rot_angle: float):
+    # NB: we use PIL because it's faster: PIL - load, rotate and save take 0.064s
+    # cv2 - load, rotate and save take 0.236s
+    img = Image.open(page_image_without_text_fn)
+    img = img.convert('RGB')
+    img = img.rotate(rot_angle, fillcolor=(255, 255, 255), expand=True)
+    img.save(page_image_without_text_fn)
