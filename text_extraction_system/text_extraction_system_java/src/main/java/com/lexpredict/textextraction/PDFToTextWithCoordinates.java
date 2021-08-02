@@ -488,7 +488,9 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             this.writePageEnd();
 
             if (deskew) {
-                if (deskewPageRotation != 0)
+                System.out.println(String.format("deskewPageRotation=%.2f, oldRotation=%d, deskewSkewAngle=%.2f",
+                        deskewPageRotation, oldRotation, deskewSkewAngle));
+                if (Math.round(deskewPageRotation) != 0)
                     page.setRotation(Math.round(deskewPageRotation));
                 else
                     page.setRotation(oldRotation);
