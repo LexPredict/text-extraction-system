@@ -475,7 +475,6 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
                         charRestoreMatrix = rotateMatrix(page.getCropBox(), angle);
                     }
 
-
                     this.curCharBackTransform = charRestoreMatrix;
                     this.curAngle = -angle;
                     super.processPage(page);
@@ -489,7 +488,10 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             this.writePageEnd();
 
             if (deskew) {
-                page.setRotation(oldRotation); // deskewPageRotation doesn't work well
+                if (deskewPageRotation != 0)
+                    page.setRotation(Math.round(deskewPageRotation));
+                else
+                    page.setRotation(oldRotation);
                 if (deskewSkewAngle != 0) {
                     try (PDPageContentStream cs = new PDPageContentStream(document,
                             page, PDPageContentStream.AppendMode.PREPEND, false)) {
