@@ -421,6 +421,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             if (weightedAngle == null || weightedAngle < 10)
                 return new float[]{0, 0, 0};
 
+            // [ avg_angle, avg_angle ~ 90, avg_angle - (avg_angle ~ 90) ]
             return new float[]{angle, pageRotation, skewAngle};
         }
     }
@@ -449,7 +450,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             angleCollector.getText(document);
             angleCollector.cleanupAngles();
 
-
+            // [ avg_angle, avg_angle ~ 90, avg_angle - (avg_angle ~ 90) ]
             float[] deskewFullAngleRotationSkewAngle = angleCollector.selectDeskewAngle(this.maxDeskewAngleAbs);
             deskewFullAngle = deskewFullAngleRotationSkewAngle[0];
             float deskewPageRotation = deskewFullAngleRotationSkewAngle[1];
@@ -488,8 +489,8 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             this.writePageEnd();
 
             if (deskew) {
-                System.out.println(String.format("deskewPageRotation=%.2f, oldRotation=%d, deskewSkewAngle=%.2f",
-                        deskewPageRotation, oldRotation, deskewSkewAngle));
+                System.out.println(String.format("%d] deskewPageRotation=%.2f, oldRotation=%d, deskewSkewAngle=%.2f",
+                        this.pageIndex, deskewPageRotation, oldRotation, deskewSkewAngle));
                 if (Math.round(deskewPageRotation) != 0)
                     page.setRotation(Math.round(deskewPageRotation));
                 else
