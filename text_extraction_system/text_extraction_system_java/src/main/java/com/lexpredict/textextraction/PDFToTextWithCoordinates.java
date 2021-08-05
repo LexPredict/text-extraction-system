@@ -44,7 +44,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
     protected boolean deskew;
 
-    protected int maxDeskewAngleAbs = 4;
+    protected int maxDeskewAngleAbs = 7;
 
     protected Matrix curCharBackTransform;
 
@@ -361,7 +361,6 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             // maximum standard deviation of detected char angles
             // if angles distribution has "long tails" we believe the angles detected
             // aren't representative. NB: this constant is measured in degrees
-            final float maxDeviation = 1.0F;
             final int minCountToStrip = 15;
             final float stripFraction = 100 / 20F;
 
@@ -380,9 +379,13 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             }
             float avgAngle = weightedAngle / totalCount;
 
+            //StringBuilder angles = new StringBuilder();
+            //for (WeightedCharAngle a : wAngles)
+            //    angles.append(String.format("%.2f;%d\n", a.angle, a.count));
+            //String aStr = angles.toString();
+
             // calculate standard deviation: if it's too high we return 0
-            float stDev = WeightedCharAngle.getStandardDeviation(wAngles, avgAngle);
-            if (stDev > maxDeviation)
+            if (!WeightedCharAngle.checkStandardDeviationOk(wAngles, avgAngle))
                 return 0;
 
             if (this.anglesToCharNum.size() < minCountToStrip)
@@ -411,15 +414,11 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
             int pageRotation = 90 * Math.round(angle / 90);
             float skewAngle = angle - pageRotation;
-            if (Math.abs(skewAngle) <= Math.abs(skewAngleAbsLimit))  // ????
+            if (Math.abs(skewAngle) <= skewAngleAbsLimit)
                 return new float[]{angle, pageRotation, skewAngle};
 
             pageRotation = 90 * Math.round(angle / 90F);
             skewAngle = 0;
-
-            Integer weightedAngle = this.anglesToCharNum.get(angle);
-            if (weightedAngle == null || weightedAngle < 10)
-                return new float[]{0, 0, 0};
 
             // [ avg_angle, avg_angle ~ 90, avg_angle - (avg_angle ~ 90) ]
             return new float[]{angle, pageRotation, skewAngle};

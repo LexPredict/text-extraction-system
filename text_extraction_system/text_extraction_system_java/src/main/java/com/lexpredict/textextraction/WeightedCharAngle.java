@@ -22,8 +22,9 @@ public class WeightedCharAngle {
         return sum / count;
     }
 
-    public static float getStandardDeviation(WeightedCharAngle[] items,
-                                             float mean) {
+    public static boolean checkStandardDeviationOk(
+            WeightedCharAngle[] items,
+            float mean) {
         float sum = 0;
         int count = 0;
         for (WeightedCharAngle item: items) {
@@ -33,6 +34,13 @@ public class WeightedCharAngle {
             count += item.count;
         }
         double meanDev = Math.pow(sum / count, 0.5F);
-        return (float) meanDev;
+        // absolute deviation works better for small angles but much worse for relatively big ones
+        // that's why we use here:
+        // - absolute deviation
+        // - but compare this value to expected maximum deviation that roughly equals to mean^2:
+        // exMaxDev ~ 0.2 for mean = 0, 0.5 for mean = 1 ... 6.5 for mean = 90
+        float ma = Math.abs(mean);
+        double exMaxDev = Math.pow((ma + 0.32) * 0.25, 0.5);
+        return meanDev < exMaxDev;
     }
 }
