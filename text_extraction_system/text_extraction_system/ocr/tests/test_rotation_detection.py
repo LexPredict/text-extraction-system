@@ -1,10 +1,48 @@
 import os
 
 from text_extraction_system.commons.tests.commons import with_default_settings
-from text_extraction_system.ocr.rotation_detection import determine_rotation, detect_rotation_dilated_rows
+from text_extraction_system.ocr.rotation_detection import determine_rotation, detect_rotation_dilated_rows, \
+    WeightedAverage
 from text_extraction_system.pdf.pdf import extract_page_images
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
+
+
+def test_weighted_angle_simple():
+    wa = WeightedAverage()
+    wa.values = [(0, 10), (10, 990)]
+    assert wa.get_weighted_avg(0) == 9.9
+
+    wa = WeightedAverage()
+    wa.values = [(1.5, 2)]
+    assert wa.get_weighted_avg(0) == 1.5
+    assert wa.get_weighted_avg(0.2) == 1.5
+
+
+def test_weighted_angle_skip_tails():
+    wa_1 = WeightedAverage([(1, 10), (5, 500), (6, 500), (100, 10)])
+    a_0 = round(wa_1.get_weighted_avg(0), 1)
+    a_1 = round(wa_1.get_weighted_avg(0.1), 1)
+
+    wa_2 = WeightedAverage([(1, 0.01), (5, 0.49), (6, 0.49), (100, 0.01)])
+    a_2 = round(wa_2.get_weighted_avg(0.1), 1)
+
+    wa_3 = WeightedAverage([(5, 0.4), (6, 0.4)])
+    a_3 = round(wa_3.get_weighted_avg(0), 1)
+
+    assert a_3 == 5.5
+    assert a_0 > a_1  # as we cut a fat tail
+    assert a_1 == a_2
+    assert a_1 == a_3
+
+
+def test_weighted_angle_short_fat_tail():
+    wa = WeightedAverage([(1, 11), (5, 1), (6, 100)])
+    a = round(wa.get_weighted_avg(0.1), 3)
+    assert a == 5.991
+
+    a_2 = round(wa.get_weighted_avg(0), 3)
+    assert a_2 < a
 
 
 @with_default_settings

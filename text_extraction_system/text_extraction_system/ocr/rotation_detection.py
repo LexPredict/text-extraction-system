@@ -3,7 +3,7 @@ import tempfile
 from collections import Counter
 from enum import Enum
 from statistics import median
-from typing import Optional
+from typing import Optional, Tuple, List
 
 import cv2
 import deskew
@@ -66,29 +66,24 @@ def detect_rotation_dilated_rows(image_fn: str, pre_calculated_orientation: Opti
 
         # Find all contours
         contours, hierarchy = cv2.findContours(dilate, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
-
-        angles_to_areas = dict()
-        max_area = -1
-        max_area_angle = 0
         total_cont_area = 0
+        weighted_ang = WeightedAverage()
+
         for c in contours:
             r = cv2.minAreaRect(c)
-            total_cont_area += r[1][0] * r[1][1]
+            rect_area = r[1][0] * r[1][1]
+            total_cont_area += rect_area
             angle = r[-1]
             if angle < -45:
                 angle = angle + 90
             angle = norm_angle(orientation + angle)
-            angle = round(angle * 10) / 10
-            area = angles_to_areas.get(angle) or 0
-            area += cv2.contourArea(c)
-            angles_to_areas[angle] = area
-            if max_area < area:
-                max_area = area
-                max_area_angle = angle
+            weighted_ang.add(angle, rect_area)
 
         img_size = gray.shape[1] * gray.shape[0]
         text_share = round(100 * total_cont_area / img_size, 2)
-        return PageRotationStatus(max_area_angle, text_share)
+        weighted_angle = weighted_ang.get_weighted_avg(0.1)
+        weighted_angle = round(weighted_angle, 1)
+        return PageRotationStatus(weighted_angle, text_share)
     finally:
         if filename:
             os.remove(filename)
@@ -165,3 +160,71 @@ def determine_rotation(image_fn: str,
         angle = 0
     rs.angle = angle
     return rs
+
+
+class WeightedAverage:
+    # The class calculates weighted average of "v" for tuples [v, w]
+    # where "w" is the weight.
+    # The class also cuts q (0 <= q < 0.5) share from both head and tail of the list
+    def __init__(self, values: Optional[List[Tuple[float, float]]] = None):
+        self.values: List[Tuple[float, int]] = values or []
+
+    def add(self, val: float, count: int):
+        self.values.append((val, count))
+
+    def get_weighted_avg(self, tails_skip_quantile: float = 0) -> float:
+        """
+        Let tails_skip_quantile = 0.1
+        values = [(1, 10), (5, 500), (6, 500), (100, 10)]
+        Note: the values are sorted.
+        We may consider 10% of extremely low values and 10% of extremely high values fluctuations.
+
+        First, we replace weights with weight shares:
+        values = [(1, 0.01), (5, 0.49), (6, 0.49), (100, 0.01)]
+
+        Now we're cutting the head 0.1 share of weighted values.
+        We totally neglect the first tuple (1, 0.01) because it's weight is below 0.1
+        We also "cut" part of the second tuple: (5, 0.49). That means we simply decrement its weight:
+        0.49 => (0.49 + 0.1) /* accumulated weight */ - 0.1 /* tails_skip_quantile */
+             =>  0.4
+        So the second tuple is now (5, 0.4)
+
+        That means get_weighted_avg([(1, 10), (5, 500), (6, 500), (100, 10)], 0.1) gives us the same as
+                   get_weighted_avg([(1, 0.01), (5, 0.49), (6, 0.49), (100, 0.01)], 0.1) or
+                   get_weighted_avg([(5, 0.4), (6, 0.4)], 0.0)
+        """
+        if not self.values:
+            return 0
+        tot_weight = sum([w for _, w in self.values])
+        if not tot_weight:
+            return 0
+        val_s = [(v, w / tot_weight) for v, w in self.values]
+
+        if not tails_skip_quantile or len(self.values) < 3:
+            return sum([v * s for v, s in val_s])
+
+        # we cut N% of extremely low and N% of extremely high values
+        val_s.sort(key=lambda v: v[0])
+        head_s, tail_s = tails_skip_quantile, 1 - tails_skip_quantile
+        body_s = 1 - tails_skip_quantile * 2
+        s = 0
+        passed_head, passed_tail = False, False
+
+        sum_val = 0
+        for v, w in val_s:
+            s += w
+            if not passed_head:
+                if s < head_s:
+                    continue
+                w = s - head_s
+                passed_head = True
+            if s > tail_s:
+                ex_part = s - tail_s
+                w -= ex_part
+                passed_tail = True
+
+            share = w / body_s
+            sum_val += v * share
+            if passed_tail:
+                break
+        return sum_val

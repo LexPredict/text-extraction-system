@@ -379,11 +379,6 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             }
             float avgAngle = weightedAngle / totalCount;
 
-            //StringBuilder angles = new StringBuilder();
-            //for (WeightedCharAngle a : wAngles)
-            //    angles.append(String.format("%.2f;%d\n", a.angle, a.count));
-            //String aStr = angles.toString();
-
             // calculate standard deviation: if it's too high we return 0
             if (!WeightedCharAngle.checkStandardDeviationOk(wAngles, avgAngle))
                 return 0;
@@ -395,12 +390,9 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             // for this, first calculate distance to each wAngles entry
             for (WeightedCharAngle angle: wAngles)
                 angle.distance = Math.abs(angle.angle - avgAngle);
-            // ... sort by distance
-            Arrays.sort(wAngles, (WeightedCharAngle a, WeightedCharAngle b) -> -Float.compare(a.distance, b.distance));
 
             // finally, skip ~(100% / stripFraction) of records and calculate weighted average
-            int skipCount = Math.round(wAngles.length / stripFraction);
-            avgAngle = WeightedCharAngle.getWeightedAverage(wAngles, skipCount);
+            avgAngle = WeightedCharAngle.getWeightedAverage(wAngles, 0.1f);
             avgAngle = Math.round(avgAngle * 10) / 10F;
             return avgAngle;
         }
