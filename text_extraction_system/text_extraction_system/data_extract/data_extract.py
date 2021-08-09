@@ -28,7 +28,8 @@ from pdfminer.pdfparser import PDFParser
 from text_extraction_system.config import get_settings
 from text_extraction_system.data_extract.lang import get_lang_detector
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf
-from text_extraction_system.ocr.rotation_detection import determine_skew, RotationDetectionMethod
+from text_extraction_system.ocr.rotation_detection import determine_rotation, RotationDetectionMethod, \
+    PageRotationStatus
 from text_extraction_system.pdf.pdf import extract_page_ocr_images, \
     raise_from_pdfbox_error_messages, rotate_pdf_pages
 from text_extraction_system.processes import raise_from_process
@@ -290,71 +291,72 @@ class PDFPageProcessingResults:
 
 @contextmanager
 def process_pdf_page(pdf_fn: str,
-                     page_num: int,
                      ocr_enabled: bool = True,
                      ocr_language: str = None,
                      ocr_timeout_sec: int = 60,
                      pdf_password: str = None) -> Generator[PDFPageProcessingResults, None, None]:
-    with open(pdf_fn, 'rb') as in_file:
-        if ocr_enabled:
-            # Try extracting "no-text" image of the pdf page.
-            # It removes all elements from the page except images having no overlapping
-            # with any text element.
-            # This is used to avoid the text duplication by OCR.
-            with extract_page_ocr_images(pdf_fn,
-                                         start_page=1,
-                                         end_page=1,
-                                         pdf_password=pdf_password,
-                                         dpi=DPI,
-                                         reset_page_rotation=False) \
-                    as image_fns:
-                # note: extract_page_ocr_images method might have returned nothing
-                # (extraction fails) or an image w/o any text
-                page_image_without_text_fn = image_fns.get(1) if image_fns else None
-
-                if page_image_without_text_fn:
-                    # the image might be rotated. Then we try to determine the image rotation angle
-                    # based on opencv algorithms and rotate the image back.
-                    # Even if the image is still rotated, OCR will extract the text. That's fine
-                    # if the image rotation angle is a multiple of 90 degree.
-                    rot_angle = determine_skew(page_image_without_text_fn,
-                                               RotationDetectionMethod.DILATED_ROWS)
-                    if rot_angle:
-                        # we don't rotate images by more than 45 degree angle
-                        rot_angle = normalize_angle_90(rot_angle)
-
-                        # rotate the document
-                        rotate_pdf_pages(pdf_fn, pdf_fn, rot_angle)
-                        # extract the image again
-                        with extract_page_ocr_images(pdf_fn,
-                                                     start_page=1,
-                                                     end_page=1,
-                                                     pdf_password=pdf_password,
-                                                     dpi=DPI,
-                                                     reset_page_rotation=False) as rot_image_fns:
-                            os.remove(page_image_without_text_fn)
-                            new_page_image_without_text_fn = rot_image_fns.get(1) if rot_image_fns else None
-                            if new_page_image_without_text_fn:
-                                shutil.move(new_page_image_without_text_fn, page_image_without_text_fn)
-                            else:
-                                page_image_without_text_fn = ''
-                if page_image_without_text_fn:
-                    # this returns a text-based PDF with glyph-less text only
-                    # to be used for merging in front of the original PDF page layout
-                    with ocr_page_to_pdf(page_image_fn=page_image_without_text_fn,
-                                         language=ocr_language,
-                                         timeout=ocr_timeout_sec,
-                                         glyphless_text_only=True,
-                                         tesseract_page_orientation_detection=True) as ocred_text_layer_pdf_fn:
-                        # we return only the transparent text layer PDF and not the merged page
-                        # because in the final step we will need to merge these transparent layer in front
-                        # of the pages in the original PDF file to keep its small size and structure/bookmarks.
-                        yield PDFPageProcessingResults(page_requires_ocr=True,
-                                                       ocred_page_fn=ocred_text_layer_pdf_fn,
-                                                       rotation_angle=rot_angle)
-                        return
-        # if we don't need OCR then
+    if not ocr_enabled:
         yield PDFPageProcessingResults(page_requires_ocr=False)
+
+    # Try extracting "no-text" image of the pdf page.
+    # It removes all elements from the page except images having no overlapping
+    # with any text element.
+    # This is used to avoid the text duplication by OCR.
+    with extract_page_ocr_images(pdf_fn,
+                                 start_page=1,
+                                 end_page=1,
+                                 pdf_password=pdf_password,
+                                 dpi=DPI,
+                                 reset_page_rotation=False) \
+            as image_fns:
+        # note: extract_page_ocr_images method might have returned nothing
+        # (extraction fails) or an image w/o any text
+        page_image_without_text_fn = image_fns.get(1) if image_fns else None
+        rot_angle = 0
+
+        if page_image_without_text_fn:
+            # the image might be rotated. Then we try to determine the image rotation angle
+            # based on opencv algorithms and rotate the image back.
+            # Even if the image is still rotated, OCR will extract the text. That's fine
+            # if the image rotation angle is a multiple of 90 degree.
+            rot_status = determine_rotation(page_image_without_text_fn,
+                                            RotationDetectionMethod.DILATED_ROWS)
+            if should_correct_rotation(pdf_fn, rot_status):
+                # we don't rotate images by more than 45 degree angle
+                rot_angle = normalize_angle_90(rot_status.angle)
+
+                # rotate the document
+                rotate_pdf_pages(pdf_fn, pdf_fn, rot_angle)
+                # extract the image again
+                with extract_page_ocr_images(pdf_fn,
+                                             start_page=1,
+                                             end_page=1,
+                                             pdf_password=pdf_password,
+                                             dpi=DPI,
+                                             reset_page_rotation=False) as rot_image_fns:
+                    os.remove(page_image_without_text_fn)
+                    new_page_image_without_text_fn = rot_image_fns.get(1) if rot_image_fns else None
+                    if new_page_image_without_text_fn:
+                        shutil.move(new_page_image_without_text_fn, page_image_without_text_fn)
+                    else:
+                        page_image_without_text_fn = ''
+        if page_image_without_text_fn:
+            # this returns a text-based PDF with glyph-less text only
+            # to be used for merging in front of the original PDF page layout
+            with ocr_page_to_pdf(page_image_fn=page_image_without_text_fn,
+                                 language=ocr_language,
+                                 timeout=ocr_timeout_sec,
+                                 glyphless_text_only=True,
+                                 tesseract_page_orientation_detection=True) as ocred_text_layer_pdf_fn:
+                # we return only the transparent text layer PDF and not the merged page
+                # because in the final step we will need to merge these transparent layer in front
+                # of the pages in the original PDF file to keep its small size and structure/bookmarks.
+                yield PDFPageProcessingResults(page_requires_ocr=True,
+                                               ocred_page_fn=ocred_text_layer_pdf_fn,
+                                               rotation_angle=rot_angle)
+                return
+    # if we don't need OCR then
+    yield PDFPageProcessingResults(page_requires_ocr=False)
 
 
 def normalize_angle_90(rot_angle: float) -> float:
@@ -376,3 +378,38 @@ def rotate_page_back(page_image_without_text_fn: str, rot_angle: float):
     img = img.convert('RGB')
     img = img.rotate(rot_angle, fillcolor=(255, 255, 255), expand=True)
     img.save(page_image_without_text_fn)
+
+
+def should_correct_rotation(pdf_fn: str, rot_status: PageRotationStatus) -> bool:
+    """
+    The page may contain much text and just a small image, that our CV2 based logic
+    may detect as rotated. And then we rotate the page itself.
+    This functions prevents rotating the page if:
+    - either the page contains enough text
+    - or the image occupies a tiny part of the page.
+    """
+    if rot_status.angle == 0:
+        return False
+    if rot_status.occupied_area_percent is None:
+        return True
+
+    java_modules_path = get_settings().java_modules_path
+    args = ['java', '-cp', f'{java_modules_path}/*',
+            'com.lexpredict.textextraction.PDFSymbolsCalculator',
+            '--original-pdf', pdf_fn]
+
+    # compare area, occupied by image parts (that might be text) and the rest of the page
+    try:
+        p = subprocess.Popen(args, stderr=PIPE, stdout=PIPE)
+        (out, err) = p.communicate()
+        symbol_count = int(out.decode("utf-8"))
+    except Exception as e:
+        log.error(f'Error in should_correct_rotation({pdf_fn}) while calling PDFSymbolsCalculator: {e}')
+        symbol_count = 0
+
+    word_percent = 100 * symbol_count / 2700  # 2700 is an estimation for avg words per page
+    if word_percent > 40:
+        return False
+    if word_percent > 10 and rot_status.occupied_area_percent < 10:
+        return False
+    return word_percent < 3

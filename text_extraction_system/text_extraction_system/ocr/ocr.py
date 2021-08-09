@@ -43,7 +43,7 @@ def ocr_page_to_pdf(page_image_fn: str,
             data, err = proc.communicate(timeout=timeout)
         except TimeoutExpired as te:
             proc.kill()
-            outs, errs = proc.communicate()
+            _outs, _errs = proc.communicate()
             raise OCRException(f'Timeout waiting for tesseract to finish:\n{args}') from te
 
         if err:
