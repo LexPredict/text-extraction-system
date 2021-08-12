@@ -44,7 +44,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
     protected boolean deskew;
 
-    protected int maxDeskewAngleAbs = 4;
+    protected int maxDeskewAngleAbs = 7;
 
     protected Matrix curCharBackTransform;
 
@@ -361,7 +361,6 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             // maximum standard deviation of detected char angles
             // if angles distribution has "long tails" we believe the angles detected
             // aren't representative. NB: this constant is measured in degrees
-            final float maxDeviation = 1.0F;
             final int minCountToStrip = 15;
             final float stripFraction = 100 / 20F;
 
@@ -381,8 +380,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             float avgAngle = weightedAngle / totalCount;
 
             // calculate standard deviation: if it's too high we return 0
-            float stDev = WeightedCharAngle.getStandardDeviation(wAngles, avgAngle);
-            if (stDev > maxDeviation)
+            if (!WeightedCharAngle.checkStandardDeviationOk(wAngles, avgAngle))
                 return 0;
 
             if (this.anglesToCharNum.size() < minCountToStrip)
@@ -392,12 +390,9 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             // for this, first calculate distance to each wAngles entry
             for (WeightedCharAngle angle: wAngles)
                 angle.distance = Math.abs(angle.angle - avgAngle);
-            // ... sort by distance
-            Arrays.sort(wAngles, (WeightedCharAngle a, WeightedCharAngle b) -> -Float.compare(a.distance, b.distance));
 
             // finally, skip ~(100% / stripFraction) of records and calculate weighted average
-            int skipCount = Math.round(wAngles.length / stripFraction);
-            avgAngle = WeightedCharAngle.getWeightedAverage(wAngles, skipCount);
+            avgAngle = WeightedCharAngle.getWeightedAverage(wAngles, 0.1f);
             avgAngle = Math.round(avgAngle * 10) / 10F;
             return avgAngle;
         }
@@ -411,16 +406,13 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
             int pageRotation = 90 * Math.round(angle / 90);
             float skewAngle = angle - pageRotation;
-            if (Math.abs(skewAngle) <= Math.abs(skewAngleAbsLimit))  // ????
+            if (Math.abs(skewAngle) <= skewAngleAbsLimit)
                 return new float[]{angle, pageRotation, skewAngle};
 
             pageRotation = 90 * Math.round(angle / 90F);
             skewAngle = 0;
 
-            Integer weightedAngle = this.anglesToCharNum.get(angle);
-            if (weightedAngle == null || weightedAngle < 10)
-                return new float[]{0, 0, 0};
-
+            // [ avg_angle, avg_angle ~ 90, avg_angle - (avg_angle ~ 90) ]
             return new float[]{angle, pageRotation, skewAngle};
         }
     }
@@ -449,7 +441,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             angleCollector.getText(document);
             angleCollector.cleanupAngles();
 
-
+            // [ avg_angle, avg_angle ~ 90, avg_angle - (avg_angle ~ 90) ]
             float[] deskewFullAngleRotationSkewAngle = angleCollector.selectDeskewAngle(this.maxDeskewAngleAbs);
             deskewFullAngle = deskewFullAngleRotationSkewAngle[0];
             float deskewPageRotation = deskewFullAngleRotationSkewAngle[1];
@@ -475,7 +467,6 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
                         charRestoreMatrix = rotateMatrix(page.getCropBox(), angle);
                     }
 
-
                     this.curCharBackTransform = charRestoreMatrix;
                     this.curAngle = -angle;
                     super.processPage(page);
@@ -489,7 +480,12 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             this.writePageEnd();
 
             if (deskew) {
-                page.setRotation((int)deskewPageRotation);
+                System.out.println(String.format("%d] deskewPageRotation=%.2f, oldRotation=%d, deskewSkewAngle=%.2f",
+                        this.pageIndex, deskewPageRotation, oldRotation, deskewSkewAngle));
+                if (Math.round(deskewPageRotation) != 0)
+                    page.setRotation(Math.round(deskewPageRotation));
+                else
+                    page.setRotation(oldRotation);
                 if (deskewSkewAngle != 0) {
                     try (PDPageContentStream cs = new PDPageContentStream(document,
                             page, PDPageContentStream.AppendMode.PREPEND, false)) {

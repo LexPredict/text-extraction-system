@@ -89,6 +89,11 @@ def extract_text_and_structure(pdf_fn: str,
 
         completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=timeout_sec,
                                                              universal_newlines=True, stderr=PIPE, stdout=PIPE)
+        try:
+            log.info('Page rotation data:')
+            log.info(completed_process.stdout)
+        except Exception as e:
+            log.error(f"Can't get page rotation data: {e}")
         raise_from_process(log, completed_process, process_title=lambda: f'Extract text and structure from {pdf_fn}')
 
         raise_from_pdfbox_error_messages(completed_process)
