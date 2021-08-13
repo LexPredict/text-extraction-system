@@ -74,6 +74,7 @@ public class GetTOCFromPDF {
                 PDNamedDestination namedDest = (PDNamedDestination) dest;
                 String destName = namedDest.getNamedDestination();
                 pd = dests.get(destName);
+                if (pd == null) continue;
             }
 
             PDPage refPage = pd.getPage();
