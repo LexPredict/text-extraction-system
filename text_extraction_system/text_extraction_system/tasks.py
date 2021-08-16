@@ -308,7 +308,8 @@ def process_pdf_page_task(_task,
                 as (local_pdf_page_fn, _remote_path):
             with process_pdf_page(local_pdf_page_fn,
                                   ocr_enabled=req.ocr_enable,
-                                  ocr_language=ocr_language) as page_proc_res:  # type: PDFPageProcessingResults
+                                  ocr_language=ocr_language,
+                                  ocr_timeout_sec=req.page_ocr_timeout_sec) as page_proc_res:  # type: PDFPageProcessingResults
                 file_name = page_num_to_fn(page_number)
                 if page_proc_res.rotation_angle:
                     file_name = f'{file_name}.{page_proc_res.rotation_angle}'
