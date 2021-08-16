@@ -86,7 +86,8 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                                     pdf_to_images_timeout_sec: int = Form(default=1800),
                                     output_format: OutputFormat = Form(default=OutputFormat.json),
                                     read_sections_from_toc: bool = Form(default=True),
-                                    table_parser: TableParser = Form(default=TableParser.area_stream)):
+                                    table_parser: TableParser = Form(default=TableParser.area_stream),
+                                    page_ocr_timeout_sec: int = Form(default=60),):
     webdav_client = get_webdav_client()
     request_id = get_valid_fn(request_id) if request_id else str(uuid4())
     log_extra = json.loads(log_extra_json_key_value) if log_extra_json_key_value else None
@@ -104,6 +105,7 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                           pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
                           read_sections_from_toc=read_sections_from_toc,
                           table_parser=table_parser,
+                          page_ocr_timeout_sec=page_ocr_timeout_sec,
                           request_callback_info=RequestCallbackInfo(
                               request_id=request_id,
                               original_file_name=file.filename,
