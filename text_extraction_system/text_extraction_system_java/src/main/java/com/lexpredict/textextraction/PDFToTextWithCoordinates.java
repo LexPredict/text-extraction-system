@@ -351,7 +351,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
                 return;
             Matrix m = text.getTextMatrix();
             m.concatenate(text.getFont().getFontMatrix());
-            double angle = Math.toDegrees(Math.atan2(m.getShearY(), m.getScaleY()));
+            double angle = Math.toDegrees(Math.atan2(m.getShearY(), m.getScaleX()));
             angle = normAngle(angle);
             // do we need the proper float angle auto-clustering here?
             anglesToCharNum.merge(Math.round(angle * 10) / 10f, text.getCharacterCodes().length, Integer::sum);
@@ -362,7 +362,6 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             // if angles distribution has "long tails" we believe the angles detected
             // aren't representative. NB: this constant is measured in degrees
             final int minCountToStrip = 15;
-            final float stripFraction = 100 / 20F;
 
             // get average weighted value
             float weightedAngle = 0;
@@ -480,12 +479,11 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             this.writePageEnd();
 
             if (deskew) {
-                System.out.println(String.format("%d] deskewPageRotation=%.2f, oldRotation=%d, deskewSkewAngle=%.2f",
+                if (deskewPageRotation != 0 || oldRotation != 0 || deskewSkewAngle != 0)
+                    System.out.println(String.format("%d] deskewPageRotation=%.2f, oldRotation=%d, deskewSkewAngle=%.2f",
                         this.pageIndex, deskewPageRotation, oldRotation, deskewSkewAngle));
                 if (Math.round(deskewPageRotation) != 0)
                     page.setRotation(Math.round(deskewPageRotation));
-                else
-                    page.setRotation(oldRotation);
                 if (deskewSkewAngle != 0) {
                     try (PDPageContentStream cs = new PDPageContentStream(document,
                             page, PDPageContentStream.AppendMode.PREPEND, false)) {
