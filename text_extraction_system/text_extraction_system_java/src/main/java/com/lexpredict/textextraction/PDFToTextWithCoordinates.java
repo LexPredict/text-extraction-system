@@ -478,18 +478,12 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             this.insideInternalPageProcessing = false;
             this.writePageEnd();
 
-            if (pageIndex == 56) {
-                int a = 1;
-            }
-
             if (deskew) {
-                System.out.println(String.format("%d] deskewPageRotation=%.2f, oldRotation=%d, deskewSkewAngle=%.2f",
+                if (deskewPageRotation != 0 || oldRotation != 0 || deskewSkewAngle != 0)
+                    System.out.println(String.format("%d] deskewPageRotation=%.2f, oldRotation=%d, deskewSkewAngle=%.2f",
                         this.pageIndex, deskewPageRotation, oldRotation, deskewSkewAngle));
                 if (Math.round(deskewPageRotation) != 0)
                     page.setRotation(Math.round(deskewPageRotation));
-                else {
-                    //page.setRotation(oldRotation);
-                }
                 if (deskewSkewAngle != 0) {
                     try (PDPageContentStream cs = new PDPageContentStream(document,
                             page, PDPageContentStream.AppendMode.PREPEND, false)) {
