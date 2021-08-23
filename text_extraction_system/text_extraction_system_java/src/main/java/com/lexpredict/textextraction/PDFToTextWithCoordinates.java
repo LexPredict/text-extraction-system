@@ -361,38 +361,36 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             // maximum standard deviation of detected char angles
             // if angles distribution has "long tails" we believe the angles detected
             // aren't representative. NB: this constant is measured in degrees
-            final int minCountToStrip = 15;
-
-            // get average weighted value
-            float weightedAngle = 0;
-            int totalCount = 0;
+            final int minCountToStrip = 3;
+            float tailSkipQuantile = 0.1f;
 
             WeightedCharAngle[] wAngles = new WeightedCharAngle[this.anglesToCharNum.size()];
-            int i = 0;
+            int i = 0, totalCount = 0;
             for (Map.Entry<Float, Integer> entry : this.anglesToCharNum.entrySet()) {
                 float angle = entry.getKey();
                 int count = entry.getValue();
-                weightedAngle += angle * count;
                 totalCount += count;
                 wAngles[i++] = new WeightedCharAngle(angle, count, 0);
             }
-            float avgAngle = weightedAngle / totalCount;
-
-            // calculate standard deviation: if it's too high we return 0
-            if (!WeightedCharAngle.checkStandardDeviationOk(wAngles, avgAngle))
+            if (totalCount == 0)
                 return 0;
 
+            // calculate distances between angle value / average angle value (totalAverage)
+            // we'll use the distances for cutting head and tail quantiles of extreme distant values
+            float totalAverage = Arrays.stream(wAngles).map(it -> it.angle * it.count).reduce(0f, Float::sum);
+            totalAverage /= totalCount;
+            for (WeightedCharAngle w: wAngles)
+                w.distance = Math.abs(w.angle - totalAverage);
+
             if (this.anglesToCharNum.size() < minCountToStrip)
-                return avgAngle;
+                tailSkipQuantile = 0;
 
-            // remove up to 10% values that are too far from avgAngle
-            // for this, first calculate distance to each wAngles entry
-            for (WeightedCharAngle angle: wAngles)
-                angle.distance = Math.abs(angle.angle - avgAngle);
+            // remove up to 10% (0.1f) values that are too far from avgAngle
+            float[] angleDev = WeightedCharAngle.getWeightedAverage(wAngles, tailSkipQuantile);
+            float avgAngle = Math.round(angleDev[0] * 10) / 10F;
+            if (!WeightedCharAngle.checkStandardDeviationOk(avgAngle, angleDev[1]))
+                return 0;
 
-            // finally, skip ~(100% / stripFraction) of records and calculate weighted average
-            avgAngle = WeightedCharAngle.getWeightedAverage(wAngles, 0.1f);
-            avgAngle = Math.round(avgAngle * 10) / 10F;
             return avgAngle;
         }
 
