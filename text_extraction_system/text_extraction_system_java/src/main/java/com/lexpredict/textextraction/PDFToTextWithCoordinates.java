@@ -361,7 +361,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             // maximum standard deviation of detected char angles
             // if angles distribution has "long tails" we believe the angles detected
             // aren't representative. NB: this constant is measured in degrees
-            final int minCountToStrip = 3;
+            final int minCountToStrip = 2;
             float tailSkipQuantile = 0.1f;
 
             WeightedCharAngle[] wAngles = new WeightedCharAngle[this.anglesToCharNum.size()];

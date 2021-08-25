@@ -69,4 +69,15 @@ public class TestWeightedCharAngle extends TestCase {
         angleDev = WeightedCharAngle.getWeightedAverage(angles, 0.001f);
         assertTrue(angleDev[1] > 1);
     }
+
+    public void testTwoValues() {
+        WeightedCharAngle[] angles = {
+                new WeightedCharAngle(0, 1149, 0),
+                new WeightedCharAngle(88.9f, 12, 0)
+        };
+        for (WeightedCharAngle angle: angles)
+            angle.distance = Math.abs(angle.angle);
+        float []angleDev = WeightedCharAngle.getWeightedAverage(angles, 0.05f);
+        assertTrue(angleDev[0] < 0.2f);
+    }
 }
