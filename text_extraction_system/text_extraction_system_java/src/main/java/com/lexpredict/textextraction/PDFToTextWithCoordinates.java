@@ -438,6 +438,10 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             angleCollector.getText(document);
             angleCollector.cleanupAngles();
 
+            if (this.pageIndex == 1) {
+                int a = 1;
+            }
+
             // [ avg_angle, avg_angle ~ 90, avg_angle - (avg_angle ~ 90) ]
             float[] deskewFullAngleRotationSkewAngle = angleCollector.selectDeskewAngle(this.maxDeskewAngleAbs);
             deskewFullAngle = deskewFullAngleRotationSkewAngle[0];
@@ -539,7 +543,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         pdf2text.pages = new ArrayList<>();
         pdf2text.setStartPage(startPage);
         pdf2text.detectAngles = true;
-        pdf2text.maxDeskewAngleAbs = 4;
+        pdf2text.maxDeskewAngleAbs = 8;
         pdf2text.setEndPage(endPage);
         pdf2text.setAddMoreFormatting(true);
         pdf2text.setParagraphEnd("\n");

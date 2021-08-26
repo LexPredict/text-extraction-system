@@ -35,7 +35,7 @@ public class WeightedCharAngle {
         for (int i = 0; i < items.length; i++)
             wItems[i] = new WeightedCharAngle(items[i].angle, items[i].count / sumW, items[i].distance);
 
-        if (tailsSkipQuantile == 0 || wItems.length < 2) {
+        if (tailsSkipQuantile == 0) {
             float a = Arrays.stream(wItems).map(it -> it.angle * it.count).reduce(0f, Float::sum);
             return new float[] { a, 0 };
         }
