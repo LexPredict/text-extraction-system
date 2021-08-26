@@ -438,10 +438,6 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             angleCollector.getText(document);
             angleCollector.cleanupAngles();
 
-            if (this.pageIndex == 1) {
-                int a = 1;
-            }
-
             // [ avg_angle, avg_angle ~ 90, avg_angle - (avg_angle ~ 90) ]
             float[] deskewFullAngleRotationSkewAngle = angleCollector.selectDeskewAngle(this.maxDeskewAngleAbs);
             deskewFullAngle = deskewFullAngleRotationSkewAngle[0];
