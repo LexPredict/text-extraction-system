@@ -8,16 +8,6 @@ import java.io.File;
 import java.util.ArrayList;
 
 public class TestWeightedCharAngle extends TestCase {
-    public void testWrongAngle6() throws Exception {
-        try (PDDocument document =
-                     PDDocument.load(new File("/home/andrey/Downloads/df_page_2.pdf"))) {
-            PDFPlainText res = PDFToTextWithCoordinates.process(document, true);
-            document.save("/tmp/000.pdf");
-            GetTextFromPDF.renderDebugPDF(document, res, "/tmp/111.pdf");
-        }
-    }
-
-
     public void testSimplyWeighted() {
         WeightedCharAngle[] angles = {
                 new WeightedCharAngle(0, 10, 0),
