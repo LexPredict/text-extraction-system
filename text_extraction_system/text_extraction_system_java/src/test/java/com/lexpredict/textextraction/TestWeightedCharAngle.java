@@ -1,7 +1,10 @@
 package com.lexpredict.textextraction;
 
+import com.lexpredict.textextraction.dto.PDFPlainText;
 import junit.framework.TestCase;
+import org.apache.pdfbox.pdmodel.PDDocument;
 
+import java.io.File;
 import java.util.ArrayList;
 
 public class TestWeightedCharAngle extends TestCase {

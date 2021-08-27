@@ -539,7 +539,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         pdf2text.pages = new ArrayList<>();
         pdf2text.setStartPage(startPage);
         pdf2text.detectAngles = true;
-        pdf2text.maxDeskewAngleAbs = 4;
+        pdf2text.maxDeskewAngleAbs = 8;
         pdf2text.setEndPage(endPage);
         pdf2text.setAddMoreFormatting(true);
         pdf2text.setParagraphEnd("\n");
