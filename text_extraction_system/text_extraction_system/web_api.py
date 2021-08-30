@@ -87,7 +87,8 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                                     output_format: OutputFormat = Form(default=OutputFormat.json),
                                     read_sections_from_toc: bool = Form(default=True),
                                     table_parser: TableParser = Form(default=TableParser.area_stream),
-                                    page_ocr_timeout_sec: int = Form(default=60),):
+                                    page_ocr_timeout_sec: int = Form(default=60),
+                                    remove_ocr_layer: bool = Form(default=False),):
     webdav_client = get_webdav_client()
     request_id = get_valid_fn(request_id) if request_id else str(uuid4())
     log_extra = json.loads(log_extra_json_key_value) if log_extra_json_key_value else None
@@ -106,6 +107,7 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                           read_sections_from_toc=read_sections_from_toc,
                           table_parser=table_parser,
                           page_ocr_timeout_sec=page_ocr_timeout_sec,
+                          remove_ocr_layer=remove_ocr_layer,
                           request_callback_info=RequestCallbackInfo(
                               request_id=request_id,
                               original_file_name=file.filename,
@@ -124,7 +126,7 @@ async def post_data_extraction_task(file: UploadFile = File(...),
     save_request_metadata(req)
     webdav_client.upload_to(file.file, f'{req.request_id}/{req.original_document}')
     async_task = process_document.apply_async(
-        (req.request_id, req.request_callback_info.to_dict()))
+        (req.request_id, req.request_callback_info.to_dict(), remove_ocr_layer))
 
     webdav_client.mkdir(f'{req.request_id}/{task_ids}')
     register_task_id(webdav_client, req.request_id, async_task.id)

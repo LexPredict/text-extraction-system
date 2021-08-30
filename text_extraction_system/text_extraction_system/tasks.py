@@ -25,6 +25,7 @@ from text_extraction_system.data_extract.tables import get_table_dtos_from_camel
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
 from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
 from text_extraction_system.pdf.pdf import merge_pdf_pages, split_pdf_to_page_blocks
+from text_extraction_system.remove_ocr_layer import remove_ocr_layer
 from text_extraction_system.request_metadata import RequestCallbackInfo, RequestMetadata, \
     save_request_metadata, \
     load_request_metadata
@@ -207,7 +208,8 @@ def handle_errors(request_id: str, request_callback_info: RequestCallbackInfo):
 @celery_app.task(acks_late=True, bind=True)
 def process_document(task,
                      request_id: str,
-                     request_callback_info: Dict[str, Any]) -> bool:
+                     request_callback_info: Dict[str, Any],
+                     remove_ocr: bool) -> bool:
     request_callback_info = RequestCallbackInfo(**request_callback_info)
     with handle_errors(request_id, request_callback_info):
         webdav_client: WebDavClient = get_webdav_client()
@@ -222,6 +224,9 @@ def process_document(task,
             ext = os.path.splitext(fn)[1]
             if ext and ext.lower() == '.pdf':
                 process_pdf(fn, req, webdav_client)
+                # remove OCR-created text layers if any
+                if remove_ocr:
+                    remove_ocr_layer(fn)
             else:
                 log.info(f'{req.original_file_name} | Converting to PDF...')
                 with convert_to_pdf(fn, timeout_sec=req.convert_to_pdf_timeout_sec) \

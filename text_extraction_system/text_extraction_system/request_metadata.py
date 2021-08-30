@@ -73,6 +73,7 @@ class RequestMetadata:
     read_sections_from_toc: bool = True
     table_parser: TableParser = TableParser.area_stream
     page_ocr_timeout_sec: int = 60
+    remove_ocr_layer: bool = False
 
     def append_error(self, problem: str, exc: Exception):
         error_message: List[str] = list()
