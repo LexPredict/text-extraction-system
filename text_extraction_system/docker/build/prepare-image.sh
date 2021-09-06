@@ -84,6 +84,7 @@ sed -i "/DOCKER_COMPOSE_FILE/ c\export DOCKER_COMPOSE_FILE=docker-compose.yml" .
 
 envsubst < Dockerfile.template > Dockerfile
 envsubst < start.template.sh > ./temp/start.sh
+cp check_pdf_utils.sh ./temp
 sudo docker build ${DOCKER_BUILD_FLAGS} --no-cache -t ${TEXT_EXTRACTION_SYSTEM_IMAGE} .
 
 rm -f -r ./temp
