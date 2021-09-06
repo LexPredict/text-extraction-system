@@ -9,6 +9,8 @@ echo "==================================================================="
 
 COPY_DST_DIR=/deploy_scripts_dst
 
+source check_pdf_utils.sh
+
 function print_usage () {
   echo ""
   echo "Usage:"
@@ -82,6 +84,7 @@ elif [ "${DOLLAR}{ROLE}" == "web-api" ]; then
   exec uvicorn --host 0.0.0.0 --port 8000 --root-path ${DOLLAR}{text_extraction_system_root_path} text_extraction_system.web_api:app
 elif [ "${DOLLAR}{ROLE}" == "celery-worker" ]; then
   startup
+   ensure_webdav_dir || true
    exec celery -A text_extraction_system.tasks worker \
       -X beat \
       -l INFO \
