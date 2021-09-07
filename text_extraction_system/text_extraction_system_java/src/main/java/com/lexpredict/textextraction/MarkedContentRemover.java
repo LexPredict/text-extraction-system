@@ -33,6 +33,83 @@ public class MarkedContentRemover {
         this.matcher = matcher;
     }
 
+    public int removeAllTextContent(PDDocument doc, PDPage page) throws IOException {
+        ResourceSuppressionTracker resourceSuppressionTracker = new ResourceSuppressionTracker();
+
+        PDResources pdResources = page.getResources();
+
+        PDFStreamParser pdParser = new PDFStreamParser(page);
+
+
+        PDStream newContents = new PDStream(doc);
+        OutputStream newContentOutput = newContents.createOutputStream(COSName.FLATE_DECODE);
+        ContentStreamWriter newContentWriter = new ContentStreamWriter(newContentOutput);
+
+        List<Object> operands = new ArrayList<>();
+        Operator operator;
+        Object token;
+        int suppressDepth = 0;
+        boolean resumeOutputOnNextOperator = false;
+        int removedCount = 0;
+
+        while (true) {
+
+            operands.clear();
+            token = pdParser.parseNextToken();
+            while(token != null && !(token instanceof Operator)) {
+                operands.add(token);
+                token = pdParser.parseNextToken();
+            }
+            operator = (Operator)token;
+
+            if (operator == null) break;
+
+            if (resumeOutputOnNextOperator) {
+                resumeOutputOnNextOperator = false;
+                suppressDepth--;
+                if (suppressDepth == 0)
+                    removedCount++;
+            }
+
+            if (OperatorName.BEGIN_TEXT.equals(operator.getName())) {
+                    suppressDepth++;
+            }
+
+            if (OperatorName.END_TEXT.equals(operator.getName())) {
+                if (suppressDepth > 0)
+                    resumeOutputOnNextOperator = true;
+            }
+
+            else if (OperatorName.SET_GRAPHICS_STATE_PARAMS.equals(operator.getName())) {
+                resourceSuppressionTracker.markForOperator(COSName.EXT_G_STATE, operands.get(0), suppressDepth == 0);
+            }
+
+            else if (OperatorName.DRAW_OBJECT.equals(operator.getName())) {
+                resourceSuppressionTracker.markForOperator(COSName.XOBJECT, operands.get(0), suppressDepth == 0);
+            }
+
+            else if (OperatorName.SET_FONT_AND_SIZE.equals(operator.getName())) {
+                resourceSuppressionTracker.markForOperator(COSName.FONT, operands.get(0), suppressDepth == 0);
+            }
+
+            if (suppressDepth == 0) {
+                newContentWriter.writeTokens(operands);
+                newContentWriter.writeTokens(operator);
+            }
+        }
+
+        if (resumeOutputOnNextOperator)
+            removedCount++;
+
+        newContentOutput.close();
+
+        page.setContents(newContents);
+
+        resourceSuppressionTracker.updateResources(pdResources);
+
+        return removedCount;
+    }
+
     public int removeMarkedContent(PDDocument doc, PDPage page) throws IOException {
         ResourceSuppressionTracker resourceSuppressionTracker = new ResourceSuppressionTracker();
 
@@ -46,7 +123,7 @@ public class MarkedContentRemover {
         ContentStreamWriter newContentWriter = new ContentStreamWriter(newContentOutput);
 
         List<Object> operands = new ArrayList<>();
-        Operator operator = null;
+        Operator operator;
         Object token;
         int suppressDepth = 0;
         boolean resumeOutputOnNextOperator = false;
@@ -115,19 +192,14 @@ public class MarkedContentRemover {
                 resourceSuppressionTracker.markForOperator(COSName.FONT, operands.get(0), suppressDepth == 0);
             }
 
-
-
             if (suppressDepth == 0) {
                 newContentWriter.writeTokens(operands);
                 newContentWriter.writeTokens(operator);
             }
-
         }
 
         if (resumeOutputOnNextOperator)
             removedCount++;
-
-
 
         newContentOutput.close();
 

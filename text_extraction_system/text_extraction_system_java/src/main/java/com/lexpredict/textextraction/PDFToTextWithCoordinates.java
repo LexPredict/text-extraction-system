@@ -287,6 +287,10 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
         float[] sortedAngles;
 
+        private int rShifts = 0, lShifts = 0, dShifts = 0, uShifts = 0;
+
+        private float lastX = -1, lastY = -1;
+
         AngleCollector(int ignoreAnglesCloserThan) throws IOException {
             this.ignoreAnglesCloserThan = ignoreAnglesCloserThan;
         }
@@ -345,13 +349,45 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
         }
 
+        public int getAngleByTrend() {
+            if (rShifts + lShifts + dShifts + uShifts < 40)
+                return 0;  // too less data to determine trends
+            // l >> r, d > u, d > l => page is rotated 90 CW
+            if ((lShifts > 4 * rShifts) &&
+                (dShifts > uShifts * 2)
+                /*(dShifts > lShifts)*/) return 90;
+            // r >> l, u > d, u > r => page is rotated 90 CCW
+            if ((rShifts > 4 * lShifts) &&
+                (uShifts > dShifts * 2)
+                /*(uShifts > rShifts)*/) return -90;
+            // u >> d, l > r, l > u => page is rotated 180 CW
+            if ((uShifts > 4 * dShifts) &&
+                (lShifts > rShifts * 2)
+                /*(lShifts > uShifts)*/) return 180;
+            return 0;
+        }
+
         @Override
         protected void processTextPosition(TextPosition text) {
             if (!TEUtils.containsAlphaNumeric(text.getUnicode()))
                 return;
+            float x = text.getX(), y = text.getY();
+            if (lastX != -1 && lastY != -1) {
+                if (x > lastX)
+                    rShifts++;
+                else if (x < lastX)
+                    lShifts++;
+                if (y > lastY)
+                    dShifts++;
+                else if (y < lastY)
+                    uShifts++;
+            }
+            lastX = x;
+            lastY = y;
+
             Matrix m = text.getTextMatrix();
             m.concatenate(text.getFont().getFontMatrix());
-            double angle = Math.toDegrees(Math.atan2(m.getShearY(), m.getScaleX()));
+            double angle = Math.toDegrees(Math.atan2(m.getShearY(), m.getScaleY()));
             angle = normAngle(angle);
             // do we need the proper float angle auto-clustering here?
             anglesToCharNum.merge(Math.round(angle * 10) / 10f, text.getCharacterCodes().length, Integer::sum);
@@ -390,7 +426,6 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             float avgAngle = Math.round(angleDev[0] * 10) / 10F;
             if (!WeightedCharAngle.checkStandardDeviationOk(avgAngle, angleDev[1]))
                 return 0;
-
             return avgAngle;
         }
 
@@ -422,7 +457,6 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         m.concatenate(Matrix.getTranslateInstance(-tx, -ty));
         return m;
     }
-
 
     @Override
     public void processPage(PDPage page) throws IOException {
