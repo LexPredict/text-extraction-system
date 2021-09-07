@@ -10,7 +10,6 @@ ${LEXNLP_COPY_CMD}
 COPY ./temp/requirements.txt /
 COPY ./temp/.env.local_dev_example /
 COPY ./temp/start.sh /text_extraction_system/
-COPY ./temp/check_pdf_utils.sh /text_extraction_system/
 COPY ./temp/deploy-docker-swarm /deploy-docker-swarm
 
 RUN ls -l /
