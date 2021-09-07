@@ -22,10 +22,7 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Extracts plain text from PDF together with the bounding boxes of each page and character.
@@ -47,7 +44,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
     protected boolean deskew;
 
-    protected int maxDeskewAngleAbs = 4;
+    protected int maxDeskewAngleAbs = 7;
 
     protected Matrix curCharBackTransform;
 
@@ -284,28 +281,28 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     }
 
     static class AngleCollector extends PDFTextStripper {
-        Map<Integer, Integer> anglesToCharNum = new HashMap<>();
+        Map<Float, Integer> anglesToCharNum = new HashMap<>();
 
         final int ignoreAnglesCloserThan;
 
-        int[] sortedAngles;
+        float[] sortedAngles;
 
         AngleCollector(int ignoreAnglesCloserThan) throws IOException {
             this.ignoreAnglesCloserThan = ignoreAnglesCloserThan;
         }
 
         public void cleanupAngles() {
-            Map<Integer, Integer> res = new HashMap<>();
+            Map<Float, Integer> res = new HashMap<>();
 
-            List<Map.Entry<Integer, Integer>> anglesToCharNumSorted = new ArrayList<>(this.anglesToCharNum.entrySet());
-            anglesToCharNumSorted.sort(Map.Entry.<Integer, Integer>comparingByValue().reversed());
+            List<Map.Entry<Float, Integer>> anglesToCharNumSorted = new ArrayList<>(this.anglesToCharNum.entrySet());
+            anglesToCharNumSorted.sort(Map.Entry.<Float, Integer>comparingByValue().reversed());
 
-            for (Map.Entry<Integer, Integer> angleNum : anglesToCharNumSorted) {
-                Integer closestAngle = null;
+            for (Map.Entry<Float, Integer> angleNum : anglesToCharNumSorted) {
+                Float closestAngle = null;
                 Integer closestAngleCharNum = null;
-                for (Map.Entry<Integer, Integer> angleNum2 : res.entrySet()) {
-                    int phi = Math.abs(angleNum.getKey() - angleNum2.getKey()) % 360;
-                    int distance = phi > 180 ? 360 - phi : phi;
+                for (Map.Entry<Float, Integer> angleNum2 : res.entrySet()) {
+                    Float phi = Math.abs(angleNum.getKey() - angleNum2.getKey()) % 360;
+                    Float distance = phi > 180 ? 360 - phi : phi;
                     if (distance < ignoreAnglesCloserThan) {
                         closestAngle = angleNum2.getKey();
                         closestAngleCharNum = angleNum2.getValue();
@@ -319,33 +316,22 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
                 }
             }
 
-            List<Map.Entry<Integer, Integer>> entries = new ArrayList<>(res.entrySet());
+            List<Map.Entry<Float, Integer>> entries = new ArrayList<>(res.entrySet());
             entries.sort(Map.Entry.comparingByValue());
 
-            int[] sortedAngles = new int[entries.size()];
+            float[] sortedAngles = new float[entries.size()];
             int i = 0;
-            for (Map.Entry<Integer, Integer> e : entries) {
+            for (Map.Entry<Float, Integer> e : entries) {
                 sortedAngles[i] = e.getKey();
                 i++;
             }
             this.sortedAngles = sortedAngles;
         }
 
-        public void inc(int rotationAngle) {
-            Map<Integer, Integer> anglesToCharNum = new HashMap<>();
-            for (Map.Entry<Integer, Integer> e : this.anglesToCharNum.entrySet()) {
-                anglesToCharNum.put(e.getKey() + rotationAngle, e.getValue());
-            }
-            this.anglesToCharNum = anglesToCharNum;
-            for (int i = 0; i < sortedAngles.length; i++) {
-                sortedAngles[i] += rotationAngle;
-            }
-        }
-
-        public double[] getLimitsByAngle(int angle) {
-            Integer closestLeft = null;
-            Integer closestRight = null;
-            for (int angle1 : this.sortedAngles) {
+        public double[] getLimitsByAngle(float angle) {
+            Float closestLeft = null;
+            Float closestRight = null;
+            for (float angle1 : this.sortedAngles) {
                 if (angle1 < angle && (closestLeft == null || angle1 > closestLeft))
                     closestLeft = angle1;
                 else if (angle1 > angle && (closestRight == null || angle1 < closestRight))
@@ -359,44 +345,76 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
         }
 
-
         @Override
         protected void processTextPosition(TextPosition text) {
             if (!TEUtils.containsAlphaNumeric(text.getUnicode()))
                 return;
             Matrix m = text.getTextMatrix();
             m.concatenate(text.getFont().getFontMatrix());
-            double angle = Math.toDegrees(Math.atan2(m.getShearY(), m.getScaleY()));
+            double angle = Math.toDegrees(Math.atan2(m.getShearY(), m.getScaleX()));
             angle = normAngle(angle);
             // do we need the proper float angle auto-clustering here?
-            anglesToCharNum.merge((int) Math.round(angle), text.getCharacterCodes().length, Integer::sum);
+            anglesToCharNum.merge(Math.round(angle * 10) / 10f, text.getCharacterCodes().length, Integer::sum);
         }
 
-        protected int[] selectDeskewAngle(int skewAngleAbsLimit) {
+        protected float getWeightedModAngle() {
+            // maximum standard deviation of detected char angles
+            // if angles distribution has "long tails" we believe the angles detected
+            // aren't representative. NB: this constant is measured in degrees
+            final int minCountToStrip = 2;
+            float tailSkipQuantile = 0.1f;
+
+            WeightedCharAngle[] wAngles = new WeightedCharAngle[this.anglesToCharNum.size()];
+            int i = 0, totalCount = 0;
+            for (Map.Entry<Float, Integer> entry : this.anglesToCharNum.entrySet()) {
+                float angle = entry.getKey();
+                int count = entry.getValue();
+                totalCount += count;
+                wAngles[i++] = new WeightedCharAngle(angle, count, 0);
+            }
+            if (totalCount == 0)
+                return 0;
+
+            // calculate distances between angle value / average angle value (totalAverage)
+            // we'll use the distances for cutting head and tail quantiles of extreme distant values
+            float totalAverage = Arrays.stream(wAngles).map(it -> it.angle * it.count).reduce(0f, Float::sum);
+            totalAverage /= totalCount;
+            for (WeightedCharAngle w: wAngles)
+                w.distance = Math.abs(w.angle - totalAverage);
+
+            if (this.anglesToCharNum.size() < minCountToStrip)
+                tailSkipQuantile = 0;
+
+            // remove up to 10% (0.1f) values that are too far from avgAngle
+            float[] angleDev = WeightedCharAngle.getWeightedAverage(wAngles, tailSkipQuantile);
+            float avgAngle = Math.round(angleDev[0] * 10) / 10F;
+            if (!WeightedCharAngle.checkStandardDeviationOk(avgAngle, angleDev[1]))
+                return 0;
+
+            return avgAngle;
+        }
+
+        protected float[] selectDeskewAngle(int skewAngleAbsLimit) {
             if (sortedAngles == null || sortedAngles.length == 0) {
-                return new int[]{0, 0, 0};
+                return new float[]{0, 0, 0};
             }
 
-            for (int i = this.sortedAngles.length - 1; i >= 0; i--) {
-                int angle = sortedAngles[i];
-                int pageRotation = 90 * Math.round((float) angle / 90);
-                int skewAngle = angle - pageRotation;
-                if (Math.abs(skewAngle) <= Math.abs(skewAngleAbsLimit))
-                    return new int[]{angle, pageRotation, skewAngle};
-            }
+            float angle = getWeightedModAngle();
 
-            int angle = sortedAngles[this.sortedAngles.length - 1];
-            int pageRotation = 90 * Math.round((float) angle / 90);
-            int skewAngle = 0;
+            int pageRotation = 90 * Math.round(angle / 90);
+            float skewAngle = angle - pageRotation;
+            if (Math.abs(skewAngle) <= skewAngleAbsLimit)
+                return new float[]{angle, pageRotation, skewAngle};
 
-            if (this.anglesToCharNum.get(angle) < 10)
-                return new int[]{0, 0, 0};
+            pageRotation = 90 * Math.round(angle / 90F);
+            skewAngle = 0;
 
-            return new int[]{angle, pageRotation, skewAngle};
+            // [ avg_angle, avg_angle ~ 90, avg_angle - (avg_angle ~ 90) ]
+            return new float[]{angle, pageRotation, skewAngle};
         }
     }
 
-    protected Matrix rotateMatrix(PDRectangle cropBox, int angle) {
+    protected Matrix rotateMatrix(PDRectangle cropBox, float angle) {
         float tx = (cropBox.getLowerLeftX() + cropBox.getUpperRightX()) / 2;
         float ty = (cropBox.getLowerLeftY() + cropBox.getUpperRightY()) / 2;
         Matrix m = Matrix.getTranslateInstance(tx, ty);
@@ -409,7 +427,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     @Override
     public void processPage(PDPage page) throws IOException {
         int pageStart = this.charBBoxes == null ? 0 : this.charBBoxes.size();
-        int deskewFullAngle = 0;
+        float deskewFullAngle = 0;
 
         if (this.detectAngles) {
             int oldRotation = page.getRotation();
@@ -420,15 +438,15 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             angleCollector.getText(document);
             angleCollector.cleanupAngles();
 
-
-            int[] deskewFullAngleRotationSkewAngle = angleCollector.selectDeskewAngle(this.maxDeskewAngleAbs);
+            // [ avg_angle, avg_angle ~ 90, avg_angle - (avg_angle ~ 90) ]
+            float[] deskewFullAngleRotationSkewAngle = angleCollector.selectDeskewAngle(this.maxDeskewAngleAbs);
             deskewFullAngle = deskewFullAngleRotationSkewAngle[0];
-            int deskewPageRotation = deskewFullAngleRotationSkewAngle[1];
-            int deskewSkewAngle = deskewFullAngleRotationSkewAngle[2];
+            float deskewPageRotation = deskewFullAngleRotationSkewAngle[1];
+            float deskewSkewAngle = deskewFullAngleRotationSkewAngle[2];
             this.writePageStart();
             this.insideInternalPageProcessing = true;
             for (int ia = angleCollector.sortedAngles.length - 1; ia >= 0; ia--) {
-                int angle = angleCollector.sortedAngles[ia];
+                float angle = angleCollector.sortedAngles[ia];
                 this.curAngleLimits = angleCollector.getLimitsByAngle(angle);
                 this.curCharBackTransform = null;
                 this.curAngle = 0;
@@ -446,7 +464,6 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
                         charRestoreMatrix = rotateMatrix(page.getCropBox(), angle);
                     }
 
-
                     this.curCharBackTransform = charRestoreMatrix;
                     this.curAngle = -angle;
                     super.processPage(page);
@@ -460,7 +477,11 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             this.writePageEnd();
 
             if (deskew) {
-                page.setRotation(deskewPageRotation);
+                if (deskewPageRotation != 0 || oldRotation != 0 || deskewSkewAngle != 0)
+                    System.out.println(String.format("%d] deskewPageRotation=%.2f, oldRotation=%d, deskewSkewAngle=%.2f",
+                        this.pageIndex, deskewPageRotation, oldRotation, deskewSkewAngle));
+                if (Math.round(deskewPageRotation) != 0)
+                    page.setRotation(Math.round(deskewPageRotation));
                 if (deskewSkewAngle != 0) {
                     try (PDPageContentStream cs = new PDPageContentStream(document,
                             page, PDPageContentStream.AppendMode.PREPEND, false)) {
@@ -501,7 +522,9 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
     }
 
     public static PDFPlainText process(PDDocument document, boolean deskew) throws Exception {
-        return process(document, -1, Integer.MAX_VALUE, deskew);
+        PDFPlainText data = process(document, -1, Integer.MAX_VALUE, deskew);
+        data.tableOfContents = GetTOCFromPDF.getTableOfContents(document);
+        return data;
     }
 
     public static PDFPlainText process(PDDocument document,
@@ -516,7 +539,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         pdf2text.pages = new ArrayList<>();
         pdf2text.setStartPage(startPage);
         pdf2text.detectAngles = true;
-        pdf2text.maxDeskewAngleAbs = 4;
+        pdf2text.maxDeskewAngleAbs = 8;
         pdf2text.setEndPage(endPage);
         pdf2text.setAddMoreFormatting(true);
         pdf2text.setParagraphEnd("\n");

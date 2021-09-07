@@ -79,5 +79,4 @@ public class TestMergeInPageLayers extends TestCase {
             FileUtils.deleteQuietly(tempDirPages.toFile());
         }
     }
-
 }

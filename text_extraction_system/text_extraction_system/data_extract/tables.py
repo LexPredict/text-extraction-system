@@ -1,20 +1,8 @@
-import shutil
-import tempfile
 from logging import getLogger
-from typing import List, Tuple, Iterable
+from typing import Iterable
 
 from camelot.core import Table as CamelotTable
-from pdfminer.converter import PDFPageAggregator
-from pdfminer.layout import LAParams
-from pdfminer.layout import LTPage
-from pdfminer.pdfdocument import PDFDocument
-from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
-from pdfminer.pdfpage import PDFPage
-from pdfminer.pdfparser import PDFParser
-
-from text_extraction_system.data_extract.camelot.camelot import extract_tables
-from text_extraction_system.pdf.pdf import extract_page_images
-from text_extraction_system_api.dto import Rectangle, Table, DataFrameTable, TableList
+from text_extraction_system_api.dto import Rectangle, Table, TableList
 
 log = getLogger(__name__)
 

@@ -6,7 +6,7 @@ import dateutil.parser
 
 from dataclasses_json import dataclass_json, config
 from marshmallow import fields
-from text_extraction_system_api.dto import OutputFormat
+from text_extraction_system_api.dto import OutputFormat, TableParser
 from webdav3.exceptions import RemoteResourceNotFound, RemoteParentNotFound
 
 from text_extraction_system.constants import metadata_fn
@@ -70,9 +70,15 @@ class RequestMetadata:
     pdf_to_images_timeout_sec: int = 1800
 
     page_rotate_angles: Optional[List[float]] = None
+    read_sections_from_toc: bool = True
+    table_parser: TableParser = TableParser.area_stream
+    page_ocr_timeout_sec: int = 60
+    remove_ocr_layer: bool = False
 
     def append_error(self, problem: str, exc: Exception):
         error_message: List[str] = list()
+        if problem:
+            error_message.append(self.problem)
         if self.error_message:
             error_message.append(self.error_message)
 

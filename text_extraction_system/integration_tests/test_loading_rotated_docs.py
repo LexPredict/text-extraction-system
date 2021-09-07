@@ -1,7 +1,6 @@
 import logging
 import os
 import zipfile
-
 from text_extraction_system_api.client import TextExtractionSystemWebClient
 from text_extraction_system_api.dto import RequestStatus
 from .testing_config import test_settings
@@ -21,13 +20,13 @@ def test_extract_text_rotated2():
     fn = os.path.join(os.path.dirname(__file__), 'data', 'rotated_small_angle.pdf.tiff')
     client = TextExtractionSystemWebClient(test_settings.api_url)
     text = client.extract_plain_text_from_document(fn)
-    expected = '''d at a certain angle 1. This is a text rotated at a certain angle 2. This is a text 
-a text rotated at a certain angle 4. This is a text rotated at a 
-dat a certain angle 6. This is a text rotated at a certain angle 7. 
+    expected = '''d at a certain angle 1. This is a text rotated at a certain angle 2. This is a text
+a text rotated at a certain angle 4. This is a text rotated at a
+dat a certain angle 6. This is a text rotated at a certain angle 7.
 
-his is a text rotate 
-rotated at a certain angle 3. This is 
-certain angle 5. This is a text rotate '''
+his is a text rotate
+rotated at a certain angle 3. This is
+certain angle 5. This is a text rotate'''
     assert expected in text
 
 

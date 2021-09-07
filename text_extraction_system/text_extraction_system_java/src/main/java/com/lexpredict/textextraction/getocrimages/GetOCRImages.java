@@ -4,6 +4,7 @@ import org.apache.commons.cli.*;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.tools.imageio.ImageIOUtil;
@@ -65,6 +66,7 @@ public class GetOCRImages {
 
             for (int i = startPage; i < endPage + 1; i++) {
                 PDPage page = document.getPage(i - 1);
+                PDRectangle cb = page.getCropBox();
                 /*
                 Setting page rotation to 0 to allow supporting the pre-rotated pages in further merging.
                 Example:

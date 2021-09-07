@@ -25,6 +25,7 @@ from text_extraction_system.data_extract.tables import get_table_dtos_from_camel
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
 from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
 from text_extraction_system.pdf.pdf import merge_pdf_pages, split_pdf_to_page_blocks
+from text_extraction_system.remove_ocr_layer import remove_ocr_layer
 from text_extraction_system.request_metadata import RequestCallbackInfo, RequestMetadata, \
     save_request_metadata, \
     load_request_metadata
@@ -207,7 +208,8 @@ def handle_errors(request_id: str, request_callback_info: RequestCallbackInfo):
 @celery_app.task(acks_late=True, bind=True)
 def process_document(task,
                      request_id: str,
-                     request_callback_info: Dict[str, Any]) -> bool:
+                     request_callback_info: Dict[str, Any],
+                     remove_ocr: bool) -> bool:
     request_callback_info = RequestCallbackInfo(**request_callback_info)
     with handle_errors(request_id, request_callback_info):
         webdav_client: WebDavClient = get_webdav_client()
@@ -222,6 +224,9 @@ def process_document(task,
             ext = os.path.splitext(fn)[1]
             if ext and ext.lower() == '.pdf':
                 process_pdf(fn, req, webdav_client)
+                # remove OCR-created text layers if any
+                if remove_ocr:
+                    remove_ocr_layer(fn)
             else:
                 log.info(f'{req.original_file_name} | Converting to PDF...')
                 with convert_to_pdf(fn, timeout_sec=req.convert_to_pdf_timeout_sec) \
@@ -307,14 +312,17 @@ def process_pdf_page_task(_task,
         with webdav_client.get_as_local_fn(f'{req.request_id}/{pages_for_processing}/{pdf_page_base_fn}') \
                 as (local_pdf_page_fn, _remote_path):
             with process_pdf_page(local_pdf_page_fn,
-                                  page_num=page_number,
                                   ocr_enabled=req.ocr_enable,
-                                  ocr_language=ocr_language) as page_proc_res:  # type: PDFPageProcessingResults
+                                  ocr_language=ocr_language,
+                                  ocr_timeout_sec=req.page_ocr_timeout_sec) as page_proc_res:  # type: PDFPageProcessingResults
+                file_name = page_num_to_fn(page_number)
+                if page_proc_res.rotation_angle:
+                    file_name = f'{file_name}.{page_proc_res.rotation_angle}'
+                remote_path = f'{req.request_id}/{pages_ocred}/{file_name}.pdf'
+
                 if page_proc_res.page_requires_ocr:
                     webdav_client.upload_file(
-                        remote_path=f'{req.request_id}'
-                                    f'/{pages_ocred}'
-                                    f'/{page_num_to_fn(page_number)}.pdf',
+                        remote_path=remote_path,
                         local_path=page_proc_res.ocred_page_fn)
     except Exception as e:
         raise Exception(f'{original_file_name} |  Exception caught while processing '
@@ -361,14 +369,21 @@ def finish_pdf_processing(task,
             # each page contains a transparent layer (glyphless font) with the recognized text
             # file names of the pages at webdav are generated in process_pdf_page_task(..) as:
             # <page_num>.pdf
-
             pdf_pages_ocred: List[int] = list()
 
             for remote_base_fn in webdav_client.list(f'{request_id}/{pages_ocred}'):
                 remote_page_pdf_fn = f'{req.request_id}/{pages_ocred}/{remote_base_fn}'
                 local_page_pdf_fn = os.path.join(pages_dir, remote_base_fn)
                 webdav_client.download_file(remote_page_pdf_fn, local_page_pdf_fn)
-                pdf_pages_ocred.append(int(os.path.splitext(remote_base_fn)[0]))
+                page_name = os.path.splitext(remote_base_fn)[0]
+                # page_name is either '00004' or '00004.-0.75' where the part after the first dot
+                # is the detected page rotation angle
+                if '.' in page_name:
+                    page_num = int(page_name[:5])
+                else:
+                    page_num = int(page_name)
+
+                pdf_pages_ocred.append(page_num)
                 requires_page_merge = True
 
             if requires_page_merge:
@@ -402,13 +417,15 @@ def extract_data_and_finish(req: RequestMetadata,
                             local_pdf_fn: str):
     req.pdf_file = req.ocred_pdf or req.converted_to_pdf or req.original_document
     pdf_fn_in_storage_base = os.path.splitext(req.original_document)[0]
-    camelot_tables: List[CamelotTable] = None
+    camelot_tables: Optional[List[CamelotTable]] = None
 
     log.info(f'Extracting plain text and structure from {req.pdf_file} '
              + ' and de-skewing pdf...' if req.deskew_enable else '...')
-    with extract_text_and_structure(local_pdf_fn, language=req.doc_language,
+    with extract_text_and_structure(local_pdf_fn,
+                                    language=req.doc_language,
                                     correct_pdf=req.deskew_enable,
-                                    render_coords_debug=req.char_coords_debug_enable) \
+                                    render_coords_debug=req.char_coords_debug_enable,
+                                    read_sections_from_toc=req.read_sections_from_toc) \
             as (text, text_structure, orig_or_corrected_pdf_fn, page_rotate_angles):
         log.info(f'Extracted {len(text)} characters from {pdf_fn_in_storage_base}')
 
@@ -444,7 +461,7 @@ def extract_data_and_finish(req: RequestMetadata,
 
         if req.table_extraction_enable:
             log.info(f'Extracting tables from {req.pdf_file}...')
-            camelot_tables = extract_tables_from_pdf_file(orig_or_corrected_pdf_fn)
+            camelot_tables = extract_tables_from_pdf_file(orig_or_corrected_pdf_fn, table_parser=req.table_parser)
         else:
             log.info(f'Table extraction is turned off.')
 

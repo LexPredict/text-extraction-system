@@ -33,7 +33,7 @@ from text_extraction_system.tasks import process_document, celery_app, register_
 from text_extraction_system_api import dto
 from text_extraction_system_api.dto import OutputFormat, TableList, PlainTextStructure, RequestStatus, \
     RequestStatuses, SystemInfo, TaskCancelResult, PDFCoordinates, STATUS_DONE, STATUS_FAILURE, UserRequestsSummary, \
-    STATUS_PENDING, UserRequestsQuery
+    STATUS_PENDING, UserRequestsQuery, TableParser
 
 app = FastAPI()
 
@@ -84,7 +84,11 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                                     log_extra_json_key_value: str = Form(default=None),
                                     convert_to_pdf_timeout_sec: int = Form(default=1800),
                                     pdf_to_images_timeout_sec: int = Form(default=1800),
-                                    output_format: OutputFormat = Form(default=OutputFormat.json)):
+                                    output_format: OutputFormat = Form(default=OutputFormat.json),
+                                    read_sections_from_toc: bool = Form(default=True),
+                                    table_parser: TableParser = Form(default=TableParser.area_stream),
+                                    page_ocr_timeout_sec: int = Form(default=60),
+                                    remove_ocr_layer: bool = Form(default=False),):
     webdav_client = get_webdav_client()
     request_id = get_valid_fn(request_id) if request_id else str(uuid4())
     log_extra = json.loads(log_extra_json_key_value) if log_extra_json_key_value else None
@@ -100,6 +104,10 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                           output_format=output_format,
                           convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
                           pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
+                          read_sections_from_toc=read_sections_from_toc,
+                          table_parser=table_parser,
+                          page_ocr_timeout_sec=page_ocr_timeout_sec,
+                          remove_ocr_layer=remove_ocr_layer,
                           request_callback_info=RequestCallbackInfo(
                               request_id=request_id,
                               original_file_name=file.filename,
@@ -118,7 +126,7 @@ async def post_data_extraction_task(file: UploadFile = File(...),
     save_request_metadata(req)
     webdav_client.upload_to(file.file, f'{req.request_id}/{req.original_document}')
     async_task = process_document.apply_async(
-        (req.request_id, req.request_callback_info.to_dict()))
+        (req.request_id, req.request_callback_info.to_dict(), remove_ocr_layer))
 
     webdav_client.mkdir(f'{req.request_id}/{task_ids}')
     register_task_id(webdav_client, req.request_id, async_task.id)
@@ -136,8 +144,8 @@ def load_request_metadata_or_raise(request_id: str) -> RequestMetadata:
 @app.delete('/api/v1/data_extraction_tasks/{request_id}/', response_model=TaskCancelResult,
             tags=["Asynchronous Data Extraction"])
 async def purge_data_extraction_task(request_id: str):
-    problems = dict()
-    success = list()
+    problems: dict = {}
+    success: list = []
     celery_task_ids: List[str] = get_request_task_ids(get_webdav_client(), request_id)
     for task_id in celery_task_ids:
         try:
@@ -389,7 +397,7 @@ async def extract_text_from_document_and_generate_searchable_pdf(
         full_extract_timeout_sec: int = Form(default=3600),
         char_coords_debug_enable: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
-):
+) -> Response:
     webdav_client = get_webdav_client()
     request_id = str(uuid4())
     _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
@@ -401,7 +409,16 @@ async def extract_text_from_document_and_generate_searchable_pdf(
         raise HTTPException(status_code=504, detail="Input file is too big")
 
     # Get extracted text-based pdf file and clean temp data
-    pdf_file = _proxy_request(webdav_client, request_id, load_request_metadata(request_id).pdf_file)
+    filename: str = load_request_metadata(request_id).pdf_file
+    pdf_file: Response = _proxy_request(
+        webdav_client=webdav_client,
+        request_id=request_id,
+        fn=filename,
+        headers={
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': f'attachment; filename={filename}'
+        }
+    )
     webdav_client.clean(f'{request_id}/')
     return pdf_file
 
