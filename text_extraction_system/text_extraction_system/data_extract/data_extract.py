@@ -323,12 +323,12 @@ def process_pdf_page(pdf_fn: str,
         rot_angle = 0
 
         if page_image_without_text_fn:
+            orientation = None
             if detect_orientation_tesseract:
                 try:
                     orientation = get_page_orientation(page_image_without_text_fn)
                 except Exception as e:
                     log.error(f'Cant get page orientation by Tesseract: {e}')
-                    pass
 
                 # TODO: presently orientation "probability" threshold is taken arbitrary
                 ORIENTATION_THRESHOLD = 3
