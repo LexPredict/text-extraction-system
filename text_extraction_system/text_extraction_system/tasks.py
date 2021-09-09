@@ -265,7 +265,8 @@ def process_pdf(pdf_fn: str,
                                                            pdf_page_base_fn,
                                                            i,
                                                            ocr_language,
-                                                           req.request_callback_info.log_extra))
+                                                           req.request_callback_info.log_extra,
+                                                           req.detect_orientation_tesseract))
 
         log.info(f'{req.original_file_name} | Scheduling {len(task_signatures)} sub-tasks...')
         request_callback_info_dict = req.request_callback_info.to_dict()
@@ -290,7 +291,8 @@ def process_pdf_page_task(_task,
                           pdf_page_base_fn: str,
                           page_number: int,
                           ocr_language: str,
-                          log_extra: Dict[str, str] = None):
+                          log_extra: Dict[str, str] = None,
+                          detect_orientation_tesseract=False):
     set_log_extra(log_extra)
     webdav_client = get_webdav_client()
     req = load_request_metadata(request_id)
@@ -314,7 +316,9 @@ def process_pdf_page_task(_task,
             with process_pdf_page(local_pdf_page_fn,
                                   ocr_enabled=req.ocr_enable,
                                   ocr_language=ocr_language,
-                                  ocr_timeout_sec=req.page_ocr_timeout_sec) as page_proc_res:  # type: PDFPageProcessingResults
+                                  ocr_timeout_sec=req.page_ocr_timeout_sec,
+                                  detect_orientation_tesseract=detect_orientation_tesseract) \
+                    as page_proc_res:  # type: PDFPageProcessingResults
                 file_name = page_num_to_fn(page_number)
                 if page_proc_res.rotation_angle:
                     file_name = f'{file_name}.{page_proc_res.rotation_angle}'
