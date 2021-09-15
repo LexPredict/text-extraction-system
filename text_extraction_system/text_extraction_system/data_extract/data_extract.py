@@ -29,6 +29,7 @@ from pdfminer.pdfparser import PDFParser
 
 from text_extraction_system.config import get_settings
 from text_extraction_system.data_extract.lang import get_lang_detector
+from text_extraction_system.file_storage import WebDavClient, get_webdav_client
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf, get_page_orientation
 from text_extraction_system.ocr.rotation_detection import determine_rotation, RotationDetectionMethod, \
     PageRotationStatus
@@ -302,7 +303,8 @@ def process_pdf_page(pdf_fn: str,
                      ocr_language: str = None,
                      ocr_timeout_sec: int = 60,
                      pdf_password: str = None,
-                     detect_orientation_tesseract=False) -> Generator[PDFPageProcessingResults, None, None]:
+                     detect_orientation_tesseract=False,
+                     orig_file_path: str = '') -> Generator[PDFPageProcessingResults, None, None]:
     if not ocr_enabled:
         yield PDFPageProcessingResults(page_requires_ocr=False)
 
@@ -321,6 +323,7 @@ def process_pdf_page(pdf_fn: str,
         # (extraction fails) or an image w/o any text
         page_image_without_text_fn = image_fns.get(1) if image_fns else None
         rot_angle = 0
+        page_orientation_angle = 0
 
         if page_image_without_text_fn:
             orientation = None
@@ -331,12 +334,16 @@ def process_pdf_page(pdf_fn: str,
                     log.error(f'Cant get page orientation by Tesseract: {e}')
 
                 # TODO: presently orientation "probability" threshold is taken arbitrary
-                ORIENTATION_THRESHOLD = 3
+                ORIENTATION_THRESHOLD = 1
                 if orientation and orientation[0] and orientation[1] > ORIENTATION_THRESHOLD:
+                    page_orientation_angle = orientation[0]
                     # rotate the document
-                    # rotate_pdf_pages(pdf_fn, pdf_fn, orientation[0])
+                    #rotate_pdf_pages(pdf_fn, pdf_fn, orientation[0])
                     # rotate the image
-                    rotate_image(orientation[0], page_image_without_text_fn, page_image_without_text_fn)
+                    #rotate_image(orientation[0], page_image_without_text_fn, page_image_without_text_fn)
+                    # upload the rotated document on WebDAV
+                    #webdav_client: WebDavClient = get_webdav_client()
+                    #webdav_client.upload_or_rewrite_file(orig_file_path, pdf_fn)
 
             # the image might be rotated. Then we try to determine the image rotation angle
             # based on opencv algorithms and rotate the image back.
@@ -377,7 +384,7 @@ def process_pdf_page(pdf_fn: str,
                 # of the pages in the original PDF file to keep its small size and structure/bookmarks.
                 yield PDFPageProcessingResults(page_requires_ocr=True,
                                                ocred_page_fn=ocred_text_layer_pdf_fn,
-                                               rotation_angle=rot_angle)
+                                               rotation_angle=rot_angle + page_orientation_angle)
                 return
     # if we don't need OCR then
     yield PDFPageProcessingResults(page_requires_ocr=False)

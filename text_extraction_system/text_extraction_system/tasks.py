@@ -258,9 +258,10 @@ def process_pdf(pdf_fn: str,
         for pdf_page_fn in pdf_page_fns:
             i += 1
             pdf_page_base_fn = os.path.basename(pdf_page_fn)
-            webdav_client.upload_file(f'{req.request_id}/{pages_for_processing}/{pdf_page_base_fn}',
-                                      pdf_page_fn)
+            webdav_path = f'{req.request_id}/{pages_for_processing}/{pdf_page_base_fn}'
+            webdav_client.upload_file(webdav_path, pdf_page_fn)
             task_signatures.append(process_pdf_page_task.s(req.request_id,
+                                                           webdav_path,
                                                            req.original_file_name,
                                                            pdf_page_base_fn,
                                                            i,
@@ -287,6 +288,7 @@ def page_num_to_fn(page_num: int) -> str:
 @celery_app.task(acks_late=True, bind=True)
 def process_pdf_page_task(_task,
                           request_id: str,
+                          orig_file_path: str,
                           original_file_name: str,
                           pdf_page_base_fn: str,
                           page_number: int,
@@ -317,7 +319,8 @@ def process_pdf_page_task(_task,
                                   ocr_enabled=req.ocr_enable,
                                   ocr_language=ocr_language,
                                   ocr_timeout_sec=req.page_ocr_timeout_sec,
-                                  detect_orientation_tesseract=detect_orientation_tesseract) \
+                                  detect_orientation_tesseract=detect_orientation_tesseract,
+                                  orig_file_path=orig_file_path) \
                     as page_proc_res:  # type: PDFPageProcessingResults
                 file_name = page_num_to_fn(page_number)
                 if page_proc_res.rotation_angle:

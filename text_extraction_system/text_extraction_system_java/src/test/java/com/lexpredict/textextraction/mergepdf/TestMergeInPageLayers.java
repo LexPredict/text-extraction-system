@@ -12,6 +12,25 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 public class TestMergeInPageLayers extends TestCase {
+    public void testMergeFromPageDir2() throws Exception {
+        Path tempDir = Files.createTempDirectory("t");
+        try {
+            File fDst = new File(tempDir.toFile(), "ocr_exp1_dst.pdf");
+            MergeInPageLayers.main(new String[]{
+                    "--original-pdf", "/home/andrey/Downloads/pdf/page_192.pdf",
+                    "--page-dir", "/home/andrey/Downloads/pdf/pages",
+                    "--dst-pdf", fDst.getAbsolutePath()});
+
+            try (PDDocument document = PDDocument.load(fDst, (String) null)) {
+                PDFPlainText res = PDFToTextWithCoordinates
+                        .process(document, true);
+                assertTrue(res.text.contains("Never in history has private"));
+            }
+
+        } finally {
+            FileUtils.deleteQuietly(tempDir.toFile());
+        }
+    }
 
     public void testMergeFromPageDir() throws Exception {
         Path tempDir = Files.createTempDirectory("t");

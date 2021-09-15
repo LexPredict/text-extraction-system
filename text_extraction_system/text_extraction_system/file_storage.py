@@ -93,7 +93,6 @@ class WebDavClient(Client):
     @wrap_connection_error
     def upload_file(self, remote_path, local_path, progress=None):
         # copy-pasted from the webdav lib with the non-needed additional http queries returned
-
         if not os.path.exists(local_path):
             raise LocalResourceNotFound(local_path)
 
@@ -103,6 +102,25 @@ class WebDavClient(Client):
 
         if os.path.isdir(local_path):
             raise OptionNotValid(name="local_path", value=local_path)
+
+        with open(local_path, "rb") as local_file:
+            self.execute_request(action='upload', path=urn.quote(), data=local_file)
+
+    @wrap_connection_error
+    def upload_or_rewrite_file(self, remote_path, local_path, progress=None):
+        if not os.path.exists(local_path):
+            raise LocalResourceNotFound(local_path)
+
+        urn = Urn(remote_path)
+        if urn.is_dir():
+            raise OptionNotValid(name="remote_path", value=remote_path)
+
+        if os.path.isdir(local_path):
+            raise OptionNotValid(name="local_path", value=local_path)
+
+        if self.check(remote_path):
+            # delete existing file
+            self.clean(remote_path)
 
         with open(local_path, "rb") as local_file:
             self.execute_request(action='upload', path=urn.quote(), data=local_file)

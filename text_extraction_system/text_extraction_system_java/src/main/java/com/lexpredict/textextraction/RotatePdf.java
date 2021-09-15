@@ -7,6 +7,8 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.util.Matrix;
+
+import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 
@@ -42,9 +44,16 @@ public class RotatePdf {
         PDRectangle cropBox = dstPage.getCropBox();
         float tx = (cropBox.getLowerLeftX() + cropBox.getUpperRightX()) / 2;
         float ty = (cropBox.getLowerLeftY() + cropBox.getUpperRightY()) / 2;
-        cs.transform(Matrix.getTranslateInstance(tx, ty));
-        cs.transform(Matrix.getRotateInstance(Math.toRadians(contentsRotate), 0, 0));
-        cs.transform(Matrix.getTranslateInstance(-tx, -ty));
+
+        Matrix m = Matrix.getTranslateInstance(tx, ty);
+        m.concatenate(Matrix.getRotateInstance(Math.toRadians(contentsRotate), 0, 0));
+        m.concatenate(Matrix.getTranslateInstance(-tx, -ty));
+        cs.transform(m);
+
+        Rectangle rectangle = cropBox.transform(m).getBounds();
+        PDRectangle newBox = new PDRectangle((float)rectangle.getX(), (float)rectangle.getY(), (float)rectangle.getWidth(), (float)rectangle.getHeight());
+        dstPage.setCropBox(newBox);
+        dstPage.setMediaBox(newBox);
 
         cs.close();
     }
