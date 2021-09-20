@@ -69,7 +69,10 @@ class TextExtractionSystemWebClient:
         glyph_enhancing: bool = False,
         remove_non_printable: bool = False,
         output_format: OutputFormat = OutputFormat.json,
-        read_sections_from_toc: bool = True
+        read_sections_from_toc: bool = True,
+        page_ocr_timeout_sec: int = 60,
+        remove_ocr_layer: bool = False,
+        detect_orientation_tesseract: bool = False
     ) -> str:
         """
         Takes bytes, BytesIO, or a BufferedReader in as input and
@@ -114,6 +117,9 @@ class TextExtractionSystemWebClient:
                 'remove_non_printable': remove_non_printable,
                 'output_format': output_format.value,
                 'read_sections_from_toc': read_sections_from_toc,
+                'page_ocr_timeout_sec': page_ocr_timeout_sec,
+                'remove_ocr_layer': remove_ocr_layer,
+                'detect_orientation_tesseract': detect_orientation_tesseract
             }
         )
         if resp.status_code not in {200, 201}:
@@ -144,7 +150,10 @@ class TextExtractionSystemWebClient:
                                       remove_non_printable: bool = False,
                                       output_format: OutputFormat = OutputFormat.json,
                                       read_sections_from_toc: bool = True,
-                                      table_parser: TableParser = TableParser.area_stream) -> str:
+                                      table_parser: TableParser = TableParser.area_stream,
+                                      page_ocr_timeout_sec: int = 60,
+                                      remove_ocr_layer: bool = False,
+                                      detect_orientation_tesseract: bool = False) -> str:
         resp = requests.post(f'{self.base_url}/api/v1/data_extraction_tasks/',
                              auth=self.auth,
                              files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
@@ -170,7 +179,10 @@ class TextExtractionSystemWebClient:
                                        remove_non_printable=remove_non_printable,
                                        output_format=output_format.value,
                                        read_sections_from_toc=read_sections_from_toc,
-                                       table_parser=table_parser.value))
+                                       table_parser=table_parser.value,
+                                       page_ocr_timeout_sec=page_ocr_timeout_sec,
+                                       remove_ocr_layer=remove_ocr_layer,
+                                       detect_orientation_tesseract=detect_orientation_tesseract))
         if resp.status_code not in {200, 201}:
             self.raise_for_status(resp)
         return json.loads(resp.content)

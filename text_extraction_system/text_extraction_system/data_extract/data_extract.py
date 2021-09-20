@@ -1,8 +1,10 @@
+import math
 import os
 import shutil
 import subprocess
 from contextlib import contextmanager
 
+import cv2
 from PIL import Image
 from dataclasses import dataclass
 from io import StringIO
@@ -27,7 +29,7 @@ from pdfminer.pdfparser import PDFParser
 
 from text_extraction_system.config import get_settings
 from text_extraction_system.data_extract.lang import get_lang_detector
-from text_extraction_system.ocr.ocr import ocr_page_to_pdf
+from text_extraction_system.ocr.ocr import ocr_page_to_pdf, get_page_orientation
 from text_extraction_system.ocr.rotation_detection import determine_rotation, RotationDetectionMethod, \
     PageRotationStatus
 from text_extraction_system.pdf.pdf import extract_page_ocr_images, \
@@ -89,6 +91,11 @@ def extract_text_and_structure(pdf_fn: str,
 
         completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=timeout_sec,
                                                              universal_newlines=True, stderr=PIPE, stdout=PIPE)
+        try:
+            log.info('Page rotation data:')
+            log.info(completed_process.stdout)
+        except Exception as e:
+            log.error(f"Can't get page rotation data: {e}")
         raise_from_process(log, completed_process, process_title=lambda: f'Extract text and structure from {pdf_fn}')
 
         raise_from_pdfbox_error_messages(completed_process)
@@ -294,7 +301,8 @@ def process_pdf_page(pdf_fn: str,
                      ocr_enabled: bool = True,
                      ocr_language: str = None,
                      ocr_timeout_sec: int = 60,
-                     pdf_password: str = None) -> Generator[PDFPageProcessingResults, None, None]:
+                     pdf_password: str = None,
+                     detect_orientation_tesseract=False) -> Generator[PDFPageProcessingResults, None, None]:
     if not ocr_enabled:
         yield PDFPageProcessingResults(page_requires_ocr=False)
 
@@ -315,12 +323,28 @@ def process_pdf_page(pdf_fn: str,
         rot_angle = 0
 
         if page_image_without_text_fn:
+            orientation = None
+            if detect_orientation_tesseract:
+                try:
+                    orientation = get_page_orientation(page_image_without_text_fn)
+                except Exception as e:
+                    log.error(f'Cant get page orientation by Tesseract: {e}')
+
+                # TODO: presently orientation "probability" threshold is taken arbitrary
+                ORIENTATION_THRESHOLD = 3
+                if orientation and orientation[0] and orientation[1] > ORIENTATION_THRESHOLD:
+                    # rotate the document
+                    # rotate_pdf_pages(pdf_fn, pdf_fn, orientation[0])
+                    # rotate the image
+                    rotate_image(orientation[0], page_image_without_text_fn, page_image_without_text_fn)
+
             # the image might be rotated. Then we try to determine the image rotation angle
             # based on opencv algorithms and rotate the image back.
             # Even if the image is still rotated, OCR will extract the text. That's fine
             # if the image rotation angle is a multiple of 90 degree.
             rot_status = determine_rotation(page_image_without_text_fn,
                                             RotationDetectionMethod.DILATED_ROWS)
+
             if should_correct_rotation(pdf_fn, rot_status):
                 # we don't rotate images by more than 45 degree angle
                 rot_angle = normalize_angle_90(rot_status.angle)
@@ -413,3 +437,20 @@ def should_correct_rotation(pdf_fn: str, rot_status: PageRotationStatus) -> bool
     if word_percent > 10 and rot_status.occupied_area_percent < 10:
         return False
     return word_percent < 3
+
+
+def rotate_image(angle: float, src_path: str, dst_path: str) -> None:
+    src = cv2.imread(src_path)
+    h, w, _ = src.shape
+    rotate_matrix = cv2.getRotationMatrix2D(center=(w/2, h/2), angle=angle, scale=1)
+
+    def should_swap_hw(a):
+        a = abs(a)
+        a = abs(a - 180 * round(a / 180))
+        return abs(round(a / 90)) > 0
+
+    if should_swap_hw(angle):
+        h, w = w, h
+
+    rotated_image = cv2.warpAffine(src=src, M=rotate_matrix, dsize=(w, h), borderValue=(255, 255, 255))
+    cv2.imwrite(dst_path, rotated_image)

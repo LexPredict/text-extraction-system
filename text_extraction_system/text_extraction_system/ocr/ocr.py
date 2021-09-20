@@ -1,11 +1,13 @@
 import os
 import shutil
+import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass
 from logging import getLogger
 from subprocess import Popen, PIPE, TimeoutExpired
 from tempfile import mkdtemp
-from typing import Generator, Optional
+from typing import Generator, Optional, Tuple
+import regex as re
 
 from PIL import Image
 
@@ -14,6 +16,62 @@ log = getLogger(__name__)
 
 class OCRException(Exception):
     pass
+
+
+RE_ORIENTATION_ANGLE = re.compile(r'(?<=Orientation in degrees:)\s+\d+')
+RE_ORIENTATION_CONFD = re.compile(r'(?<=Orientation confidence:)\s+[\d\.]+')
+
+
+def get_page_orientation(page_image_fn: str, timeout: int = 180) -> Optional[Tuple[int, float]]:
+    """
+    Gets: path to the page's image
+    Returns: None or (orientation_angle_degree, confidence_value)
+    """
+    args = ['tesseract', '--psm', '0', '-l', 'osd']
+    args.append(page_image_fn)
+    with tempfile.TemporaryDirectory() as ocr_results_dir:
+        ocr_results_path = os.path.join(ocr_results_dir, 'tes_output.txt')
+        args.append(ocr_results_path)
+        env = os.environ.copy()
+        log.debug(f'Executing tesseract to check orientation: {args}')
+        proc = Popen(args, env=env, stdout=PIPE, stderr=PIPE)
+        try:
+            _data, err = proc.communicate(timeout=timeout)
+        except TimeoutExpired as te:
+            proc.kill()
+            _outs, _errs = proc.communicate()
+            raise OCRException(f'Timeout waiting for tesseract to finish:\n{args}') from te
+
+        if err:
+            err = err.decode('utf8', 'ignore')
+        if proc.returncode != 0:
+            raise OCRException(f'Tesseract returned non-zero code.\n'
+                               f'Command line:\n'
+                               f'{args}\n'
+                               f'Process stdout:\n'
+                               f'{err}'
+                               f'Process stderr:\n'
+                               f'{err}')
+        with open(ocr_results_path + '.osd', 'r') as f_results:
+            results_text = f_results.read()
+    """Example result:
+    Page number: 0
+    Orientation in degrees: 180
+    Rotate: 180
+    Orientation confidence: 4.38
+    Script: Latin
+    Script confidence: 1.44
+    """
+    if not results_text:
+        log.debug(f'tesseract --psm 0 returned 0 bytes')
+        return None
+    angle_strs = [m.group(0).strip() for m in RE_ORIENTATION_ANGLE.finditer(results_text)]
+    if not angle_strs:
+        log.debug(f'tesseract --psm 0 returned: {results_text}')
+    conf_strs = [m.group(0).strip() for m in RE_ORIENTATION_CONFD.finditer(results_text)]
+    if not conf_strs:
+        log.debug(f'tesseract --psm 0 returned: {results_text}')
+    return int(angle_strs[0]), float(conf_strs[0])
 
 
 @contextmanager

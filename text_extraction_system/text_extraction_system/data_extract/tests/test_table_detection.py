@@ -1,11 +1,21 @@
 import os
 
+from text_extraction_system_api.dto import TableParser
+
 from text_extraction_system.commons.tests.commons import with_default_settings
+from text_extraction_system.data_extract.camelot.camelot import extract_tables_from_pdf_file
 from text_extraction_system.ocr.tables.table_detection import TableLocationCell, TableLocationCluster, TableLocation, \
     TableDetectorSettings
 from text_extraction_system.ocr.tables.table_detection import DEFAULT_DETECTING_SETTINGS as DS
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
+
+
+@with_default_settings
+def test_corr_pdf():
+    pdf_fn = '/home/andrey/Downloads/wa_corr.pdf'
+    extract_tables_from_pdf_file(
+        pdf_fn, True, TableParser.area_stream, 60)
 
 
 @with_default_settings

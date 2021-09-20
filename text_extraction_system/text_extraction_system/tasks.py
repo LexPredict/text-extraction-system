@@ -25,6 +25,7 @@ from text_extraction_system.data_extract.tables import get_table_dtos_from_camel
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
 from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
 from text_extraction_system.pdf.pdf import merge_pdf_pages, split_pdf_to_page_blocks
+from text_extraction_system.remove_ocr_layer import remove_ocr_layer
 from text_extraction_system.request_metadata import RequestCallbackInfo, RequestMetadata, \
     save_request_metadata, \
     load_request_metadata
@@ -207,7 +208,8 @@ def handle_errors(request_id: str, request_callback_info: RequestCallbackInfo):
 @celery_app.task(acks_late=True, bind=True)
 def process_document(task,
                      request_id: str,
-                     request_callback_info: Dict[str, Any]) -> bool:
+                     request_callback_info: Dict[str, Any],
+                     remove_ocr: bool) -> bool:
     request_callback_info = RequestCallbackInfo(**request_callback_info)
     with handle_errors(request_id, request_callback_info):
         webdav_client: WebDavClient = get_webdav_client()
@@ -222,6 +224,9 @@ def process_document(task,
             ext = os.path.splitext(fn)[1]
             if ext and ext.lower() == '.pdf':
                 process_pdf(fn, req, webdav_client)
+                # remove OCR-created text layers if any
+                if remove_ocr:
+                    remove_ocr_layer(fn)
             else:
                 log.info(f'{req.original_file_name} | Converting to PDF...')
                 with convert_to_pdf(fn, timeout_sec=req.convert_to_pdf_timeout_sec) \
@@ -260,7 +265,8 @@ def process_pdf(pdf_fn: str,
                                                            pdf_page_base_fn,
                                                            i,
                                                            ocr_language,
-                                                           req.request_callback_info.log_extra))
+                                                           req.request_callback_info.log_extra,
+                                                           req.detect_orientation_tesseract))
 
         log.info(f'{req.original_file_name} | Scheduling {len(task_signatures)} sub-tasks...')
         request_callback_info_dict = req.request_callback_info.to_dict()
@@ -285,7 +291,8 @@ def process_pdf_page_task(_task,
                           pdf_page_base_fn: str,
                           page_number: int,
                           ocr_language: str,
-                          log_extra: Dict[str, str] = None):
+                          log_extra: Dict[str, str] = None,
+                          detect_orientation_tesseract=False):
     set_log_extra(log_extra)
     webdav_client = get_webdav_client()
     req = load_request_metadata(request_id)
@@ -308,7 +315,10 @@ def process_pdf_page_task(_task,
                 as (local_pdf_page_fn, _remote_path):
             with process_pdf_page(local_pdf_page_fn,
                                   ocr_enabled=req.ocr_enable,
-                                  ocr_language=ocr_language) as page_proc_res:  # type: PDFPageProcessingResults
+                                  ocr_language=ocr_language,
+                                  ocr_timeout_sec=req.page_ocr_timeout_sec,
+                                  detect_orientation_tesseract=detect_orientation_tesseract) \
+                    as page_proc_res:  # type: PDFPageProcessingResults
                 file_name = page_num_to_fn(page_number)
                 if page_proc_res.rotation_angle:
                     file_name = f'{file_name}.{page_proc_res.rotation_angle}'
