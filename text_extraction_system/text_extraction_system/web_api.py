@@ -385,7 +385,8 @@ async def extract_plain_text_from_document(
         raise HTTPException(status_code=504, detail="Input file is too big")
 
     # Get extracted plain text and clean temp data
-    plain_text = _proxy_request(webdav_client, request_id,
+    plain_text = _proxy_request(webdav_client,
+                                request_id,
                                 load_request_metadata(request_id).plain_text_file,
                                 headers={'Content-Type': 'text/plain; charset=utf-8'})
     webdav_client.clean(f'{request_id}/')
@@ -476,7 +477,7 @@ def _proxy_request(webdav_client,
             content = type_conversion(content)
         return Response(content=content, status_code=resp.status_code, headers=headers)
     except RemoteResourceNotFound:
-        raise HTTPException(HTTP_404_NOT_FOUND, f'No such request if or there is no {fn} in the request results')
+        raise HTTPException(HTTP_404_NOT_FOUND, f'No such request or there is no filename `{fn}` in the request results')
 
 
 def _wait_for_pdf_extraction_finish(request_id: str, timeout_sec: int) -> bool:
