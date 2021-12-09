@@ -88,7 +88,8 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                                     read_sections_from_toc: bool = Form(default=True),
                                     table_parser: TableParser = Form(default=TableParser.area_stream),
                                     page_ocr_timeout_sec: int = Form(default=60),
-                                    remove_ocr_layer: bool = Form(default=False),):
+                                    remove_ocr_layer: bool = Form(default=False),
+                                    detect_orientation_tesseract: bool = Form(default=False),):
     webdav_client = get_webdav_client()
     request_id = get_valid_fn(request_id) if request_id else str(uuid4())
     log_extra = json.loads(log_extra_json_key_value) if log_extra_json_key_value else None
@@ -108,6 +109,7 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                           table_parser=table_parser,
                           page_ocr_timeout_sec=page_ocr_timeout_sec,
                           remove_ocr_layer=remove_ocr_layer,
+                          detect_orientation_tesseract=detect_orientation_tesseract,
                           request_callback_info=RequestCallbackInfo(
                               request_id=request_id,
                               original_file_name=file.filename,
@@ -335,11 +337,12 @@ async def extract_all_data_from_document(
         full_extract_timeout_sec: int = Form(default=3600),
         char_coords_debug_enable: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
+        remove_ocr_layer: bool = Form(default=False),
 ):
     webdav_client = get_webdav_client()
     request_id = str(uuid4())
     _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
-                             pdf_to_images_timeout_sec, char_coords_debug_enable, output_format)
+                             pdf_to_images_timeout_sec, char_coords_debug_enable, output_format, remove_ocr_layer)
 
     # Wait until celery finishes extracting else return TimeoutError
     if not _wait_for_pdf_extraction_finish(request_id, full_extract_timeout_sec):
@@ -369,11 +372,12 @@ async def extract_plain_text_from_document(
         full_extract_timeout_sec: int = Form(default=3600),
         char_coords_debug_enable: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
+        remove_ocr_layer: bool = Form(default=False),
 ):
     webdav_client = get_webdav_client()
     request_id = str(uuid4())
     _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
-                             pdf_to_images_timeout_sec, char_coords_debug_enable, output_format)
+                             pdf_to_images_timeout_sec, char_coords_debug_enable, output_format, remove_ocr_layer)
 
     # Wait until celery finishes extracting else return TimeoutError
     if not _wait_for_pdf_extraction_finish(request_id, full_extract_timeout_sec):
@@ -381,7 +385,8 @@ async def extract_plain_text_from_document(
         raise HTTPException(status_code=504, detail="Input file is too big")
 
     # Get extracted plain text and clean temp data
-    plain_text = _proxy_request(webdav_client, request_id,
+    plain_text = _proxy_request(webdav_client,
+                                request_id,
                                 load_request_metadata(request_id).plain_text_file,
                                 headers={'Content-Type': 'text/plain; charset=utf-8'})
     webdav_client.clean(f'{request_id}/')
@@ -397,11 +402,12 @@ async def extract_text_from_document_and_generate_searchable_pdf(
         full_extract_timeout_sec: int = Form(default=3600),
         char_coords_debug_enable: bool = Form(default=False),
         output_format: OutputFormat = Form(default=OutputFormat.json),
-) -> Response:
+        remove_ocr_layer: bool = Form(default=False),
+):
     webdav_client = get_webdav_client()
     request_id = str(uuid4())
     _run_sync_pdf_processing(webdav_client, request_id, file, doc_language, convert_to_pdf_timeout_sec,
-                             pdf_to_images_timeout_sec, char_coords_debug_enable, output_format)
+                             pdf_to_images_timeout_sec, char_coords_debug_enable, output_format, remove_ocr_layer)
 
     # Wait until celery finishes extracting else return TimeoutError
     if not _wait_for_pdf_extraction_finish(request_id, full_extract_timeout_sec):
@@ -471,7 +477,7 @@ def _proxy_request(webdav_client,
             content = type_conversion(content)
         return Response(content=content, status_code=resp.status_code, headers=headers)
     except RemoteResourceNotFound:
-        raise HTTPException(HTTP_404_NOT_FOUND, f'No such request if or there is no {fn} in the request results')
+        raise HTTPException(HTTP_404_NOT_FOUND, f'No such request or there is no filename `{fn}` in the request results')
 
 
 def _wait_for_pdf_extraction_finish(request_id: str, timeout_sec: int) -> bool:
@@ -500,13 +506,15 @@ def _wait_for_pdf_extraction_finish(request_id: str, timeout_sec: int) -> bool:
     return no_errors
 
 
-def _run_sync_pdf_processing(webdav_client, request_id: str,
+def _run_sync_pdf_processing(webdav_client,
+                             request_id: str,
                              file: UploadFile,
                              doc_language: str,
                              convert_to_pdf_timeout_sec: int,
                              pdf_to_images_timeout_sec: int,
                              char_coords_debug_enable: bool,
-                             output_format: OutputFormat):
+                             output_format: OutputFormat,
+                             remove_ocr_layer: bool):
     """Run celery tasks to extract data from document
     """
     req = RequestMetadata(original_file_name=file.filename,
@@ -518,6 +526,7 @@ def _run_sync_pdf_processing(webdav_client, request_id: str,
                           convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
                           pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
                           char_coords_debug_enable=char_coords_debug_enable,
+                          remove_ocr_layer=remove_ocr_layer,
                           request_callback_info=RequestCallbackInfo(
                               request_id=request_id,
                               original_file_name=file.filename))
@@ -525,6 +534,8 @@ def _run_sync_pdf_processing(webdav_client, request_id: str,
     save_request_metadata(req)
     webdav_client.upload_to(file.file, f'{req.request_id}/{req.original_document}')
     async_task = process_document.apply_async(
-        (req.request_id, req.request_callback_info.to_dict()))
+        (req.request_id, req.request_callback_info.to_dict(), req.remove_ocr_layer)
+    )
     webdav_client.mkdir(f'{req.request_id}/{task_ids}')
     register_task_id(webdav_client, req.request_id, async_task.id)
+
