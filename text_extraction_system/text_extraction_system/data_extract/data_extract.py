@@ -305,6 +305,7 @@ def process_pdf_page(pdf_fn: str,
                      detect_orientation_tesseract=False) -> Generator[PDFPageProcessingResults, None, None]:
     if not ocr_enabled:
         yield PDFPageProcessingResults(page_requires_ocr=False)
+        return
 
     # Try extracting "no-text" image of the pdf page.
     # It removes all elements from the page except images having no overlapping
