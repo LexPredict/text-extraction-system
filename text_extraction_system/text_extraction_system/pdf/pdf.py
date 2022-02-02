@@ -38,8 +38,14 @@ def iterate_pages(pdf_fn: str, use_advanced_detection: bool = False) -> Generato
             else LAParams(all_texts=True, boxes_flow=None, grid_size=0)
         device = PDFPageAggregator(rsrcmgr, laparams=laparams)
         interpreter = PDFPageInterpreter(rsrcmgr, device)
-        for page in PDFPage.create_pages(doc):
-            interpreter.process_page(page)
+        for n, page in enumerate(PDFPage.create_pages(doc)):
+            try:
+                interpreter.process_page(page)
+            except TypeError as e:
+                # faced to Exception in pdfminer.pdfinterpr.fo_TD when it tries to multipl. float, int and bytes
+                # original exception: "can't multiply sequence by non-int of type 'float'"
+                log.warning(f'Failed to correctly process page layout for page #{n}, '
+                            f'original exception: "{e.__repr__()}"; skip it.')
             page_layout: LTPage = device.get_result()
             yield page_layout
 
