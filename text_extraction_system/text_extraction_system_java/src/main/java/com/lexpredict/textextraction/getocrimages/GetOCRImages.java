@@ -106,7 +106,11 @@ public class GetOCRImages {
                                 break;
                             }
                         }
-                        if (!foundIntersect) images.add(img);
+                        if (outputPrefixWithText == null) {
+                            images.add(img);
+                        } else {
+                            if (!foundIntersect) images.add(img);
+                        }
                     }
 
                     if (!images.isEmpty()) {
