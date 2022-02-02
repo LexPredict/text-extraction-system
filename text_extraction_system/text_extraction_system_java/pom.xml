@@ -6,7 +6,7 @@
 
     <groupId>org.example</groupId>
     <artifactId>text_extraction_system_java</artifactId>
-    <version>1.0</version>
+    <version>1.2</version>
     <build>
         <plugins>
             <plugin>
