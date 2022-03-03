@@ -15,6 +15,7 @@ Jinja2==2.11.3
 JSON-log-formatter==0.2.0
 kombu==5.0.2
 lxml==4.6.3
+MarkupSafe==2.0.1
 marshmallow==3.8.0
 marshmallow-enum==1.5.1
 msgpack==1.0.2
