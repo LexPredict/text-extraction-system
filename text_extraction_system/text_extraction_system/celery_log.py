@@ -64,11 +64,12 @@ class HumanReadableTraceBackException(TracebackException):
         return result
 
     def human_readable_format(self, suppress_context_for_message: bool = True) -> str:
+        from text_extraction_system.processes import InjuredDocumentError
         message_lines, stack_lines = self.human_readable_format_msg_stack_lines()
         total = list()
         if message_lines:
             total.extend(message_lines)
-        if stack_lines:
+        if stack_lines and InjuredDocumentError.__name__ not in '\n'.join(message_lines):
             total.append('\nStack trace:')
             total.extend(stack_lines)
         return '\n'.join(total)

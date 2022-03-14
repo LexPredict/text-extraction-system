@@ -23,6 +23,10 @@ class ProcessReturnedErrorCode(Exception):
     pass
 
 
+class InjuredDocumentError(Exception):
+    pass
+
+
 def render_process_msg(completed_process: CompletedProcess) -> str:
     msg = f'Command line:\n' \
           f'{completed_process.args}'
@@ -41,15 +45,19 @@ def render_process_msg(completed_process: CompletedProcess) -> str:
 
 
 def raise_from_process(log: logging.Logger, completed_process: CompletedProcess, process_title: Callable[[], str]):
+    error_title = process_title()
+    error_message = render_process_msg(completed_process)
     if completed_process.returncode != 0:
-        raise ProcessReturnedErrorCode(f'Process returned non-zero code:\n'
-                                       f'{process_title()}\n'
-                                       f'{render_process_msg(completed_process)}')
-    else:
-        if log.isEnabledFor(logging.DEBUG):
-            log.debug(f'Successfully executed sub-process:\n'
-                      f'{process_title()}\n'
-                      f'{render_process_msg(completed_process)}')
+        if 'java.io.IOException: Error: Expected operator' in error_message:
+            raise InjuredDocumentError('The document is injured and cannot be processed.')
+        else:
+            raise ProcessReturnedErrorCode(f'Process returned non-zero code:\n'
+                                           f'{error_title}\n'
+                                           f'{error_message}')
+    elif log.isEnabledFor(logging.DEBUG):
+        log.debug(f'Successfully executed sub-process:\n'
+                  f'{error_title}\n'
+                  f'{error_message}')
 
 
 def io_pipe_lines(src: TextIO, dst: Callable[[str], None]):
