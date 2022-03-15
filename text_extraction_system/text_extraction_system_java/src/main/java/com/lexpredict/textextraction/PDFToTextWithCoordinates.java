@@ -150,7 +150,9 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
             pageIndex++;
             if (getCurrentPageNo() >= getStartPage()
                     && getCurrentPageNo() <= getEndPage()) {
-                processPage(page);
+                try {
+                    processPage(page);
+                } catch (IOException e){}
             }
         }
     }
