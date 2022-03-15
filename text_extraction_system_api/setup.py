@@ -12,7 +12,7 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version='1.1.0',
+    version='1.2.0',
 
     description='LexPredict Text Extraction System API',
     long_description='''LexPredict Text Extraction System: a tool for extracting the document text and structure ' \

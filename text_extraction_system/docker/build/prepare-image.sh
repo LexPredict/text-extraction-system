@@ -32,7 +32,7 @@ pushd ../../text_extraction_system_java
 mvn clean package dependency:copy-dependencies
 rm -f ../java_modules/*.jar
 mkdir -p ../java_modules
-cp target/text_extraction_system_java-1.0.jar ../java_modules/
+cp target/text_extraction_system_java-1.2.jar ../java_modules/
 cp target/dependency/* ../java_modules/
 popd
 rsync --exclude='.git/' ../../java_modules ./temp -a --copy-links -v
