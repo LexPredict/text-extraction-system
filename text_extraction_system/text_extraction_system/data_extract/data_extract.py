@@ -1,4 +1,3 @@
-import math
 import os
 import shutil
 import subprocess
@@ -29,15 +28,16 @@ from pdfminer.pdfparser import PDFParser
 
 from text_extraction_system.config import get_settings
 from text_extraction_system.data_extract.lang import get_lang_detector
-from text_extraction_system.ocr.ocr import ocr_page_to_pdf, get_page_orientation
-from text_extraction_system.ocr.rotation_detection import determine_rotation, RotationDetectionMethod, \
-    PageRotationStatus
+from text_extraction_system.ocr.ocr import ocr_page_to_pdf, get_page_orientation, OCRException
+from text_extraction_system.ocr.rotation_detection import determine_rotation, \
+    RotationDetectionMethod, PageRotationStatus
 from text_extraction_system.pdf.pdf import extract_page_ocr_images, \
     raise_from_pdfbox_error_messages, rotate_pdf_pages
 from text_extraction_system.processes import raise_from_process
 from text_extraction_system.utils import LanguageConverter
-from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, PlainTextStructure, \
-    PlainTextSentence, TextAndPDFCoordinates, PDFCoordinates, PlainTableOfContentsRecord
+from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, \
+    PlainTextStructure, PlainTextSentence, TextAndPDFCoordinates, PDFCoordinates, \
+    PlainTableOfContentsRecord
 from text_extraction_system_api.pdf_coordinates.pdf_coords_common import find_page_by_smb_index
 from text_extraction_system_api.pdf_coordinates.coord_text_map import CoordTextMap
 
@@ -327,9 +327,12 @@ def process_pdf_page(pdf_fn: str,
             orientation = None
             if detect_orientation_tesseract:
                 try:
-                    orientation = get_page_orientation(page_image_without_text_fn)
+                    orientation = get_page_orientation(page_image_without_text_fn,
+                                                       language=ocr_language)
                 except Exception as e:
-                    log.error(f'Cant get page orientation by Tesseract: {e}')
+                    error_text = OCRException.TOO_FEW_CHARACTERS_ERROR \
+                        if OCRException.TOO_FEW_CHARACTERS_ERROR in e else e
+                    log.error(f'Cant get page orientation by Tesseract: {error_text}')
 
                 # TODO: presently orientation "probability" threshold is taken arbitrary
                 ORIENTATION_THRESHOLD = 3
