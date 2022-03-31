@@ -11,10 +11,13 @@ import regex as re
 
 from PIL import Image
 
+from text_extraction_system.constants import TESSERACT_DEFAULT_LANGUAGE
+
 log = getLogger(__name__)
 
 
 class OCRException(Exception):
+    TOO_FEW_CHARACTERS_ERROR = 'Too few characters. Skipping this page'
     pass
 
 
@@ -22,12 +25,14 @@ RE_ORIENTATION_ANGLE = re.compile(r'(?<=Orientation in degrees:)\s+\d+')
 RE_ORIENTATION_CONFD = re.compile(r'(?<=Orientation confidence:)\s+[\d\.]+')
 
 
-def get_page_orientation(page_image_fn: str, timeout: int = 180) -> Optional[Tuple[int, float]]:
+def get_page_orientation(page_image_fn: str,
+                         language: str = TESSERACT_DEFAULT_LANGUAGE,
+                         timeout: int = 180) -> Optional[Tuple[int, float]]:
     """
     Gets: path to the page's image
     Returns: None or (orientation_angle_degree, confidence_value)
     """
-    args = ['tesseract', '--psm', '0', '-l', 'osd']
+    args = ['tesseract', '--psm', '0', '-l', language]
     args.append(page_image_fn)
     with tempfile.TemporaryDirectory() as ocr_results_dir:
         ocr_results_path = os.path.join(ocr_results_dir, 'tes_output.txt')
@@ -48,8 +53,6 @@ def get_page_orientation(page_image_fn: str, timeout: int = 180) -> Optional[Tup
             raise OCRException(f'Tesseract returned non-zero code.\n'
                                f'Command line:\n'
                                f'{args}\n'
-                               f'Process stdout:\n'
-                               f'{err}'
                                f'Process stderr:\n'
                                f'{err}')
         with open(ocr_results_path + '.osd', 'r') as f_results:
