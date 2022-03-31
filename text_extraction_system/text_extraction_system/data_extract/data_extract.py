@@ -27,6 +27,7 @@ from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfparser import PDFParser
 
 from text_extraction_system.config import get_settings
+from text_extraction_system.constants import TESSERACT_DEFAULT_LANGUAGE
 from text_extraction_system.data_extract.lang import get_lang_detector
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf, get_page_orientation, OCRException
 from text_extraction_system.ocr.rotation_detection import determine_rotation, \
@@ -327,8 +328,9 @@ def process_pdf_page(pdf_fn: str,
             orientation = None
             if detect_orientation_tesseract:
                 try:
-                    orientation = get_page_orientation(page_image_without_text_fn,
-                                                       language=ocr_language)
+                    orientation = get_page_orientation(
+                        page_image_without_text_fn,
+                        language=ocr_language or TESSERACT_DEFAULT_LANGUAGE)
                 except Exception as e:
                     error_text = OCRException.TOO_FEW_CHARACTERS_ERROR \
                         if OCRException.TOO_FEW_CHARACTERS_ERROR in e else e
