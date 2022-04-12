@@ -9,6 +9,7 @@ from typing import Generator
 
 from text_extraction_system.config import get_settings
 from text_extraction_system.locking.socket_lock import get_lock
+from text_extraction_system.pdf.soffice_utils import OfficeDocumentConverter
 from text_extraction_system.processes import raise_from_process, render_process_msg
 
 log = logging.getLogger(__name__)
@@ -32,7 +33,6 @@ def _run_process(args, timeout: int) -> CompletedProcess:
 
 @contextmanager
 def convert_to_pdf(src_fn: str,
-                   soffice_single_process_locking: bool = True,
                    timeout_sec: int = 1800) -> Generator[str, None, None]:
     """
     Converts the specified file to pdf using Libre Office CLI.
@@ -49,36 +49,23 @@ def convert_to_pdf(src_fn: str,
     src_fn_base, src_ext = os.path.splitext(src_fn_base)
     out_fn = os.path.join(temp_dir, src_fn_base + '.pdf')
     try:
+        additional_error_data = ""
         if src_ext.lower() in {'.tiff', '.jpg', '.jpeg', '.png'}:
             java_modules_path = get_settings().java_modules_path
             args = ['java', '-cp', f'{java_modules_path}/*',
                     'com.lexpredict.textextraction.MakePDFFromImages',
                     out_fn, src_fn]
             completed_process: CompletedProcess = _run_process(args, timeout_sec)
+            raise_from_process(log, completed_process, lambda: f'Converting {src_fn} to pdf.')
+            additional_error_data = render_process_msg(completed_process)
         else:
-            args = ['soffice', '--headless', '--invisible', '--nodefault', '--view', '--nolockcheck',
-                    '--nologo', '--norestore', '--nofirststartwizard', '--convert-to', 'pdf', src_fn,
-                    '--outdir', temp_dir]
-
-            # We are using "soffice" (Libre Office) to "print" any document to pdf
-            # and it seems not allowing running more than one copy of the process in some environments.
-            # The following is a workaround mostly for in-container usage.
-            # There is no guaranty that it will work on a dev machine when there is an "soffice" process
-            # started by some other app/user.
-            if soffice_single_process_locking:
-                with get_lock('soffice_single_process',
-                              wait_required_listener=
-                              lambda: log.info('Waiting for another conversion task to finish first...')):
-                    completed_process: CompletedProcess = _run_process(args, timeout_sec)
-            else:
-                completed_process: CompletedProcess = _run_process(args, timeout_sec)
-
-        raise_from_process(log, completed_process, lambda: f'Converting {src_fn} to pdf.')
+            soffice_converter = OfficeDocumentConverter()
+            soffice_converter.convert(src_fn, out_fn)
 
         if not os.path.isfile(out_fn):
-            raise OutputPDFDoesNotExistAfterConversion(f'Unable to convert {src_fn} to pdf. '
-                                                       f'Output file does not exist after conversion.\n'
-                                                       + render_process_msg(completed_process))
+            raise OutputPDFDoesNotExistAfterConversion(
+                f'Unable to convert {src_fn} to pdf. Output file does not exist after conversion.'
+                f'\n{additional_error_data}')
         yield out_fn
 
     finally:
