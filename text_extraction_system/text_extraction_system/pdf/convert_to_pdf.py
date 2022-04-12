@@ -60,7 +60,10 @@ def convert_to_pdf(src_fn: str,
             additional_error_data = render_process_msg(completed_process)
         else:
             soffice_converter = OfficeDocumentConverter()
-            soffice_converter.convert(src_fn, out_fn)
+            try:
+                soffice_converter.convert(src_fn, out_fn)
+            except Exception as e:
+                additional_error_data = e
 
         if not os.path.isfile(out_fn):
             raise OutputPDFDoesNotExistAfterConversion(
