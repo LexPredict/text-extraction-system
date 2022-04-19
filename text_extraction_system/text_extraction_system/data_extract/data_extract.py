@@ -333,7 +333,7 @@ def process_pdf_page(pdf_fn: str,
                         language=ocr_language or TESSERACT_DEFAULT_LANGUAGE)
                 except Exception as e:
                     error_text = OCRException.TOO_FEW_CHARACTERS_ERROR \
-                        if OCRException.TOO_FEW_CHARACTERS_ERROR in e else e
+                        if OCRException.TOO_FEW_CHARACTERS_ERROR in str(e) else e
                     log.error(f'Cant get page orientation by Tesseract: {error_text}')
 
                 # TODO: presently orientation "probability" threshold is taken arbitrary
