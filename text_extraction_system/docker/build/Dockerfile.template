@@ -27,7 +27,7 @@ RUN apt-get -y update --fix-missing && \
     | xargs -r locale-gen --purge && \
 	echo -e \'LANG="en_US.UTF-8"\nLANGUAGE="en_US:en"\n\' > /etc/default/locale && \
 	mkdir -p /text_extraction_system/models && \
-	wget https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin -O /text_extraction_system/models/lid.176.bin && \
+	wget http://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.bin -O /text_extraction_system/models/lid.176.bin && \
 	python3 --version && pip3 install -r /requirements.txt && ${LEXNLP_MASTER_INSTALL_CMD} && pip3 install -c /requirements.txt -e /text_extraction_system_api && \
     su - ${SHARED_USER_NAME} -c "python3 -m nltk.downloader averaged_perceptron_tagger punkt stopwords words maxent_ne_chunker wordnet" && \
     apt-get install -y tesseract-ocr tesseract-ocr-eng tesseract-ocr-ita tesseract-ocr-fra tesseract-ocr-spa tesseract-ocr-deu tesseract-ocr-rus && \
