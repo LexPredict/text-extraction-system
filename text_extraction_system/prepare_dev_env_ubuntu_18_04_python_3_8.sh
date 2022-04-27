@@ -16,7 +16,7 @@ pip install -e ../text_extraction_system_api
 
 # NLTK should be installed within lexpredict-contraxsuite-core
 # The following downloads its models
-python3 -m nltk.downloader averaged_perceptron_tagger punkt stopwords words maxent_ne_chunker wordnet
+python3 -m nltk.downloader averaged_perceptron_tagger punkt stopwords words maxent_ne_chunker wordnet omw-1.4
 
 # Downloading model for language detection
 mkdir models
