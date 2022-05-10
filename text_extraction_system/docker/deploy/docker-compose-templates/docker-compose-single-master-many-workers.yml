@@ -29,6 +29,12 @@ services:
       replicas: 1
       placement:
         constraints: [node.role == manager]
+    healthcheck:
+      test:
+        ["CMD-SHELL","curl -s -I http://localhost | grep -q 'HTTP/1.1 401 Unauthorized'"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
     ports:
       # We publish the webdav service into the host network to avoid occasional problems
       # with Docker Swarm virtual network / routing under high load.
@@ -60,6 +66,11 @@ services:
         constraints: [node.role == manager]
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      interval: 1s
+      timeout: 3s
+      retries: 5
 
   tes-celery:
     image: ${TEXT_EXTRACTION_SYSTEM_IMAGE}
@@ -123,6 +134,11 @@ services:
         constraints: [node.role == manager]
     stop_signal: SIGQUIT
     stop_grace_period: 1m
+    healthcheck:
+      test: ["CMD-SHELL","celery -A text_extraction_system.tasks inspect ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
     logging:
       driver: "json-file"
       options:
@@ -160,6 +176,12 @@ services:
       replicas: 1
       placement:
         constraints: [node.role == manager]
+    # 
+    healthcheck:
+      test: ["CMD-SHELL","curl -f http://localhost:8000"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
     ports:
       - 8000:8000
 
