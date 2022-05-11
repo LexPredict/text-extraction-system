@@ -98,6 +98,11 @@ services:
       mode: global # Exactly one instance per node. Primitive AWS autoscaling solution.
       placement:
         constraints: [node.role != manager]
+    healthcheck:
+      test: ["CMD-SHELL","celery -A text_extraction_system.tasks inspect ping"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
     stop_signal: SIGQUIT
     stop_grace_period: 1m
     logging:
