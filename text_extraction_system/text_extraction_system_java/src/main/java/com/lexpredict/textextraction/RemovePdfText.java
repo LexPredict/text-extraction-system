@@ -1,6 +1,8 @@
 package com.lexpredict.textextraction;
 
 import com.lexpredict.textextraction.mergepdf.MergeInPageLayers;
+import com.lexpredict.textextraction.errors.InjuredDocumentException;
+
 import org.apache.commons.cli.*;
 import org.apache.pdfbox.cos.COSDictionary;
 import org.apache.pdfbox.cos.COSName;
@@ -32,7 +34,7 @@ public class RemovePdfText {
         }
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InjuredDocumentException {
         CommandLine cmd = parseCliArgs(args);
         String src = cmd.getOptionValue("original-pdf");
         String dstPdf = cmd.getOptionValue("dst-pdf");
@@ -59,6 +61,8 @@ public class RemovePdfText {
 
             newDoc.setAllSecurityToBeRemoved(true);
             newDoc.save(dstPdf);
+        } catch (IOException e) {
+            throw new InjuredDocumentException();
         }
     }
 

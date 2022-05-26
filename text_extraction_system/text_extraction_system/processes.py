@@ -48,7 +48,8 @@ def raise_from_process(log: logging.Logger, completed_process: CompletedProcess,
     error_title = process_title()
     error_message = render_process_msg(completed_process)
     if completed_process.returncode != 0:
-        if 'java.io.IOException: Error: Expected operator' in error_message:
+        if 'java.io.IOException: Error: Expected operator' in error_message \
+                or 'document is injured' in error_message:
             raise InjuredDocumentError('The document is injured and cannot be processed.')
         else:
             raise ProcessReturnedErrorCode(f'Process returned non-zero code:\n'
