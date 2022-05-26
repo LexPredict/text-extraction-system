@@ -1,3 +1,4 @@
+import gc
 import os
 import shutil
 import subprocess
@@ -102,8 +103,12 @@ def extract_text_and_structure(pdf_fn: str,
         raise_from_pdfbox_error_messages(completed_process)
 
         with open(out_fn, 'rb') as pages_f:
-            # see object structure in com.lexpredict.textextraction.dto.PDFPlainText
-            pdfbox_res: Dict[str, Any] = msgpack.unpack(pages_f, raw=False)
+            try:
+                gc.disable()
+                # see object structure in com.lexpredict.textextraction.dto.PDFPlainText
+                pdfbox_res: Dict[str, Any] = msgpack.unpack(pages_f, raw=False)
+            finally:
+                gc.enable()
 
         # Remove Null characters because of incompatibility with PostgreSQL
         text = pdfbox_res['text'].replace("\x00", "")
