@@ -8,6 +8,8 @@ from subprocess import CompletedProcess
 from subprocess import PIPE
 from typing import Generator
 
+import magic
+
 from text_extraction_system.config import get_settings
 from text_extraction_system.locking.socket_lock import get_lock
 from text_extraction_system.processes import raise_from_process, render_process_msg
@@ -56,7 +58,10 @@ def prepare_large_data_file(src_fn: str,
         src_fn_base, src_ext = os.path.splitext(src_fn_base)
         out_fn = os.path.join(out_dir, src_fn_base + '.txt')
 
-        args = ['lowriter', '--headless', '--convert-to', 'txt', src_fn, '--outdir', out_dir]
+        if not src_ext:
+            filetype = magic.from_file(src_fn)
+
+        args = ['lowriter', '--headless', '--convert-to', 'txt:Text', src_fn, '--outdir', out_dir]
 
         with get_lock('lowriter_single_process',
                       wait_required_listener=lambda: log.info(
