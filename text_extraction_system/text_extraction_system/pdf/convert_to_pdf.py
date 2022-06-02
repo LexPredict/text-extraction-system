@@ -66,17 +66,16 @@ def convert_to_pdf(src_fn: str,
     the output file is written into a temporary directory and next yielded to the caller.
     After returning from the yield the output file and the output temp directory are removed.
     """
-    if not os.path.isfile(src_fn):
+    if not os.path.isfile(src_fn) and not os.path.isfile(src_fn):
         raise InputFileDoesNotExist(src_fn)
 
-    src_fn, src_fn_base, src_ext = separate_filename_basename_and_extension(src_fn)
+    temp_dir = tempfile.mkdtemp()
+    src_fn, src_fn_base, src_ext = separate_filename_basename_and_extension(src_fn, temp_dir)
+    out_fn = os.path.join(temp_dir, src_fn_base + '.pdf')
 
     # Bypass pdf file
     if src_ext == 'pdf':
         return src_fn
-
-    temp_dir = tempfile.mkdtemp()
-    out_fn = os.path.join(temp_dir, src_fn_base + '.pdf')
 
     try:
         if src_ext.lower() in {'.tiff', '.jpg', '.jpeg', '.png'}:
