@@ -1,5 +1,7 @@
 package com.lexpredict.textextraction.mergepdf;
 
+import com.lexpredict.textextraction.errors.InjuredDocumentException;
+
 import org.apache.commons.cli.*;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.pdfbox.multipdf.LayerUtility;
@@ -50,7 +52,7 @@ public class MergeInPageLayers {
 
     private static final Pattern PAGE_ROTATE_ANGLE = Pattern.compile("^rotate_(\\d+)=(.*)$");
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InjuredDocumentException {
 
         CommandLine cmd = parseCliArgs(args);
 
@@ -185,6 +187,8 @@ public class MergeInPageLayers {
             }
             dstDocument.setAllSecurityToBeRemoved(true);
             dstDocument.save(dstPdf);
+        } catch (IOException e) {
+            throw new InjuredDocumentException();
         }
     }
 

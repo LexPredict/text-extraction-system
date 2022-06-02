@@ -35,6 +35,7 @@ def get_known_task_ids_from_celery_api(app) -> Set[str]:
     collect_task_ids(i.reserved())
     return task_ids
 
+
 def store_pending_task_info_in_webdav(body,
                                       exchange,
                                       routing_key,
@@ -59,7 +60,7 @@ def store_pending_task_info_in_webdav(body,
     webdav_client.pickle(obj=task_info, remote_path=f'{tasks_pending}/{task_id}')
 
 
-def remove_pending_task_info_from_webdav(task_id: str, task_name: str):
+def remove_pending_task_info_from_webdav(task_id: str, task_name: str = ''):
     try:
         get_webdav_client().clean(f'{tasks_pending}/{task_id}')
     except RemoteResourceNotFound:

@@ -12,13 +12,15 @@ from typing import List, Optional, Tuple, Dict
 
 import pikepdf
 from pdfminer.converter import PDFPageAggregator
-from pdfminer.layout import LAParams, LTTextBox, LTTextLine, LTImage, LTItem, LTLayoutContainer, LTPage
+from pdfminer.layout import LAParams, LTTextBox, LTTextLine, LTImage, LTItem, LTLayoutContainer, \
+    LTPage
 from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
 from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfparser import PDFParser
 
 from text_extraction_system.config import get_settings
+from text_extraction_system.pdf.utils import pikepdf_opened_w_error
 from text_extraction_system.processes import raise_from_process, render_process_msg
 
 log = getLogger(__name__)
@@ -198,8 +200,8 @@ def build_block_fn(src_fn: str, page_start: int, page_end: int) -> str:
 @contextmanager
 def split_pdf_to_page_blocks(src_pdf_fn: str,
                              pages_per_block: int = 1,
-                             page_block_base_name: str = None, ) -> Generator[List[str], None, None]:
-    with pikepdf.open(src_pdf_fn) as pdf:
+                             page_block_base_name: str = None) -> Generator[List[str], None, None]:
+    with pikepdf_opened_w_error(src_pdf_fn) as pdf:
         if len(pdf.pages) < 1:
             yield []
             return
@@ -208,8 +210,7 @@ def split_pdf_to_page_blocks(src_pdf_fn: str,
             yield [src_pdf_fn]
             return
 
-        if not page_block_base_name:
-            page_block_base_name = os.path.basename(src_pdf_fn)
+        page_block_base_name = page_block_base_name or os.path.basename(src_pdf_fn)
         temp_dir = mkdtemp()
         try:
             res: List[str] = list()
