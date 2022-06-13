@@ -23,14 +23,14 @@ class TestLoading2ndTime(unittest.TestCase):
         try:
             pdf_1st = os.path.join(temp_dir, '1st_time.pdf')
             with self.client.extract_all_data_from_document(
-                    fn, char_coords_debug_enable=True) as zip_fn:
+                    fn, doc_language='en', char_coords_debug_enable=True) as zip_fn:
                 with zipfile.ZipFile(zip_fn, 'r') as archive:
                     with archive.open('pdf_img_90.ocred_corr.pdf', 'r') as pdf_processed:
                         with open(pdf_1st, 'bw') as f_pdf_1st:
                             copyfileobj(pdf_processed, f_pdf_1st)
 
             with self.client.extract_all_data_from_document(
-                    pdf_1st, char_coords_debug_enable=True) as zip_fn:
+                    pdf_1st, doc_language='en', char_coords_debug_enable=True) as zip_fn:
                 with zipfile.ZipFile(zip_fn, 'r') as archive:
                     with archive.open('1st_time.plain.txt', 'r') as f_txt:
                         txt = f_txt.read().decode('utf-8')
@@ -52,13 +52,11 @@ class TestLoadingRotatedDocs(unittest.TestCase):
     def test_extract_text_rotated2(self):
         fn = os.path.join(os.path.dirname(__file__), 'data', 'rotated_small_angle.pdf.tiff')
         text = self.client.extract_plain_text_from_document(fn, doc_language='en')
-        expected = '''d at a certain angle 1. This is a text rotated at a certain angle 2. This is a text
-    a text rotated at a certain angle 4. This is a text rotated at a
-    dat a certain angle 6. This is a text rotated at a certain angle 7.
-    
-    his is a text rotate
-    rotated at a certain angle 3. This is
-    certain angle 5. This is a text rotate'''
+        expected = "d at a certain angle 1. This is a text rotated at a certain angle 2. " \
+                   "This is a text \nrotated at a certain angle 3. This is a text rotated at " \
+                   "a certain angle 4. This is a text rotated at a \ncertain angle 5. This is " \
+                   "a text rotated at a certain angle 6. This is a text rotated at a certain " \
+                   "angle 7."
         assert expected in text
 
     def test_extract_text_rotated4(self):

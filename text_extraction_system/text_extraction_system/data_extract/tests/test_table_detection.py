@@ -20,7 +20,7 @@ pathlib.Path(tmp_results_path).mkdir(parents=True, exist_ok=True)
 
 @with_default_settings
 def test_corr_pdf():
-    pdf_fn = data_dir_path / 'wa_corr.pdf'
+    pdf_fn = data_dir_path / 'tables.pdf'
     extract_tables_from_pdf_file(str(pdf_fn), True, TableParser.area_stream, 60)
 
 

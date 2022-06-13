@@ -84,6 +84,7 @@ class TestBasicAPICallbackMethods(unittest.TestCase):
 
         request_id = self.client.schedule_data_extraction_task(
             fn,
+            doc_language='en',
             call_back_url=self.call_back_url,
             call_back_additional_info='hello world',
             output_format=OutputFormat.msgpack)
@@ -231,6 +232,7 @@ class TestBasicAPICallbackMethods(unittest.TestCase):
 
         request_id = self.client.schedule_data_extraction_task(
             fn,
+            doc_language='en',
             call_back_url=self.call_back_url,
             call_back_additional_info='hello world',
             log_extra={'hello': 'world', 'test': True},
