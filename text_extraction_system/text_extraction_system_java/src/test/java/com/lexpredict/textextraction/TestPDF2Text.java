@@ -8,6 +8,7 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 
 import java.io.InputStream;
 import java.io.StringWriter;
+import java.util.Arrays;
 
 
 public class TestPDF2Text extends TestCase {
@@ -67,6 +68,33 @@ public class TestPDF2Text extends TestCase {
                 String t = "certain angle 1";
 
                 assertTrue(res.text.contains(t));
+            }
+        }
+    }
+
+    public void test_coordinates() throws Exception {
+        double[] tempCoords;
+
+        try (InputStream stream = TestPDF2Text.class
+                .getResourceAsStream("/coordinates.pdf")) {
+            try (PDDocument document = PDDocument.load(stream)) {
+                PDFPlainText res = PDFToTextWithCoordinates.process(document, true);
+
+                // ObjectMapper om = new ObjectMapper();
+                // StringWriter sw = new StringWriter();
+                // om.writerWithDefaultPrettyPrinter().writeValue(sw, res);
+                // System.out.println(sw);
+
+                System.out.println("Here are coordinates less than 0");
+
+                for (int i = 0; i < res.charBBoxes.size(); i++) {
+                    tempCoords = res.charBBoxes.get(i);
+                    if (tempCoords[0] < 0 || tempCoords[1] < 0) {
+                        System.out.println(Arrays.toString(tempCoords));
+                    }
+                }
+
+                assertTrue(true);
             }
         }
     }
