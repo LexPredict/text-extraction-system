@@ -86,7 +86,7 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                                     pdf_to_images_timeout_sec: int = Form(default=1800),
                                     output_format: OutputFormat = Form(default=OutputFormat.json),
                                     read_sections_from_toc: bool = Form(default=True),
-                                    table_parser: TableParser = Form(default=TableParser.area_stream),
+                                    table_parser: TableParser = Form(default=TableParser.lattice),
                                     page_ocr_timeout_sec: int = Form(default=60),
                                     remove_ocr_layer: bool = Form(default=False),
                                     detect_orientation_tesseract: bool = Form(default=False),):

@@ -150,7 +150,7 @@ class TextExtractionSystemWebClient:
                                       remove_non_printable: bool = False,
                                       output_format: OutputFormat = OutputFormat.json,
                                       read_sections_from_toc: bool = True,
-                                      table_parser: TableParser = TableParser.area_stream,
+                                      table_parser: TableParser = TableParser.lattice,
                                       page_ocr_timeout_sec: int = 60,
                                       remove_ocr_layer: bool = False,
                                       detect_orientation_tesseract: bool = False) -> str:
