@@ -71,7 +71,7 @@ class RequestMetadata:
 
     page_rotate_angles: Optional[List[float]] = None
     read_sections_from_toc: bool = True
-    table_parser: TableParser = TableParser.area_stream
+    table_parser: TableParser = TableParser.lattice
     page_ocr_timeout_sec: int = 60
     remove_ocr_layer: bool = False
     detect_orientation_tesseract: bool = False

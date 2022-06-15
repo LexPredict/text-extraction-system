@@ -1,4 +1,3 @@
-import os
 import pathlib
 import tempfile
 
@@ -21,7 +20,7 @@ pathlib.Path(tmp_results_path).mkdir(parents=True, exist_ok=True)
 @with_default_settings
 def test_corr_pdf():
     pdf_fn = data_dir_path / 'tables.pdf'
-    extract_tables_from_pdf_file(str(pdf_fn), True, TableParser.area_stream, 60)
+    extract_tables_from_pdf_file(str(pdf_fn), True, TableParser.lattice, 60)
 
 
 @with_default_settings
@@ -179,34 +178,37 @@ def test_try_add_cell():
     assert 2 == len(tl.clusters_by_pivot['r'])
 
 
-# ToDo: fix TableDetector bugs and uncomment this test
-# @with_default_settings
-# def test_clear_clusters():
-#     tl = TableLocation(1, 100, 100, 300, DS)
-#     tl.try_add_cell(TableLocationCell(15, 101, 14, 20))
-#     tl.try_add_cell(TableLocationCell(18, 121, 14, 20))
-#     tl.try_add_cell(TableLocationCell(17, 131, 31, 20))
-#     tl.try_add_cell(TableLocationCell(21, 139, 14, 20))
-#     tl.try_add_cell(TableLocationCell(23, 141, 14, 20))
-#     tl.try_add_cell(TableLocationCell(25, 151, 14, 20))
-#     tl.try_add_cell(TableLocationCell(38, 102, 14, 20))
-#     tl.try_add_cell(TableLocationCell(39, 102, 14, 20))
-#
-#     assert 2 == len(tl.clusters_by_pivot['l'])
-#     assert 6 == len(tl.clusters_by_pivot['l'][0].cells)
-#     assert 2 == len(tl.clusters_by_pivot['l'][1].cells)
-#     assert 3 == len(tl.clusters_by_pivot['m'])
-#     assert 5 == len(tl.clusters_by_pivot['m'][0].cells)
-#     assert 1 == len(tl.clusters_by_pivot['m'][1].cells)
-#     assert 2 == len(tl.clusters_by_pivot['m'][2].cells)
-#     assert 2 == len(tl.clusters_by_pivot['r'])
-#     assert 5 == len(tl.clusters_by_pivot['r'][0].cells)
-#     assert 3 == len(tl.clusters_by_pivot['r'][1].cells)
-#
-#     tl.clear_clusters()
-#
-#     assert 2 == len(tl.column_clusters)
-#     assert 5 == len(tl.column_clusters[0].cells)
+@with_default_settings
+def test_clear_clusters():
+    tl = TableLocation(1, 100, 100, 300, DS)
+    tl.try_add_cell(TableLocationCell(15, 101, 14, 20))
+    tl.try_add_cell(TableLocationCell(18, 121, 14, 20))
+    tl.try_add_cell(TableLocationCell(17, 131, 31, 20))
+    tl.try_add_cell(TableLocationCell(20, 139, 14, 20))
+    tl.try_add_cell(TableLocationCell(22, 141, 14, 20))
+    tl.try_add_cell(TableLocationCell(24, 151, 14, 20))
+    tl.try_add_cell(TableLocationCell(38, 102, 14, 20))
+    tl.try_add_cell(TableLocationCell(39, 102, 14, 20))
+
+    assert 2 == len(tl.clusters_by_pivot['l'])
+    assert 6 == len(tl.clusters_by_pivot['l'][0].cells)
+    assert 2 == len(tl.clusters_by_pivot['l'][1].cells)
+    assert 3 == len(tl.clusters_by_pivot['m'])
+    assert 5 == len(tl.clusters_by_pivot['m'][0].cells)
+    assert 1 == len(tl.clusters_by_pivot['m'][1].cells)
+    assert 2 == len(tl.clusters_by_pivot['m'][2].cells)
+    assert 2 == len(tl.clusters_by_pivot['r'])
+    assert 5 == len(tl.clusters_by_pivot['r'][0].cells)
+    assert 3 == len(tl.clusters_by_pivot['r'][1].cells)
+
+    tl.clear_clusters()
+
+    print(tl.column_clusters)
+    print(tl.column_clusters[0].cells)
+    print(tl.column_clusters[1].cells)
+
+    assert 2 == len(tl.column_clusters)
+    assert 5 == len(tl.column_clusters[0].cells)
 
 
 @with_default_settings
