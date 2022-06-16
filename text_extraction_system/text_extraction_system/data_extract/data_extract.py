@@ -308,7 +308,7 @@ def process_pdf_page(pdf_fn: str,
         yield PDFPageProcessingResults(page_requires_ocr=False)
         return
 
-    # Try extracting "no-text" image of the pdf page.
+    # Try extracting "no-text" image of the pdf page into PNG file.
     # It removes all elements from the page except images having no overlapping
     # with any text element.
     # This is used to avoid the text duplication by OCR.
@@ -357,20 +357,10 @@ def process_pdf_page(pdf_fn: str,
 
                 # rotate the document
                 rotate_pdf_pages(pdf_fn, pdf_fn, rot_angle)
-                # extract the image again
-                with extract_page_ocr_images(pdf_fn,
-                                             start_page=1,
-                                             end_page=1,
-                                             pdf_password=pdf_password,
-                                             dpi=DPI,
-                                             reset_page_rotation=False) as rot_image_fns:
-                    os.remove(page_image_without_text_fn)
-                    new_page_image_without_text_fn = rot_image_fns.get(1) if rot_image_fns else None
-                    if new_page_image_without_text_fn:
-                        shutil.move(new_page_image_without_text_fn, page_image_without_text_fn)
-                    else:
-                        page_image_without_text_fn = ''
-        if page_image_without_text_fn:
+
+                # rotate extracted image
+                rotate_image(rot_angle, page_image_without_text_fn, page_image_without_text_fn)
+
             # this returns a text-based PDF with glyph-less text only
             # to be used for merging in front of the original PDF page layout
             with ocr_page_to_pdf(page_image_fn=page_image_without_text_fn,
