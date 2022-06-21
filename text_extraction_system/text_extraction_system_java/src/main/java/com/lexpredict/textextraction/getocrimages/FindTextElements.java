@@ -1,8 +1,8 @@
 package com.lexpredict.textextraction.getocrimages;
 
 import com.lexpredict.textextraction.TEUtils;
+import com.lexpredict.textextraction.dto.PDFVisibleTextStripper;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.text.TextPosition;
 import org.apache.pdfbox.util.Matrix;
 
@@ -12,7 +12,7 @@ import java.io.StringWriter;
 import java.util.LinkedList;
 import java.util.List;
 
-public class FindTextElements extends PDFTextStripper {
+public class FindTextElements extends PDFVisibleTextStripper {
 
     public FindTextElements() throws IOException {
         this.setStartPage(-1);

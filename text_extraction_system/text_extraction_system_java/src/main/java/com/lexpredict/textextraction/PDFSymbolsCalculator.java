@@ -1,8 +1,8 @@
 package com.lexpredict.textextraction;
 
+import com.lexpredict.textextraction.dto.PDFVisibleTextStripper;
 import org.apache.commons.cli.*;
 import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.text.PDFTextStripper;
 
 import java.io.File;
 import java.io.IOException;
@@ -12,9 +12,9 @@ public class PDFSymbolsCalculator {
         CommandLine cmd = parseCliArgs(args);
         String src = cmd.getOptionValue("original-pdf");
 
-        PDFTextStripper pdfStripper = null;
+        PDFVisibleTextStripper pdfStripper = null;
         try (PDDocument doc = PDDocument.load(new File(src))) {
-            pdfStripper = new PDFTextStripper();
+            pdfStripper = new PDFVisibleTextStripper();
             String parsedText = pdfStripper.getText(doc);
             System.out.println(parsedText.length());
         }

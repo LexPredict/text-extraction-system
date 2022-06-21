@@ -2,6 +2,7 @@ package com.lexpredict.textextraction;
 
 import com.lexpredict.textextraction.dto.PDFPlainText;
 import com.lexpredict.textextraction.dto.PDFPlainTextPage;
+import com.lexpredict.textextraction.dto.PDFVisibleTextStripper;
 import org.apache.pdfbox.cos.COSArray;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -12,7 +13,6 @@ import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDDocumentOutline;
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineItem;
 import org.apache.pdfbox.pdmodel.interactive.documentnavigation.outline.PDOutlineNode;
-import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.pdfbox.text.TextPosition;
 import org.apache.pdfbox.util.Matrix;
 import org.xml.sax.SAXException;
@@ -30,7 +30,7 @@ import java.util.*;
  * Based on the code from Apache TIKA and Apache PDFBox which
  * was originally licensed under Apache 2.0 license (https://tika.apache.org/license.html).
  */
-public class PDFToTextWithCoordinates extends PDFTextStripper {
+public class PDFToTextWithCoordinates extends PDFVisibleTextStripper {
     int startPage = -1;
     int pageIndex = -1;
 
@@ -136,10 +136,10 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
      */
     @Override
     protected void processPages(PDPageTree pages) throws IOException {
-        //we currently need this hack because we aren't able to increment
-        //the private currentPageNo in PDFTextStripper,
-        //and PDFTextStripper's processPage relies on that variable
-        //being >= startPage when deciding whether or not to process a page
+        // we currently need this hack because we aren't able to increment
+        // the private currentPageNo in PDFTextStripper,
+        // and PDFTextStripper's processPage relies on that variable
+        // being >= startPage when deciding whether or not to process a page
         // See:
         // if (currentPageNo >= startPage && currentPageNo <= endPage
         //                && (startBookmarkPageNumber == -1 || currentPageNo >= startBookmarkPageNumber)
@@ -282,7 +282,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         return angle;
     }
 
-    static class AngleCollector extends PDFTextStripper {
+    static class AngleCollector extends PDFVisibleTextStripper {
         Map<Float, Integer> anglesToCharNum = new HashMap<>();
 
         final int ignoreAnglesCloserThan;
