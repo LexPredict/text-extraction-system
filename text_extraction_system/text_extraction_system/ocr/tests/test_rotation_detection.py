@@ -1,8 +1,8 @@
 import os
 
 from text_extraction_system.commons.tests.commons import with_default_settings
-from text_extraction_system.ocr.rotation_detection import determine_rotation, detect_rotation_dilated_rows, \
-    WeightedAverage
+from text_extraction_system.ocr.rotation_detection import determine_rotation, \
+    detect_rotation_dilated_rows, WeightedAverage
 from text_extraction_system.pdf.pdf import extract_page_images
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
@@ -57,7 +57,6 @@ def test_angle1_dilated_rows():
     fn = os.path.join(data_dir, 'deskew_goes_crazy.png')
     angle = detect_rotation_dilated_rows(fn, pre_calculated_orientation=None).angle
     assert int(angle) == 0
-
 
 
 @with_default_settings
