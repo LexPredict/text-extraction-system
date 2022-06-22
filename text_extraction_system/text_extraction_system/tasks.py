@@ -1,3 +1,4 @@
+import gc
 import json
 import logging
 import os
@@ -449,13 +450,22 @@ def extract_data_and_finish(req: RequestMetadata,
 
         if req.output_format == OutputFormat.msgpack:
             req.pdf_coordinates_file = pdf_fn_in_storage_base + '.pdf_coordinates.msgpack'
-            packed = msgpack.packb(text_structure.pdf_coordinates.__dict__, use_bin_type=True, use_single_float=True)
-            webdav_client.upload_to(packed, f'{req.request_id}/{req.pdf_coordinates_file}')
-
             req.text_structure_file = pdf_fn_in_storage_base + '.document_structure.msgpack'
-            packed = msgpack.packb(text_structure.text_structure.to_dict(), use_bin_type=True, use_single_float=True)
-            webdav_client.upload_to(packed,
-                                    f'{req.request_id}/{req.text_structure_file}')
+
+            try:
+                gc.disable()
+                packed_pdf_coords = msgpack.packb(text_structure.pdf_coordinates.__dict__,
+                                                  use_bin_type=True,
+                                                  use_single_float=True)
+                packed_text_struct = msgpack.packb(text_structure.text_structure.to_dict(),
+                                                   use_bin_type=True,
+                                                   use_single_float=True)
+            finally:
+                webdav_client.upload_to(packed_pdf_coords,
+                                        f'{req.request_id}/{req.pdf_coordinates_file}')
+                webdav_client.upload_to(packed_text_struct,
+                                        f'{req.request_id}/{req.text_structure_file}')
+                gc.enable()
 
         if req.char_coords_debug_enable or req.deskew_enable:
             req.page_rotate_angles = page_rotate_angles
