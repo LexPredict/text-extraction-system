@@ -16,22 +16,17 @@ phases:
       - aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
       - COMMIT_HASH=$(echo ${CODEBUILD_RESOLVED_SOURCE_VERSION} | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
-      #- echo Add env file 
-      #- aws s3 cp s3://${ENV_BUCKET}/${ENV_FILE} .env
+      - echo Add env file 
+      - aws s3 cp s3://${ENV_BUCKET}/${ENV_FILE} ./text_extraction_system/docker/build/build_setenv_local.sh
   build:
     commands:
-      - echo Export env variables
-      - export TEXT_EXTRACTION_SYSTEM_IMAGE=${ECR_REPOSITORY_URI}
-      - export TEXT_EXTRACTION_SYSTEM_IMAGE_FROM=ubuntu:20.04
-
       - echo Build started on `date`
-      - echo Building the Docker image...
-      - docker build -t ${ECR_REPOSITORY_URI}:latest .
-      - docker tag ${ECR_REPOSITORY_URI}:latest ${ECR_REPOSITORY_URI}:${IMAGE_TAG}
+      - echo Run build script...
+      - cd ./text_extraction_system/docker/build/ && ./prepare-image.sh
       - echo Build completed on `date`
       - echo Pushing the Docker images...
       - docker push ${ECR_REPOSITORY_URI}:latest
-      - docker push ${ECR_REPOSITORY_URI}:${IMAGE_TAG}
+      #- docker push ${ECR_REPOSITORY_URI}:${IMAGE_TAG}
       - printf '[{"name":"mc-frontend","imageUri":"%s"}]' ${ECR_REPOSITORY_URI}:latest > imagedefinitions.json
 artifacts:
   files: imagedefinitions.json
