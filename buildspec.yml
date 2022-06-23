@@ -24,10 +24,11 @@ phases:
       - echo Run build script...
       - cd ./text_extraction_system/docker/build/ && ./prepare-image.sh
       - echo Build completed on `date`
+      - cd ../../../
       - echo Pushing the Docker images...
       - docker push ${ECR_REPOSITORY_URI}:latest
       #- docker push ${ECR_REPOSITORY_URI}:${IMAGE_TAG}
-      - printf '[{"name":"mc-frontend","imageUri":"%s"}]' ${ECR_REPOSITORY_URI}:latest > imagedefinitions.json
+      - printf '[{"name":"mc-tes","imageUri":"%s"}]' ${ECR_REPOSITORY_URI}:latest > imagedefinitions.json
 artifacts:
   files: imagedefinitions.json
   #  commands:
