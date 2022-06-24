@@ -64,9 +64,9 @@ function startup () {
       echo "Dependencies are ready. Starting up..."
   fi
   if [[ -z "${DOLLAR}{LAUNCH_TYPE}" ]]; then
-      echo "Set ulimit"
+      echo "Set ulimit to 65535"
       ulimit -n 65535
-  if [[ -z "${DOLLAR}{LAUNCH_TYPE}"== "ECS" ]]; then
+  if [[ "${DOLLAR}{LAUNCH_TYPE}"== "ECS" ]]; then
       echo "Starting on ECS Platform. Ulimit is set on task level"
   else
       echo '$LLAUNCH_TYPE should be ECS or undefined'
