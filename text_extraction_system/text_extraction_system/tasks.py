@@ -70,16 +70,13 @@ init_task_tracking()
 
 @worker_process_init.connect
 def setup_recursion_limit(*args, **kwargs):
-    # This is a workaround for pdfminer.six to not crash on too deep
-    # data structures in some PDF files. It has recursion internally which looks correct
-    # but does not work for some documents.
-    # Of course this is totally unsafe and a bad practice
-    # but it works.
-    # Without this we would have to fork and modify algorithms in pdfminer.six which
-    # would require much more development and testing work.
+    # This is a workaround for pdfminer.six to not crash on too deep data structures in some PDF files. It has
+    # recursion internally which looks correct but does not work for some documents. Of course this is totally
+    # unsafe and a bad practice but it works. Without this we would have to fork and modify algorithms
+    # in pdfminer.six which would require much more development and testing work.
+    import os
     from text_extraction_system.commons.sysutils import increase_recursion_limit
     increase_recursion_limit()
-    import os
     log.info(f'Recursion limit increased for a Celery worker process {os.getpid()}')
 
 
