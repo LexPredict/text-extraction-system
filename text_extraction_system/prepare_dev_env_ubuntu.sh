@@ -10,14 +10,14 @@ sudo apt-get install virtualenv python3-dev libreoffice maven tesseract-ocr tess
                      tesseract-ocr-rus
 
 # Prepare python virtual env
-virtualenv -p /usr/bin/python3 venv
-source venv/bin/activate
+virtualenv -p /usr/bin/python3 .venv
+source .venv/bin/activate
 pip install -U setuptools
-pip install -r requirements.txt
+pip install -U -r requirements.txt
 
 # Install additional python packages
-pip install --no-deps -e ../../lexpredict-contraxsuite-core/
-pip install -e ../text_extraction_system_api
+pip install -U --no-deps -e ../../lexpredict-contraxsuite-core/
+pip install -U -e ../text_extraction_system_api
 
 # NLTK should be installed within lexpredict-contraxsuite-core. The following downloads its models
 python3 -m nltk.downloader averaged_perceptron_tagger punkt stopwords words maxent_ne_chunker \
@@ -41,7 +41,7 @@ cp .test_env.local_dev_example .test_env
 docker swarm init
 docker network create --driver overlay contraxsuite_contrax_net
 
-pushd ./docker/deploy
+pushd docker/deploy
 sudo ./deploy-to-swarm-cluster.sh
 popd
 
