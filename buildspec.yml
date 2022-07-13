@@ -29,7 +29,7 @@ phases:
       - echo '*** --- Generate ImageDefinition Files --- '
       - printf '[{"name":"mc-tes-web-api","imageUri":"%s"}]' ${ECR_REPOSITORY_URI}:latest > api_imagedefinitions.json
       - printf '[{"name":"mc-tes-celery","imageUri":"%s"}]' ${ECR_REPOSITORY_URI}:latest > celery_imagedefinition.json
-      - printf '[{"name":"tes-celery-beat","imageUri":"%s"}]' ${ECR_REPOSITORY_URI}:latest > celery_beat_imagedefinition.json
+      - printf '[{"name":"mc-tes-celery-beat","imageUri":"%s"}]' ${ECR_REPOSITORY_URI}:latest > celery_beat_imagedefinition.json
 artifacts:
   files: 
     - api_imagedefinitions.json
