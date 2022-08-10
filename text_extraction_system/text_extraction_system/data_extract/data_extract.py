@@ -1,3 +1,4 @@
+import gc
 import os
 import shutil
 import subprocess
@@ -13,7 +14,7 @@ from tempfile import mkdtemp
 from typing import Tuple, Generator, Optional, Dict, Any, List
 
 import msgpack
-from lexnlp.nlp.en.segments.paragraphs import get_paragraphs
+from lexnlp.nlp.en.segments.paragraphs import get_paragraph_spans
 from lexnlp.nlp.en.segments.sections import get_document_sections_with_titles
 from lexnlp.nlp.en.segments.sentences import get_sentence_span_list
 from lexnlp.nlp.en.segments.titles import get_titles
@@ -102,8 +103,12 @@ def extract_text_and_structure(pdf_fn: str,
         raise_from_pdfbox_error_messages(completed_process)
 
         with open(out_fn, 'rb') as pages_f:
-            # see object structure in com.lexpredict.textextraction.dto.PDFPlainText
-            pdfbox_res: Dict[str, Any] = msgpack.unpack(pages_f, raw=False)
+            try:
+                gc.disable()
+                # see object structure in com.lexpredict.textextraction.dto.PDFPlainText
+                pdfbox_res: Dict[str, Any] = msgpack.unpack(pages_f, raw=False)
+            finally:
+                gc.enable()
 
         # Remove Null characters because of incompatibility with PostgreSQL
         text = pdfbox_res['text'].replace("\x00", "")
@@ -155,7 +160,7 @@ def extract_text_and_structure(pdf_fn: str,
         paragraphs = [PlainTextParagraph(start=start,
                                          end=end,
                                          language=language or lang.predict_lang(segment))
-                      for segment, start, end in get_paragraphs(text, return_spans=True)]
+                      for start, end, segment, in get_paragraph_spans(text)]
 
         if read_sections_from_toc and table_of_contents:
             sections = get_sections_from_table_of_contents(table_of_contents,
