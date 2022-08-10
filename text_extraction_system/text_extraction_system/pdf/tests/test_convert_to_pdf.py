@@ -6,7 +6,8 @@ import pytest
 
 from text_extraction_system.commons.tests.commons import with_default_settings
 from text_extraction_system.data_extract.data_extract import extract_text_pdfminer
-from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf, InputFileDoesNotExist
+from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
+from text_extraction_system.pdf.errors import InputFileDoesNotExist
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 

@@ -94,8 +94,18 @@ public class GetOCRImages {
                 if (outputPrefixNoText != null) {
                     FindImages fi = new FindImages();
                     FindTextElements ft = new FindTextElements();
-                    fi.processPage(page);
-                    ft.processPage(page);
+
+                    try {
+                        fi.processPage(page);
+                    } catch (Exception e){
+                        e.printStackTrace();
+                    }
+
+                    try {
+                        ft.processPage(page);
+                    } catch (Exception e){
+                        e.printStackTrace();
+                    }
 
                     List<FindImages.FoundImage> images = new ArrayList<>();
                     for (FindImages.FoundImage img : fi.found) {
@@ -106,7 +116,11 @@ public class GetOCRImages {
                                 break;
                             }
                         }
-                        if (!foundIntersect) images.add(img);
+                        if (outputPrefixWithText == null) {
+                            images.add(img);
+                        } else {
+                            if (!foundIntersect) images.add(img);
+                        }
                     }
 
                     if (!images.isEmpty()) {

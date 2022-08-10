@@ -1,0 +1,9 @@
+[run]
+omit=
+    .data/*
+    venv/*
+branch = True
+
+[report]
+show_missing = True
+skip_empty = True

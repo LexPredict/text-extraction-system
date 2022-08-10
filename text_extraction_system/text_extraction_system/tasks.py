@@ -1,3 +1,4 @@
+import gc
 import json
 import logging
 import os
@@ -69,16 +70,13 @@ init_task_tracking()
 
 @worker_process_init.connect
 def setup_recursion_limit(*args, **kwargs):
-    # This is a workaround for pdfminer.six to not crash on too deep
-    # data structures in some PDF files. It has recursion internally which looks correct
-    # but does not work for some documents.
-    # Of course this is totally unsafe and a bad practice
-    # but it works.
-    # Without this we would have to fork and modify algorithms in pdfminer.six which
-    # would require much more development and testing work.
+    # This is a workaround for pdfminer.six to not crash on too deep data structures in some PDF files. It has
+    # recursion internally which looks correct but does not work for some documents. Of course this is totally
+    # unsafe and a bad practice but it works. Without this we would have to fork and modify algorithms
+    # in pdfminer.six which would require much more development and testing work.
+    import os
     from text_extraction_system.commons.sysutils import increase_recursion_limit
     increase_recursion_limit()
-    import os
     log.info(f'Recursion limit increased for a Celery worker process {os.getpid()}')
 
 
@@ -265,7 +263,8 @@ def process_pdf(pdf_fn: str,
                                                            pdf_page_base_fn,
                                                            i,
                                                            ocr_language,
-                                                           req.request_callback_info.log_extra))
+                                                           req.request_callback_info.log_extra,
+                                                           req.detect_orientation_tesseract))
 
         log.info(f'{req.original_file_name} | Scheduling {len(task_signatures)} sub-tasks...')
         request_callback_info_dict = req.request_callback_info.to_dict()
@@ -290,7 +289,8 @@ def process_pdf_page_task(_task,
                           pdf_page_base_fn: str,
                           page_number: int,
                           ocr_language: str,
-                          log_extra: Dict[str, str] = None):
+                          log_extra: Dict[str, str] = None,
+                          detect_orientation_tesseract=False):
     set_log_extra(log_extra)
     webdav_client = get_webdav_client()
     req = load_request_metadata(request_id)
@@ -314,7 +314,9 @@ def process_pdf_page_task(_task,
             with process_pdf_page(local_pdf_page_fn,
                                   ocr_enabled=req.ocr_enable,
                                   ocr_language=ocr_language,
-                                  ocr_timeout_sec=req.page_ocr_timeout_sec) as page_proc_res:  # type: PDFPageProcessingResults
+                                  ocr_timeout_sec=req.page_ocr_timeout_sec,
+                                  detect_orientation_tesseract=detect_orientation_tesseract) \
+                    as page_proc_res:  # type: PDFPageProcessingResults
                 file_name = page_num_to_fn(page_number)
                 if page_proc_res.rotation_angle:
                     file_name = f'{file_name}.{page_proc_res.rotation_angle}'
@@ -445,13 +447,22 @@ def extract_data_and_finish(req: RequestMetadata,
 
         if req.output_format == OutputFormat.msgpack:
             req.pdf_coordinates_file = pdf_fn_in_storage_base + '.pdf_coordinates.msgpack'
-            packed = msgpack.packb(text_structure.pdf_coordinates.__dict__, use_bin_type=True, use_single_float=True)
-            webdav_client.upload_to(packed, f'{req.request_id}/{req.pdf_coordinates_file}')
-
             req.text_structure_file = pdf_fn_in_storage_base + '.document_structure.msgpack'
-            packed = msgpack.packb(text_structure.text_structure.to_dict(), use_bin_type=True, use_single_float=True)
-            webdav_client.upload_to(packed,
-                                    f'{req.request_id}/{req.text_structure_file}')
+
+            try:
+                gc.disable()
+                packed_pdf_coords = msgpack.packb(text_structure.pdf_coordinates.__dict__,
+                                                  use_bin_type=True,
+                                                  use_single_float=True)
+                packed_text_struct = msgpack.packb(text_structure.text_structure.to_dict(),
+                                                   use_bin_type=True,
+                                                   use_single_float=True)
+            finally:
+                webdav_client.upload_to(packed_pdf_coords,
+                                        f'{req.request_id}/{req.pdf_coordinates_file}')
+                webdav_client.upload_to(packed_text_struct,
+                                        f'{req.request_id}/{req.text_structure_file}')
+                gc.enable()
 
         if req.char_coords_debug_enable or req.deskew_enable:
             req.page_rotate_angles = page_rotate_angles

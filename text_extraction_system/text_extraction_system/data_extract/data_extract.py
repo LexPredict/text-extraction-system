@@ -1,8 +1,10 @@
+import gc
 import os
 import shutil
 import subprocess
 from contextlib import contextmanager
 
+import cv2
 from PIL import Image
 from dataclasses import dataclass
 from io import StringIO
@@ -12,7 +14,7 @@ from tempfile import mkdtemp
 from typing import Tuple, Generator, Optional, Dict, Any, List
 
 import msgpack
-from lexnlp.nlp.en.segments.paragraphs import get_paragraphs
+from lexnlp.nlp.en.segments.paragraphs import get_paragraph_spans
 from lexnlp.nlp.en.segments.sections import get_document_sections_with_titles
 from lexnlp.nlp.en.segments.sentences import get_sentence_span_list
 from lexnlp.nlp.en.segments.titles import get_titles
@@ -26,16 +28,18 @@ from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfparser import PDFParser
 
 from text_extraction_system.config import get_settings
+from text_extraction_system.constants import TESSERACT_DEFAULT_LANGUAGE
 from text_extraction_system.data_extract.lang import get_lang_detector
-from text_extraction_system.ocr.ocr import ocr_page_to_pdf
-from text_extraction_system.ocr.rotation_detection import determine_rotation, RotationDetectionMethod, \
-    PageRotationStatus
+from text_extraction_system.ocr.ocr import ocr_page_to_pdf, get_page_orientation, OCRException
+from text_extraction_system.ocr.rotation_detection import determine_rotation, \
+    RotationDetectionMethod, PageRotationStatus
 from text_extraction_system.pdf.pdf import extract_page_ocr_images, \
     raise_from_pdfbox_error_messages, rotate_pdf_pages
 from text_extraction_system.processes import raise_from_process
 from text_extraction_system.utils import LanguageConverter
-from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, PlainTextStructure, \
-    PlainTextSentence, TextAndPDFCoordinates, PDFCoordinates, PlainTableOfContentsRecord
+from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, \
+    PlainTextStructure, PlainTextSentence, TextAndPDFCoordinates, PDFCoordinates, \
+    PlainTableOfContentsRecord
 from text_extraction_system_api.pdf_coordinates.pdf_coords_common import find_page_by_smb_index
 from text_extraction_system_api.pdf_coordinates.coord_text_map import CoordTextMap
 
@@ -99,8 +103,12 @@ def extract_text_and_structure(pdf_fn: str,
         raise_from_pdfbox_error_messages(completed_process)
 
         with open(out_fn, 'rb') as pages_f:
-            # see object structure in com.lexpredict.textextraction.dto.PDFPlainText
-            pdfbox_res: Dict[str, Any] = msgpack.unpack(pages_f, raw=False)
+            try:
+                gc.disable()
+                # see object structure in com.lexpredict.textextraction.dto.PDFPlainText
+                pdfbox_res: Dict[str, Any] = msgpack.unpack(pages_f, raw=False)
+            finally:
+                gc.enable()
 
         # Remove Null characters because of incompatibility with PostgreSQL
         text = pdfbox_res['text'].replace("\x00", "")
@@ -152,7 +160,7 @@ def extract_text_and_structure(pdf_fn: str,
         paragraphs = [PlainTextParagraph(start=start,
                                          end=end,
                                          language=language or lang.predict_lang(segment))
-                      for segment, start, end in get_paragraphs(text, return_spans=True)]
+                      for start, end, segment, in get_paragraph_spans(text)]
 
         if read_sections_from_toc and table_of_contents:
             sections = get_sections_from_table_of_contents(table_of_contents,
@@ -299,11 +307,13 @@ def process_pdf_page(pdf_fn: str,
                      ocr_enabled: bool = True,
                      ocr_language: str = None,
                      ocr_timeout_sec: int = 60,
-                     pdf_password: str = None) -> Generator[PDFPageProcessingResults, None, None]:
+                     pdf_password: str = None,
+                     detect_orientation_tesseract=False) -> Generator[PDFPageProcessingResults, None, None]:
     if not ocr_enabled:
         yield PDFPageProcessingResults(page_requires_ocr=False)
+        return
 
-    # Try extracting "no-text" image of the pdf page.
+    # Try extracting "no-text" image of the pdf page into PNG file.
     # It removes all elements from the page except images having no overlapping
     # with any text element.
     # This is used to avoid the text duplication by OCR.
@@ -320,32 +330,42 @@ def process_pdf_page(pdf_fn: str,
         rot_angle = 0
 
         if page_image_without_text_fn:
+            orientation = None
+            if detect_orientation_tesseract:
+                try:
+                    orientation = get_page_orientation(
+                        page_image_without_text_fn,
+                        language=ocr_language or TESSERACT_DEFAULT_LANGUAGE)
+                except Exception as e:
+                    error_text = OCRException.TOO_FEW_CHARACTERS_ERROR \
+                        if OCRException.TOO_FEW_CHARACTERS_ERROR in str(e) else e
+                    log.error(f'Cant get page orientation by Tesseract: {error_text}')
+
+                # TODO: presently orientation "probability" threshold is taken arbitrary
+                ORIENTATION_THRESHOLD = 3
+                if orientation and orientation[0] and orientation[1] > ORIENTATION_THRESHOLD:
+                    # rotate the document
+                    # rotate_pdf_pages(pdf_fn, pdf_fn, orientation[0])
+                    # rotate the image
+                    rotate_image(orientation[0], page_image_without_text_fn, page_image_without_text_fn)
+
             # the image might be rotated. Then we try to determine the image rotation angle
             # based on opencv algorithms and rotate the image back.
             # Even if the image is still rotated, OCR will extract the text. That's fine
             # if the image rotation angle is a multiple of 90 degree.
             rot_status = determine_rotation(page_image_without_text_fn,
                                             RotationDetectionMethod.DILATED_ROWS)
+
             if should_correct_rotation(pdf_fn, rot_status):
                 # we don't rotate images by more than 45 degree angle
                 rot_angle = normalize_angle_90(rot_status.angle)
 
                 # rotate the document
                 rotate_pdf_pages(pdf_fn, pdf_fn, rot_angle)
-                # extract the image again
-                with extract_page_ocr_images(pdf_fn,
-                                             start_page=1,
-                                             end_page=1,
-                                             pdf_password=pdf_password,
-                                             dpi=DPI,
-                                             reset_page_rotation=False) as rot_image_fns:
-                    os.remove(page_image_without_text_fn)
-                    new_page_image_without_text_fn = rot_image_fns.get(1) if rot_image_fns else None
-                    if new_page_image_without_text_fn:
-                        shutil.move(new_page_image_without_text_fn, page_image_without_text_fn)
-                    else:
-                        page_image_without_text_fn = ''
-        if page_image_without_text_fn:
+
+                # rotate extracted image
+                rotate_image(rot_angle, page_image_without_text_fn, page_image_without_text_fn)
+
             # this returns a text-based PDF with glyph-less text only
             # to be used for merging in front of the original PDF page layout
             with ocr_page_to_pdf(page_image_fn=page_image_without_text_fn,
@@ -418,3 +438,20 @@ def should_correct_rotation(pdf_fn: str, rot_status: PageRotationStatus) -> bool
     if word_percent > 10 and rot_status.occupied_area_percent < 10:
         return False
     return word_percent < 3
+
+
+def rotate_image(angle: float, src_path: str, dst_path: str) -> None:
+    src = cv2.imread(src_path)
+    h, w, _ = src.shape
+    rotate_matrix = cv2.getRotationMatrix2D(center=(w/2, h/2), angle=angle, scale=1)
+
+    def should_swap_hw(a):
+        a = abs(a)
+        a = abs(a - 180 * round(a / 180))
+        return abs(round(a / 90)) > 0
+
+    if should_swap_hw(angle):
+        h, w = w, h
+
+    rotated_image = cv2.warpAffine(src=src, M=rotate_matrix, dsize=(w, h), borderValue=(255, 255, 255))
+    cv2.imwrite(dst_path, rotated_image)

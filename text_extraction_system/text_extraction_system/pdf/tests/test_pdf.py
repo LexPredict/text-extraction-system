@@ -5,8 +5,8 @@ import pikepdf
 
 from text_extraction_system.commons.tests.commons import with_default_settings
 from text_extraction_system.data_extract.data_extract import extract_text_pdfminer
-from text_extraction_system.pdf.pdf import split_pdf_to_page_blocks, extract_page_images, iterate_pages, \
-    page_requires_ocr
+from text_extraction_system.pdf.pdf import split_pdf_to_page_blocks, extract_page_images, \
+    iterate_pages, page_requires_ocr
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
 

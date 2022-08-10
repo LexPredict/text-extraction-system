@@ -2,7 +2,7 @@ import os
 
 from text_extraction_system.commons.tests.commons import with_default_settings
 from text_extraction_system.data_extract.data_extract import extract_text_pdfminer, extract_text_and_structure
-from text_extraction_system.ocr.ocr import ocr_page_to_pdf, orientation_and_script_detected
+from text_extraction_system.ocr.ocr import ocr_page_to_pdf, orientation_and_script_detected, get_page_orientation
 from text_extraction_system.pdf.pdf import extract_page_images
 
 data_dir = os.path.join(os.path.dirname(__file__), 'data')
@@ -30,6 +30,16 @@ def test_ocr_rotated():
         with ocr_page_to_pdf(png_fns[0]) as pdf_fn:
             with extract_text_and_structure(pdf_fn) as (txt, txt_struct, _s, _d):
                 assert 'rotated' in txt
+
+
+@with_default_settings
+def test_ocr_orientation():
+    fn = os.path.join(data_dir, 'page_192_alt.pdf')
+    with extract_page_images(fn, 1, 1) as png_fns:
+        page_o = get_page_orientation(png_fns[0])
+        print(page_o)
+        assert page_o[0] == 180
+        assert page_o[1] > 0.5
 
 
 @with_default_settings

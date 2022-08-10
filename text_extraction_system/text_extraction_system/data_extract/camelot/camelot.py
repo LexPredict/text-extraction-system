@@ -59,7 +59,7 @@ class CustomizedStream(Stream):
 def extract_tables(pageno: int,
                    page_layout: LTPage,
                    pdf_page_image_fn: str,
-                   table_parser: TableParser = TableParser.area_stream,
+                   table_parser: TableParser = TableParser.lattice,
                    min_accuracy: int = 60) -> List[CamelotTable]:
     extractor = get_extractor(pdf_page_image_fn, table_parser)
     if not extractor:
@@ -80,7 +80,7 @@ def extract_tables(pageno: int,
 
 
 def get_extractor(pdf_page_image_fn: str,
-                  table_parser: TableParser = TableParser.area_stream):
+                  table_parser: TableParser = TableParser.lattice):
     areas = None
     detect_areas = table_parser == TableParser.area_stream or table_parser == TableParser.area_lattice
     extract_method = 'lattice' if table_parser == TableParser.lattice or table_parser == TableParser.area_lattice \
@@ -97,7 +97,7 @@ def get_extractor(pdf_page_image_fn: str,
 
 def extract_tables_from_pdf_file(pdf_fn: str,
                                  pdfminer_advanced_detection: bool = False,
-                                 table_parser: TableParser = TableParser.area_stream,
+                                 table_parser: TableParser = TableParser.lattice,
                                  min_accuracy: int = 60) -> List[CamelotTable]:
     res: List[CamelotTable] = list()
     with extract_page_images(pdf_fn=pdf_fn, dpi=71) as image_fns:

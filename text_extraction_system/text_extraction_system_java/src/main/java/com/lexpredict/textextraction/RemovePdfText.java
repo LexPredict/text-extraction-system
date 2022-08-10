@@ -1,6 +1,8 @@
 package com.lexpredict.textextraction;
 
 import com.lexpredict.textextraction.mergepdf.MergeInPageLayers;
+import com.lexpredict.textextraction.errors.InjuredDocumentException;
+
 import org.apache.commons.cli.*;
 import org.apache.pdfbox.cos.COSDictionary;
 import org.apache.pdfbox.cos.COSName;
@@ -9,6 +11,7 @@ import org.apache.pdfbox.pdmodel.PDPage;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 
 
 public class RemovePdfText {
@@ -31,10 +34,12 @@ public class RemovePdfText {
         }
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InjuredDocumentException {
         CommandLine cmd = parseCliArgs(args);
         String src = cmd.getOptionValue("original-pdf");
         String dstPdf = cmd.getOptionValue("dst-pdf");
+        boolean rmText = Arrays.stream(cmd.getOptions())
+                .anyMatch(x -> (x.getOpt() == null ? "" : x.getOpt()).equals("rmtext"));
 
         PDDocument newDoc = new PDDocument();
         MarkedContentRemover rm = new MarkedContentRemover(new COGMatcher());
@@ -48,11 +53,16 @@ public class RemovePdfText {
 
                 PDPage newPage = new PDPage(newPageDict);
                 newDoc.addPage(newPage);
-                rm.removeMarkedContent(newDoc, newPage);
+                if (rmText)
+                    rm.removeAllTextContent(newDoc, newPage);
+                else
+                    rm.removeMarkedContent(newDoc, newPage);
             }
 
             newDoc.setAllSecurityToBeRemoved(true);
             newDoc.save(dstPdf);
+        } catch (IOException e) {
+            throw new InjuredDocumentException();
         }
     }
 
@@ -68,6 +78,11 @@ public class RemovePdfText {
                 "File name to save the resulting PDF.");
         dstPDF.setRequired(true);
         options.addOption(dstPDF);
+
+        Option removeTextOps = new Option("rmtext", "rm-text", false,
+                "Remove all text operators.");
+        removeTextOps.setRequired(false);
+        options.addOption(removeTextOps);
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();

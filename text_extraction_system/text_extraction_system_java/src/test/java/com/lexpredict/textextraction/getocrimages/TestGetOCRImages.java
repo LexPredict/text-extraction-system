@@ -65,6 +65,25 @@ public class TestGetOCRImages extends TestCase {
         }
     }
 
+    public void test3rdOcrNoTextOnly() throws IOException {
+        Path tempDir = Files.createTempDirectory("t");
+        File f = new File(tempDir.toFile(), "/image_text_overlap_2.pdf");
+        try {
+            try (InputStream is = TestGetOCRImages.class.getResourceAsStream("/image_text_overlap_2.pdf")) {
+                FileUtils.copyToFile(is, f);
+            }
+            GetOCRImages.main(new String[]{f.getAbsolutePath(),
+                    "--format", "PNG",
+                    "--dpi", "300",
+                    "--start-page", "1",
+                    "--end-page", "1",
+                    "--output-prefix-no-text", tempDir.toString() + "/page_no_text_"});
+            assertFalse(new File(tempDir.toFile(), "page_with_text_00001.png").isFile());
+            assertTrue(new File(tempDir.toFile(), "page_no_text_00001.png").isFile());
+        } finally {
+            FileUtils.deleteQuietly(tempDir.toFile());
+        }
+    }
 
     public void testMistakenlyNotOcred() throws IOException {
         Path tempDir = Files.createTempDirectory("t");
