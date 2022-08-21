@@ -12,6 +12,7 @@ sudo apt-get install virtualenv python3-dev libreoffice maven tesseract-ocr tess
 # Prepare python virtual env
 virtualenv -p /usr/bin/python3 .venv
 source .venv/bin/activate
+pip install -U wheel
 pip install -U setuptools
 pip install -U -r requirements.txt
 
