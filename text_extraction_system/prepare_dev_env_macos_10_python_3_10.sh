@@ -28,6 +28,7 @@ sudo port install libreoffice
 virtualenv -p /usr/local/bin/python3.10 venv
 
 source venv/bin/activate
+pip install -U wheel
 pip install -U setuptools
 pip install -r requirements.txt
 pip install -e ../text_extraction_system_api/

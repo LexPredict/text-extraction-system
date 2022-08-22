@@ -60,13 +60,6 @@ cd ./docker/deploy
 sudo ./deploy-to-swarm-cluster.sh
 ``` 
 
-### Running Unit Tests
-```
-cd text_extraction_system
-source venv/bin/activate
-pytest --log-cli-level=INFO text_extraction_system
-```
-The unit tests do not (should not) require the .env/.test_env files.
 ### Starting Local Dev Server
 ```
 source venv/bin/activate
@@ -78,6 +71,20 @@ uvicorn text_extraction_system.web_api:app --reload
 celery -A text_extraction_system.tasks worker
 ```
 The same commands can be used to start web api and celery in PyCharm.
+
+### Updating Python packages
+`Pipdeptree` is used to check all dependencies and generate file with all requirements:
+```
+pipdeptree -f | sed 's/ //g' | sort -u > requirements.txt
+```
+
+### Running Unit Tests
+```
+cd text_extraction_system
+source venv/bin/activate
+pytest --log-cli-level=INFO text_extraction_system
+```
+The unit tests do not (should not) require the .env/.test_env files.
 
 ### Running Integration Tests
 The integration test require running WebAPI and Celery apps.
