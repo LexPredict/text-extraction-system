@@ -63,7 +63,18 @@ function startup () {
       done
       echo "Dependencies are ready. Starting up..."
   fi
-  ulimit -n 65535
+  echo "Check Launch Type ..."
+  if [[ -z "${DOLLAR}{LAUNCH_TYPE}" ]]; then
+      echo "Set ulimit to 65535"
+      ulimit -n 65535
+  elif [[ "${DOLLAR}{LAUNCH_TYPE}" == "ECS" ]]; then
+      echo "Starting on ECS Platform. Ulimit is set on task level"
+      CPU_QUARTER_CORES=${DOLLAR}{CELERY_CPU_CORES_NUMBER}
+      echo "Starting Celery on ${DOLLAR}{CPU_QUARTER_CORES} CPU Cores"
+  else
+      echo '$LAUNCH_TYPE should be ECS or undefined'
+      exit 1
+  fi
 }
 
 if [ "${DOLLAR}{ROLE}" == "unit_tests" ]; then
@@ -86,8 +97,6 @@ elif [ "${DOLLAR}{ROLE}" == "celery-worker" ]; then
       -X beat \
       -l INFO \
       --concurrency=${DOLLAR}{CPU_QUARTER_CORES} \
-      --autoscale=${DOLLAR}{CPU_QUARTER_CORES},${DOLLAR}{CPU_QUARTER_CORES} \
-      -Ofair \
       -n celery@%h \
       --statedb=/data/celery_worker_state/celery-worker-state-${DOLLAR}{HOSTNAME}.db
 elif [ "${DOLLAR}{ROLE}" == "celery-beat" ]; then
