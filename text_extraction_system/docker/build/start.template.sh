@@ -69,8 +69,6 @@ function startup () {
       ulimit -n 65535
   elif [[ "${DOLLAR}{LAUNCH_TYPE}" == "ECS" ]]; then
       echo "Starting on ECS Platform. Ulimit is set on task level"
-      CPU_QUARTER_CORES=${DOLLAR}{CELERY_CPU_CORES_NUMBER}
-      echo "Starting Celery on ${DOLLAR}{CPU_QUARTER_CORES} CPU Cores"
   else
       echo '$LAUNCH_TYPE should be ECS or undefined'
       exit 1
@@ -93,7 +91,11 @@ elif [ "${DOLLAR}{ROLE}" == "web-api" ]; then
   exec uvicorn --host 0.0.0.0 --port 8000 --root-path ${DOLLAR}{text_extraction_system_root_path} text_extraction_system.web_api:app
 elif [ "${DOLLAR}{ROLE}" == "celery-worker" ]; then
   startup
-   exec celery -A text_extraction_system.tasks worker \
+  if [[ "${DOLLAR}{LAUNCH_TYPE}" == "ECS" ]]; then
+      CPU_QUARTER_CORES=${DOLLAR}{CELERY_CPU_CORES_NUMBER}
+      echo "Starting Celery on ${DOLLAR}{CPU_QUARTER_CORES} CPU Cores"
+  fi
+  exec celery -A text_extraction_system.tasks worker \
       -X beat \
       -l INFO \
       --concurrency=${DOLLAR}{CPU_QUARTER_CORES} \
