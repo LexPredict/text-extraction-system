@@ -97,7 +97,7 @@ elif [ "${DOLLAR}{ROLE}" == "celery-worker" ]; then
   fi
   if [[ -z "${DOLLAR}{CELERY_WORKERS_NUMBER}" ]]; then
     echo "CELERY_WORKERS_NUMBER is unset, setting to 1"
-    CELERY_WORKERS_NUMBER=2
+    CELERY_WORKERS_NUMBER=3
   fi
   echo "Start ${DOLLAR}{CELERY_WORKERS_NUMBER} workers, concurrency=${DOLLAR}{CELERY_CPU_CORES_NUMBER}"
   for (( i=1; i<=${DOLLAR}((${DOLLAR}{CELERY_WORKERS_NUMBER} - 1)); i++ ))
