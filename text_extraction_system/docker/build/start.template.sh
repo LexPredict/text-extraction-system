@@ -91,26 +91,39 @@ elif [ "${DOLLAR}{ROLE}" == "web-api" ]; then
   exec uvicorn --host 0.0.0.0 --port 8000 --root-path ${DOLLAR}{text_extraction_system_root_path} text_extraction_system.web_api:app
 elif [ "${DOLLAR}{ROLE}" == "celery-worker" ]; then
   startup
-  if [[ "${DOLLAR}{LAUNCH_TYPE}" == "ECS" ]]; then
-      CPU_QUARTER_CORES=${DOLLAR}{CELERY_CPU_CORES_NUMBER}
-      echo "Starting Celery on ${DOLLAR}{CPU_QUARTER_CORES} CPU Cores"
+  if [[ -z "${DOLLAR}{CELERY_CPU_CORES_NUMBER}" ]]; then
+    echo "CELERY_CPU_CORES_NUMBER is unset, setting to 1"
+    CELERY_CPU_CORES_NUMBER=${DOLLAR}{CPU_QUARTER_CORES}
   fi
+  if [[ -z "${DOLLAR}{CELERY_WORKERS_NUMBER}" ]]; then
+    echo "CELERY_WORKERS_NUMBER is unset, setting to 1"
+    CELERY_WORKERS_NUMBER=1
+  fi
+  echo "Start ${DOLLAR}{CELERY_WORKERS_NUMBER} workers, concurrency=${DOLLAR}{CELERY_CPU_CORES_NUMBER}"
+  for (( i=1; i<=${DOLLAR}((${DOLLAR}{CELERY_WORKERS_NUMBER} - 1)); i++ ))
+  do
+    celery -A text_extraction_system.tasks worker \
+      -X beat \
+      -l INFO \
+      -c ${DOLLAR}{CELERY_CPU_CORES_NUMBER} \
+      -n celery-${DOLLAR}{i}@%h \
+      -S /data/celery_worker_state/celery-worker-state-${DOLLAR}{i}-${DOLLAR}{HOSTNAME}.db &
+  done
   exec celery -A text_extraction_system.tasks worker \
       -X beat \
       -l INFO \
-      --concurrency=${DOLLAR}{CPU_QUARTER_CORES} \
-      -n celery@%h \
-      --statedb=/data/celery_worker_state/celery-worker-state-${DOLLAR}{HOSTNAME}.db
+      -c ${DOLLAR}{CELERY_CPU_CORES_NUMBER} \
+      -n celery-${DOLLAR}{CELERY_WORKERS_NUMBER}@%h \
+      -S /data/celery_worker_state/celery-worker-state-${DOLLAR}{CELERY_WORKERS_NUMBER}-${DOLLAR}{HOSTNAME}.db
 elif [ "${DOLLAR}{ROLE}" == "celery-beat" ]; then
   startup
    exec celery -A text_extraction_system.tasks worker \
       -B \
       -Q beat \
       -l INFO \
-      --concurrency=1 \
-      -Ofair \
+      -c 1 \
       -n beat@%h \
-      --statedb=/data/celery_worker_state/celery-beat-state-${DOLLAR}{HOSTNAME}.db
+      -S /data/celery_worker_state/celery-beat-state-${DOLLAR}{HOSTNAME}.db
 elif [ "${DOLLAR}{ROLE}" == "generate-swarm-scripts" ]; then
   echo "Copying Docker Swarm deployment scripts to the mounted volume at: ${DOLLAR}{COPY_DST_DIR}..."
   if [[ ! -d /deploy_scripts_dst  ]]; then
