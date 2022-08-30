@@ -43,6 +43,8 @@ function print_usage () {
 
 CPU_CORES=${DOLLAR}(grep -c ^processor /proc/cpuinfo)
 CPU_QUARTER_CORES=${DOLLAR}(( ${DOLLAR}{CPU_CORES} > 4 ? ${DOLLAR}{CPU_CORES} / 4 : 1 ))
+DEFAULT_CELERY_CPU_CORES_NUMBER=${DOLLAR}{CPU_QUARTER_CORES}
+DEFAULT_CELERY_WORKERS_NUMBER=1
 SHARED_USER_NAME=$(whoami)
 
 ROLE=${DOLLAR}1
@@ -91,13 +93,21 @@ elif [ "${DOLLAR}{ROLE}" == "web-api" ]; then
   exec uvicorn --host 0.0.0.0 --port 8000 --root-path ${DOLLAR}{text_extraction_system_root_path} text_extraction_system.web_api:app
 elif [ "${DOLLAR}{ROLE}" == "celery-worker" ]; then
   startup
-  if [[ -z "${DOLLAR}{CELERY_CPU_CORES_NUMBER}" ]]; then
-    echo "CELERY_CPU_CORES_NUMBER is unset, setting to 1"
-    CELERY_CPU_CORES_NUMBER=${DOLLAR}{CPU_QUARTER_CORES}
-  fi
-  if [[ -z "${DOLLAR}{CELERY_WORKERS_NUMBER}" ]]; then
-    echo "CELERY_WORKERS_NUMBER is unset, setting to 1"
-    CELERY_WORKERS_NUMBER=1
+  if [[ "${DOLLAR}{LAUNCH_TYPE}" == "ECS" ]]; then
+    if [[ -z "${DOLLAR}{CELERY_CPU_CORES_NUMBER}" ]]; then
+      echo "CELERY_CPU_CORES_NUMBER is unset, setting to default = ${DOLLAR}{DEFAULT_CELERY_CPU_CORES_NUMBER}"
+      CELERY_CPU_CORES_NUMBER=${DOLLAR}{DEFAULT_CELERY_CPU_CORES_NUMBER}
+    fi
+    if [[ -z "${DOLLAR}{CELERY_WORKERS_NUMBER}" ]]; then
+      echo "CELERY_WORKERS_NUMBER is unset, setting to default = ${DOLLAR}{DEFAULT_CELERY_WORKERS_NUMBER}"
+      CELERY_WORKERS_NUMBER=${DOLLAR}{DEFAULT_CELERY_WORKERS_NUMBER}
+    fi
+  else
+    echo '$LAUNCH_TYPE is undefined'
+    echo "Set CELERY_CPU_CORES_NUMBER to default = ${DOLLAR}{DEFAULT_CELERY_CPU_CORES_NUMBER}"
+    CELERY_CPU_CORES_NUMBER=${DOLLAR}{DEFAULT_CELERY_CPU_CORES_NUMBER}
+    echo "Set CELERY_WORKERS_NUMBER to default = ${DOLLAR}{DEFAULT_CELERY_WORKERS_NUMBER}"
+    CELERY_WORKERS_NUMBER=${DOLLAR}{DEFAULT_CELERY_WORKERS_NUMBER}
   fi
   echo "Start ${DOLLAR}{CELERY_WORKERS_NUMBER} workers, concurrency=${DOLLAR}{CELERY_CPU_CORES_NUMBER}"
   for (( i=1; i<=${DOLLAR}((${DOLLAR}{CELERY_WORKERS_NUMBER} - 1)); i++ ))
