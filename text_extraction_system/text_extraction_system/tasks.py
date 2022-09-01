@@ -253,11 +253,14 @@ def process_pdf(pdf_fn: str,
         language, locale_code = lang_converter.get_language_and_locale_code(req.doc_language)
         ocr_language = lang_converter.convert_language_to_tesseract_view(language)
 
+        import time
         for pdf_page_fn in pdf_page_fns:
             i += 1
             pdf_page_base_fn = os.path.basename(pdf_page_fn)
+            start = time.time()
             webdav_client.upload_file(f'{req.request_id}/{pages_for_processing}/{pdf_page_base_fn}',
                                       pdf_page_fn)
+            log.info(f'{req.original_file_name} | Uploaded page {i}, took {time.time() - start} seconds')
             task_signatures.append(process_pdf_page_task.s(req.request_id,
                                                            req.original_file_name,
                                                            pdf_page_base_fn,
@@ -438,10 +441,12 @@ def extract_data_and_finish(req: RequestMetadata,
         if req.output_format == OutputFormat.json:
             req.pdf_coordinates_file = pdf_fn_in_storage_base + '.pdf_coordinates.json'
             jsn = json.dumps(text_structure.pdf_coordinates.to_dict(), indent=2)
+            webdav_client.session = requests.Session()
             webdav_client.upload_to(jsn.encode('utf-8'), f'{req.request_id}/{req.pdf_coordinates_file}')
 
             req.text_structure_file = pdf_fn_in_storage_base + '.document_structure.json'
             plain_text_structure = json.dumps(text_structure.text_structure.to_dict(), indent=2)
+            webdav_client.session = requests.Session()
             webdav_client.upload_to(plain_text_structure.encode('utf-8'),
                                     f'{req.request_id}/{req.text_structure_file}')
 
