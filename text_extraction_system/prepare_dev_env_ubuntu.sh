@@ -50,7 +50,6 @@ popd
 #  echo $OS_NAME
 #  echo $OS_VERSION
 #fi
-
 #if [[ "$PYTHON3_VERSION" == "Python 3.8"* ]]; then
 #  echo $PYTHON3_VERSION
 #fi
