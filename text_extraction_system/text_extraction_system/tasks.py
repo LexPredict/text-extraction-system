@@ -464,6 +464,21 @@ def extract_data_and_finish(req: RequestMetadata,
                                         f'{req.request_id}/{req.text_structure_file}')
                 gc.enable()
 
+        if req.output_format == OutputFormat.protobuf:
+            req.pdf_coordinates_file = pdf_fn_in_storage_base + '.pdf_coordinates.bin'
+            req.text_structure_file = pdf_fn_in_storage_base + '.document_structure.bin'
+
+            try:
+                # ToDo: update with protobuf pack
+                # packed_pdf_coords = msgpack.packb(text_structure.pdf_coordinates.__dict__)
+                # packed_text_struct = msgpack.packb(text_structure.text_structure.to_dict())
+                pass
+            finally:
+                webdav_client.upload_to(packed_pdf_coords,
+                                        f'{req.request_id}/{req.pdf_coordinates_file}')
+                webdav_client.upload_to(packed_text_struct,
+                                        f'{req.request_id}/{req.text_structure_file}')
+
         if req.char_coords_debug_enable or req.deskew_enable:
             req.page_rotate_angles = page_rotate_angles
             req.corrected_pdf = os.path.splitext(os.path.basename(req.pdf_file))[0] + '_corr.pdf'
@@ -487,6 +502,13 @@ def extract_data_and_finish(req: RequestMetadata,
             if req.output_format == OutputFormat.msgpack:
                 req.tables_file = pdf_fn_in_storage_base + '.tables.msgpack'
                 packed = msgpack.packb(tables.to_dict(), use_bin_type=True, use_single_float=True)
+                webdav_client.upload_to(packed, f'{req.request_id}/{req.tables_file}')
+
+            if req.output_format == OutputFormat.protobuf:
+                req.tables_file = pdf_fn_in_storage_base + '.tables.bin'
+                # ToDo: replace with protobuf pack
+                # packed = msgpack.packb(tables.to_dict(), use_bin_type=True, use_single_float=True)
+                packed = ""
                 webdav_client.upload_to(packed, f'{req.request_id}/{req.tables_file}')
 
     if settings.delete_temp_files_on_request_finish:
