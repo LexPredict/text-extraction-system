@@ -271,6 +271,24 @@ class TextExtractionSystemWebClient:
         self.raise_for_status(resp)
         return TaskCancelResult.from_json(resp.content)
 
+    def schedule_calculate_estimate(self,
+                                    request_id: str,
+                                    estimate_callback_url: Optional[str] = None):
+        resp = requests.post(f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/estimate/',
+                             auth=self.auth,
+                             data=dict(estimate_callback_url=estimate_callback_url))
+        if resp.status_code != 200:
+            self.raise_for_status(resp)
+    
+    def schedule_calculate_progress(self,
+                                    request_id: str,
+                                    progress_callback_url: Optional[str] = None):
+        resp = requests.post(f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/progress/',
+                             auth=self.auth,
+                             data=dict(progress_callback_url=progress_callback_url))
+        if resp.status_code != 200:
+            self.raise_for_status(resp)
+
     @classmethod
     def _unpack_msgpack_text_structure(cls, data: Optional[bytes]) -> Optional[PlainTextStructure]:
         if not data:

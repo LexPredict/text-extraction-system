@@ -28,6 +28,8 @@ class RequestCallbackInfo:
     call_back_celery_parent_task_id: Optional[str] = None
     call_back_additional_info: Optional[str] = None
     call_back_celery_version: int = 4
+    call_back_estimate_url: Optional[str] = None
+    call_back_progress_url: Optional[str] = None
     log_extra: Optional[Dict[str, str]] = None
 
 

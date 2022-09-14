@@ -33,7 +33,7 @@ from text_extraction_system.tasks import process_document, celery_app, register_
 from text_extraction_system_api import dto
 from text_extraction_system_api.dto import OutputFormat, TableList, PlainTextStructure, RequestStatus, \
     RequestStatuses, SystemInfo, TaskCancelResult, PDFCoordinates, STATUS_DONE, STATUS_FAILURE, UserRequestsSummary, \
-    STATUS_PENDING, UserRequestsQuery, TableParser
+    STATUS_PENDING, UserRequestsQuery, TableParser, RequestEstimate, RequestProgress
 
 app = FastAPI()
 
@@ -306,6 +306,26 @@ async def delete_request_files(request_id: str):
         get_webdav_client().clean(f'{request_id}/')
     except RemoteResourceNotFound:
         raise HTTPException(HTTP_404_NOT_FOUND, 'No such data extraction request')
+
+
+@app.post('/api/v1/data_extraction_tasks/{request_id}/estimate/', response_model=RequestEstimate,
+          tags=["Asynchronous Data Extraction"])
+async def post_request_estimate(request_id: str,
+                                estimate_callback_url: str = Form(default=None)):
+    req = load_request_metadata_or_raise(request_id)
+    req.request_callback_info.call_back_estimate_url = estimate_callback_url
+    save_request_metadata(req)
+    return Response(status_code=200)
+
+
+@app.post('/api/v1/data_extraction_tasks/{request_id}/progress/', response_model=RequestProgress,
+          tags=["Asynchronous Data Extraction"])
+async def post_request_progress(request_id: str,
+                                progress_callback_url: str = Form(default=None)):
+    req = load_request_metadata_or_raise(request_id)
+    req.request_callback_info.call_back_progress_url = progress_callback_url
+    save_request_metadata(req)
+    return Response(status_code=200)
 
 
 def pack_request_results(req: RequestMetadata) -> io.BytesIO:
