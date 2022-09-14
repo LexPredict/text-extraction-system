@@ -12,6 +12,7 @@ sudo apt-get install virtualenv python3-dev libreoffice maven tesseract-ocr tess
 # Prepare python virtual env
 virtualenv -p /usr/bin/python3 .venv
 source .venv/bin/activate
+pip install -U wheel
 pip install -U setuptools
 pip install -U -r requirements.txt
 
@@ -49,7 +50,6 @@ popd
 #  echo $OS_NAME
 #  echo $OS_VERSION
 #fi
-
 #if [[ "$PYTHON3_VERSION" == "Python 3.8"* ]]; then
 #  echo $PYTHON3_VERSION
 #fi
