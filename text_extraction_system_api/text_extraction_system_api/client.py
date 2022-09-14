@@ -56,6 +56,8 @@ class TextExtractionSystemWebClient:
         call_back_celery_root_task_id: Optional[str] = None,
         call_back_celery_parent_task_id: Optional[str] = None,
         call_back_additional_info: Optional[str] = None,
+        estimation_call_back_url: Optional[str] = None,
+        progress_call_back_url: Optional[str] = None,
         doc_language: Optional[str] = None,
         convert_to_pdf_timeout_sec: int = 1800,
         pdf_to_images_timeout_sec: int = 1800,
@@ -104,6 +106,8 @@ class TextExtractionSystemWebClient:
                 'call_back_celery_parent_task_id': call_back_celery_parent_task_id,
                 'call_back_additional_info': call_back_additional_info,
                 'call_back_celery_version': call_back_celery_version,
+                'estimation_call_back_url': estimation_call_back_url,
+                'progress_call_back_url': progress_call_back_url,
                 'convert_to_pdf_timeout_sec': convert_to_pdf_timeout_sec,
                 'pdf_to_images_timeout_sec': pdf_to_images_timeout_sec,
                 'doc_language': doc_language,
@@ -136,6 +140,8 @@ class TextExtractionSystemWebClient:
                                       call_back_celery_root_task_id: Optional[str] = None,
                                       call_back_celery_parent_task_id: Optional[str] = None,
                                       call_back_additional_info: Optional[str] = None,
+                                      estimation_call_back_url: Optional[str] = None,
+                                      progress_call_back_url: Optional[str] = None,
                                       doc_language: Optional[str] = None,
                                       convert_to_pdf_timeout_sec: int = 1800,
                                       pdf_to_images_timeout_sec: int = 1800,
@@ -166,6 +172,8 @@ class TextExtractionSystemWebClient:
                                        call_back_celery_parent_task_id=call_back_celery_parent_task_id,
                                        call_back_additional_info=call_back_additional_info,
                                        call_back_celery_version=call_back_celery_version,
+                                       estimation_call_back_url=estimation_call_back_url,
+                                       progress_call_back_url=progress_call_back_url,
                                        convert_to_pdf_timeout_sec=convert_to_pdf_timeout_sec,
                                        pdf_to_images_timeout_sec=pdf_to_images_timeout_sec,
                                        doc_language=doc_language,
@@ -270,24 +278,6 @@ class TextExtractionSystemWebClient:
         resp = requests.delete(url, auth=self.auth)
         self.raise_for_status(resp)
         return TaskCancelResult.from_json(resp.content)
-
-    def schedule_calculate_estimate(self,
-                                    request_id: str,
-                                    estimate_callback_url: Optional[str] = None):
-        resp = requests.post(f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/estimate/',
-                             auth=self.auth,
-                             data=dict(estimate_callback_url=estimate_callback_url))
-        if resp.status_code != 200:
-            self.raise_for_status(resp)
-    
-    def schedule_calculate_progress(self,
-                                    request_id: str,
-                                    progress_callback_url: Optional[str] = None):
-        resp = requests.post(f'{self.base_url}/api/v1/data_extraction_tasks/{request_id}/progress/',
-                             auth=self.auth,
-                             data=dict(progress_callback_url=progress_callback_url))
-        if resp.status_code != 200:
-            self.raise_for_status(resp)
 
     @classmethod
     def _unpack_msgpack_text_structure(cls, data: Optional[bytes]) -> Optional[PlainTextStructure]:

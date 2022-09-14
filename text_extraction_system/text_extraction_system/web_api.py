@@ -75,6 +75,8 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                                     call_back_celery_parent_task_id: str = Form(default=None),
                                     call_back_celery_root_task_id: str = Form(default=None),
                                     call_back_celery_version: int = Form(default=4),
+                                    estimation_call_back_url: str = Form(default=None),
+                                    progress_call_back_url: str = Form(default=None),
                                     doc_language: str = Form(default=''),
                                     ocr_enable: bool = Form(default=True),
                                     table_extraction_enable: bool = Form(default=True),
@@ -122,6 +124,8 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                               call_back_celery_parent_task_id=call_back_celery_parent_task_id,
                               call_back_celery_root_task_id=call_back_celery_root_task_id,
                               call_back_celery_version=call_back_celery_version,
+                              call_back_estimate_url=estimation_call_back_url,
+                              call_back_progress_url=progress_call_back_url,
                               log_extra=log_extra))
     webdav_client.mkdir(f'/{req.request_id}')
 
@@ -306,26 +310,6 @@ async def delete_request_files(request_id: str):
         get_webdav_client().clean(f'{request_id}/')
     except RemoteResourceNotFound:
         raise HTTPException(HTTP_404_NOT_FOUND, 'No such data extraction request')
-
-
-@app.post('/api/v1/data_extraction_tasks/{request_id}/estimate/', response_model=RequestEstimate,
-          tags=["Asynchronous Data Extraction"])
-async def post_request_estimate(request_id: str,
-                                estimate_callback_url: str = Form(default=None)):
-    req = load_request_metadata_or_raise(request_id)
-    req.request_callback_info.call_back_estimate_url = estimate_callback_url
-    save_request_metadata(req)
-    return Response(status_code=200)
-
-
-@app.post('/api/v1/data_extraction_tasks/{request_id}/progress/', response_model=RequestProgress,
-          tags=["Asynchronous Data Extraction"])
-async def post_request_progress(request_id: str,
-                                progress_callback_url: str = Form(default=None)):
-    req = load_request_metadata_or_raise(request_id)
-    req.request_callback_info.call_back_progress_url = progress_callback_url
-    save_request_metadata(req)
-    return Response(status_code=200)
 
 
 def pack_request_results(req: RequestMetadata) -> io.BytesIO:
