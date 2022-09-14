@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 import unittest
 
 import pikepdf
@@ -240,3 +241,50 @@ class TestBasicAPICallbackMethods(unittest.TestCase):
         self.srv.wait_for_test_results(timeout_sec=120,
                                        assert_func=assert_func,
                                        assert_func_args=[request_id])
+
+    # def test_basic_api_get_estimate(self):
+    #     fn = os.path.join(os.path.dirname(__file__), 'data', 'many_pages.odt')
+    #
+    #     def assert_func(rs_id: str):
+    #         rs: RequestStatus = self.client.get_data_extraction_task_status(rs_id)
+    #         assert rs.status == 'DONE'
+    #         assert os.path.basename(fn) == rs.original_file_name
+    #         assert rs.converted_cleaned_pdf
+    #         assert rs.tables_extracted is False
+    #         assert rs.plain_text_extracted
+    #         assert rs.text_structure_extracted
+    #         assert rs.additional_info == 'hello world'
+    #
+    #         text = self.client.get_plain_text(rs.request_id)
+    #         for i in range(1, 22):
+    #             assert f'This is page {i}' in text
+    #
+    #         with self.client.get_pdf_as_local_file(rs.request_id) as tfn:
+    #             with pikepdf.open(tfn) as pdf:
+    #                 assert len(pdf.pages) == 22
+    #
+    #         text_struct: PlainTextStructure = self.client.get_extracted_text_structure_as_msgpack(
+    #             rs.request_id)
+    #         assert text_struct.language == 'en'
+    #         assert len(text_struct.pages) == 22
+    #         assert len(text_struct.paragraphs) == 1
+    #         assert len(text_struct.sentences) > 2
+    #
+    #         log.info('Text extraction results look good. All assertions passed.')
+    #
+    #     request_id = self.client.schedule_data_extraction_task(
+    #         fn,
+    #         call_back_url=self.call_back_url,
+    #         call_back_additional_info='hello world',
+    #         doc_language='en',
+    #         log_extra={'hello': 'world', 'test': True},
+    #         output_format=OutputFormat.msgpack)
+    #     self.client.schedule_calculate_estimate(
+    #         request_id=request_id,
+    #         estimate_callback_url=self.call_back_url)
+    #     self.srv.wait_for_test_results(timeout_sec=120,
+    #                                    assert_func=assert_func,
+    #                                    assert_func_args=[request_id])
+    #
+    #     # the following additionally tests if we are able to delete directories
+    #     self.client.delete_data_extraction_task_files(request_id)

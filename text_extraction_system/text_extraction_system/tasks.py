@@ -4,6 +4,7 @@ import logging
 import os
 import shutil
 import tempfile
+import time
 from contextlib import contextmanager
 from typing import List, Dict, Optional, Any
 
@@ -28,13 +29,12 @@ from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
 from text_extraction_system.pdf.pdf import merge_pdf_pages, split_pdf_to_page_blocks
 from text_extraction_system.remove_ocr_layer import remove_ocr_layer
 from text_extraction_system.request_metadata import RequestCallbackInfo, RequestMetadata, \
-    save_request_metadata, \
-    load_request_metadata
+    save_request_metadata, load_request_metadata
 from text_extraction_system.result_delivery.celery_client import send_task
 from text_extraction_system.task_health.task_health import store_pending_task_info_in_webdav, \
     remove_pending_task_info_from_webdav, re_schedule_unknown_pending_tasks, init_task_tracking
 from text_extraction_system.utils import LanguageConverter
-from text_extraction_system_api.dto import OutputFormat
+from text_extraction_system_api.dto import OutputFormat, RequestEstimate, RequestProgress
 from text_extraction_system_api.dto import RequestStatus, STATUS_FAILURE, STATUS_PENDING, STATUS_DONE
 
 log = logging.getLogger(__name__)
@@ -253,6 +253,8 @@ def process_pdf(pdf_fn: str,
         language, locale_code = lang_converter.get_language_and_locale_code(req.doc_language)
         ocr_language = lang_converter.convert_language_to_tesseract_view(language)
 
+        pages_amount = len(pdf_page_fns)
+
         for pdf_page_fn in pdf_page_fns:
             i += 1
             pdf_page_base_fn = os.path.basename(pdf_page_fn)
@@ -264,7 +266,8 @@ def process_pdf(pdf_fn: str,
                                                            i,
                                                            ocr_language,
                                                            req.request_callback_info.log_extra,
-                                                           req.detect_orientation_tesseract))
+                                                           req.detect_orientation_tesseract,
+                                                           pages_amount))
 
         log.info(f'{req.original_file_name} | Scheduling {len(task_signatures)} sub-tasks...')
         request_callback_info_dict = req.request_callback_info.to_dict()
@@ -290,7 +293,9 @@ def process_pdf_page_task(_task,
                           page_number: int,
                           ocr_language: str,
                           log_extra: Dict[str, str] = None,
-                          detect_orientation_tesseract=False):
+                          detect_orientation_tesseract=False,
+                          pages_amount: int = 0):
+    start_processing_time = time.time()
     set_log_extra(log_extra)
     webdav_client = get_webdav_client()
     req = load_request_metadata(request_id)
@@ -329,7 +334,16 @@ def process_pdf_page_task(_task,
     except Exception as e:
         raise Exception(f'{original_file_name} |  Exception caught while processing '
                         f'PDF page {page_number}: {pdf_page_base_fn}') from e
+    if page_number == 1:
+        # Time to process all pages + time to preprocess document + predicted time to postprocess document
+        estimate_time = int((time.time() - start_processing_time) * pages_amount
+                            + (start_processing_time - req.request_date.timestamp()) * 2)
+        deliver_estimate(req.request_callback_info, RequestEstimate(pages=pages_amount,
+                                                                    estimate=estimate_time))
 
+    deliver_progress(req.request_callback_info, RequestProgress(pages=pages_amount,
+                                                                current_page=page_number,
+                                                                progress=int(100 * page_number / pages_amount)))
     return page_number
 
 
@@ -547,6 +561,26 @@ def deliver_results(req: RequestCallbackInfo, req_status: RequestStatus):
                               'coords extracted' if req_status.pdf_coordinates_extracted else '',
                               'pages OCRed' if req_status.pdf_pages_ocred else ''])
     log.info(f'{req.original_file_name} | Finished processing request (#{req.request_id}). {status_extra}')
+
+
+def deliver_estimate(req: RequestCallbackInfo, req_estimate: RequestEstimate):
+    if req.call_back_estimate_url:
+        try:
+            log.info(f'{req.original_file_name} | POSTing the estimate results to {req.call_back_estimate_url}...')
+            requests.post(req.call_back_estimate_url, json=req_estimate.to_dict())
+        except Exception as err:
+            log.error(f'{req.original_file_name} | Unable to POST the estimate results to {req.call_back_estimate_url}',
+                      exc_info=err)
+
+
+def deliver_progress(req: RequestCallbackInfo, req_progress: RequestProgress):
+    if req.call_back_progress_url:
+        try:
+            log.info(f'{req.original_file_name} | POSTing the progress results to {req.call_back_progress_url}...')
+            requests.post(req.call_back_progress_url, json=req_progress.to_dict())
+        except Exception as err:
+            log.error(f'{req.original_file_name} | Unable to POST the progress results to {req.call_back_progress_url}',
+                      exc_info=err)
 
 
 @celery_app.task(acks_late=True, bind=True, queue=queue_celery_beat)
