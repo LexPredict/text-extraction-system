@@ -6,6 +6,8 @@ from contextlib import contextmanager
 from subprocess import CompletedProcess
 from typing import Generator
 
+from PIL import Image
+
 from text_extraction_system.config import get_settings
 from text_extraction_system.locking.socket_lock import get_lock
 from text_extraction_system.pdf.errors import InputFileDoesNotExist, \
@@ -70,6 +72,7 @@ def convert_to_pdf(src_fn: str,
         raise InputFileDoesNotExist(src_fn)
 
     temp_dir = tempfile.mkdtemp()
+    source_fn = src_fn
     src_fn, src_fn_base, src_ext = separate_filename_basename_and_extension(src_fn, temp_dir)
     out_fn = os.path.join(temp_dir, src_fn_base + '.pdf')
 
@@ -79,6 +82,10 @@ def convert_to_pdf(src_fn: str,
 
     try:
         if src_ext.lower() in {'.tiff', '.jpg', '.jpeg', '.png'}:
+            if src_ext.lower() == '.png':
+                im = Image.open(source_fn)
+                rgb_im = im.convert('RGB')
+                rgb_im.save(source_fn)
             completed_process = convert_image_to_pdf(src_fn, out_fn, timeout_sec)
         else:
             completed_process = soffice_convert_to_pdf(src_fn, temp_dir,
