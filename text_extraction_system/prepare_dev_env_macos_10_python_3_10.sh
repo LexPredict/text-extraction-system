@@ -12,31 +12,33 @@ mkdir installers
 # Install python and venv
 brew install wget
 brew install python@3.10
-pip install virtualenv
+pip3 install virtualenv
 # For python-magic
 brew install libmagic
 
+brew install qpdf
+brew install tesseract
+
 # Install Java stuff
-brew install openjdk@8
-sudo ln -sfn /usr/local/opt/openjdk@8/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-8.jdk
+brew install openjdk
 brew install maven
+
+# Required for successful python packages compilation
+xcode-select --install
 
 # Install Libre Office tools
 sudo port install libreoffice
 
 # ensure this is the expected Python executable
-virtualenv -p /usr/local/bin/python3.10 venv
+python3.10 -m venv .venv
 
-source venv/bin/activate
-pip install -U wheel
-pip install -U setuptools
-pip install -r requirements.txt
-pip install -e ../text_extraction_system_api/
-pip install --no-deps -e ../../lexpredict-contraxsuite-core/
+source .venv/bin/activate
+pip3 install -U wheel setuptools pip pipenv
+pipenv install --deploy --dev
+pip3 install --no-deps -e ../../lexpredict-contraxsuite-core/
 
 # NLTK should be installed within lexpredict-contraxsuite-core. The following downloads its models
-bash /Applications/Python\ 3.10/Install\ Certificates.command
-python3 -m nltk.downloader averaged_perceptron_tagger punkt stopwords words maxent_ne_chunker wordnet
+python3.10 -m nltk.downloader averaged_perceptron_tagger punkt stopwords words maxent_ne_chunker wordnet
 
 # Downloading model for language detection
 mkdir models

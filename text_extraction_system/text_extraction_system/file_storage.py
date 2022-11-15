@@ -79,6 +79,13 @@ class WebDavClient(Client):
             for block in response.iter_content(1024):
                 local_file.write(block)
 
+    def upload(self, remote_path, local_path, progress=None, progress_args=()):
+        if os.path.isdir(local_path):
+            self.upload_directory(local_path=local_path, remote_path=remote_path, progress=progress,
+                                  progress_args=progress_args)
+        else:
+            self.upload_file(local_path=local_path, remote_path=remote_path)
+
     @wrap_connection_error
     def download_files(self, remote_paths: List[str], dst_dir: str) -> io.BytesIO:
         # copy-pasted from the webdav lib with the non-needed additional http queries returned

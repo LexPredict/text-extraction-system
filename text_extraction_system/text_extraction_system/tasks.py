@@ -54,8 +54,7 @@ class CeleryConfig:
     def worker_autoscaler(self) -> Optional[str]:
         if settings.celery_shutdown_when_no_tasks_longer_than_sec:
             return 'text_extraction_system.celery_autoscaler:ShutdownWhenNoTasksAutoscaler'
-        else:
-            return 'celery.worker.autoscale:Autoscaler'
+        return 'celery.worker.autoscale:Autoscaler'
 
 
 celery_app = Celery(
@@ -76,8 +75,8 @@ def setup_recursion_limit(*args, **kwargs):
     # in pdfminer.six which would require much more development and testing work.
     import os
     from text_extraction_system.commons.sysutils import increase_recursion_limit
-    increase_recursion_limit()
-    log.info(f'Recursion limit increased for a Celery worker process {os.getpid()}')
+    if increase_recursion_limit():
+        log.info(f'Recursion limit increased for a Celery worker process {os.getpid()}')
 
 
 @after_setup_logger.connect
@@ -88,10 +87,8 @@ def setup_loggers(*args, **kwargs):
     logger.handlers.clear()
 
     if conf.log_to_stdout:
-        if conf.log_to_stdout_json:
-            formatter = JSONFormatter()
-        else:
-            formatter = logging.Formatter('%(levelname)s %(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        formatter = JSONFormatter() if conf.log_to_stdout_json \
+            else logging.Formatter('%(levelname)s %(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
         sh = logging.StreamHandler()
         sh.setFormatter(formatter)
         logger.addHandler(sh)
@@ -482,7 +479,8 @@ def extract_data_and_finish(req: RequestMetadata,
             req.page_rotate_angles = page_rotate_angles
             req.corrected_pdf = os.path.splitext(os.path.basename(req.pdf_file))[0] + '_corr.pdf'
             req.pdf_file = req.corrected_pdf
-            webdav_client.upload(f'{req.request_id}/{req.corrected_pdf}', orig_or_corrected_pdf_fn)
+            webdav_client.upload(f'{req.request_id}/{req.corrected_pdf}', orig_or_corrected_pdf_fn,
+                                 lambda x: None, tuple())
 
         if req.table_extraction_enable:
             log.info(f'Extracting tables from {req.pdf_file}...')
