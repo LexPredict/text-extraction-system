@@ -1,0 +1,15 @@
+syntax = "proto2";
+
+message Page {
+  required int32 number = 1 [default = 0];
+  required int32 start = 2 [default = 0];
+  required int32 end = 3 [default = 0];
+  optional float rotation = 4 [default = 0];
+  repeated float bbox = 5 [packed=true];
+}
+
+message Pages {
+  required string title = 1;
+  required string language = 2;
+  repeated Page pages = 3;
+}
