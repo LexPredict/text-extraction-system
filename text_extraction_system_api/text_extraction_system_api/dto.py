@@ -225,3 +225,20 @@ class SystemInfo:
     build_date: str
     python_version: str
     pandas_version: str
+
+
+@pydantic_dataclass
+@dataclass_json
+@dataclass
+class RequestEstimate:
+    pages: int
+    estimate: int
+
+
+@pydantic_dataclass
+@dataclass_json
+@dataclass
+class RequestProgress:
+    pages: int
+    current_page: int
+    progress: int

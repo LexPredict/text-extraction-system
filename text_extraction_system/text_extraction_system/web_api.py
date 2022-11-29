@@ -33,7 +33,7 @@ from text_extraction_system.tasks import process_document, celery_app, register_
 from text_extraction_system_api import dto
 from text_extraction_system_api.dto import OutputFormat, TableList, PlainTextStructure, RequestStatus, \
     RequestStatuses, SystemInfo, TaskCancelResult, PDFCoordinates, STATUS_DONE, STATUS_FAILURE, UserRequestsSummary, \
-    STATUS_PENDING, UserRequestsQuery, TableParser
+    STATUS_PENDING, UserRequestsQuery, TableParser, RequestEstimate, RequestProgress
 
 app = FastAPI()
 
@@ -75,6 +75,8 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                                     call_back_celery_parent_task_id: str = Form(default=None),
                                     call_back_celery_root_task_id: str = Form(default=None),
                                     call_back_celery_version: int = Form(default=4),
+                                    estimation_call_back_url: str = Form(default=None),
+                                    progress_call_back_url: str = Form(default=None),
                                     doc_language: str = Form(default=''),
                                     ocr_enable: bool = Form(default=True),
                                     table_extraction_enable: bool = Form(default=True),
@@ -122,6 +124,8 @@ async def post_data_extraction_task(file: UploadFile = File(...),
                               call_back_celery_parent_task_id=call_back_celery_parent_task_id,
                               call_back_celery_root_task_id=call_back_celery_root_task_id,
                               call_back_celery_version=call_back_celery_version,
+                              call_back_estimate_url=estimation_call_back_url,
+                              call_back_progress_url=progress_call_back_url,
                               log_extra=log_extra))
     webdav_client.mkdir(f'/{req.request_id}')
 
