@@ -80,7 +80,7 @@ pipdeptree -f | sed 's/ //g' | sort -u > requirements.txt
 
 ### Compiling .proto files
 ```shell
-python -m grpc_tools.protoc -I text_extraction_system/proto_files --python_out=text_extraction_system/python_pb2_files text_extraction_system/proto_files/*.proto
+python -m grpc_tools.protoc -I ../text_extraction_system_api/text_extraction_system_api/proto_files --python_out=../text_extraction_system_api/text_extraction_system_api/python_pb2_files ../text_extraction_system_api/text_extraction_system_api/proto_files/*.proto
 ```
 
 ### Running Unit Tests

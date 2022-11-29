@@ -96,7 +96,7 @@ def test_angle5():
     fn = os.path.join(data_dir, 'two_vertical_lines.png')
     angle = determine_rotation(fn).angle
     # actually should be 0 but this image will not be rotated because it does not pass OSD check
-    assert int(angle) == -89
+    assert -95 <= int(angle) <= -85
 
 
 @with_default_settings
