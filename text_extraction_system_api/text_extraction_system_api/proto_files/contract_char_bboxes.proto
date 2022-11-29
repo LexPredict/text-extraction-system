@@ -1,0 +1,10 @@
+syntax = "proto2";
+
+message Coordinates {
+  repeated float coords = 1 [packed=true];
+}
+
+message CharBboxes {
+  repeated Coordinates char_bboxes = 1;
+  optional bool __initialised__ = 2;
+}

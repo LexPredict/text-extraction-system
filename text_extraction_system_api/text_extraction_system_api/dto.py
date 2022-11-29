@@ -16,6 +16,7 @@ STATUS_FAILURE = 'FAILURE'
 class OutputFormat(str, Enum):
     msgpack = 'msgpack'
     json = 'json'
+    protobuf = 'protobuf'
     
     
 class TableParser(str, Enum):

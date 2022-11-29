@@ -78,6 +78,11 @@ The same commands can be used to start web api and celery in PyCharm.
 pipdeptree -f | sed 's/ //g' | sort -u > requirements.txt
 ```
 
+### Compiling .proto files
+```shell
+python -m grpc_tools.protoc -I ../text_extraction_system_api/text_extraction_system_api/proto_files --python_out=../text_extraction_system_api/text_extraction_system_api/python_pb2_files ../text_extraction_system_api/text_extraction_system_api/proto_files/*.proto
+```
+
 ### Running Unit Tests
 ```
 cd text_extraction_system
