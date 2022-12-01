@@ -455,18 +455,13 @@ def extract_data_and_finish(req: RequestMetadata,
 
         if req.output_format == OutputFormat.json:
             req.pdf_coordinates_file = pdf_fn_in_storage_base + '.pdf_coordinates.json'
-            jsn = json.dumps(text_structure.pdf_coordinates.to_dict(), indent=2)
-            content = jsn.encode('utf-8')
-            log.info(f'Start pdf-coord-json uploading to {req.request_id}/{req.pdf_coordinates_file}, '
-                     f'size={len(content)}')
-            webdav_client.upload_to(content, f'{req.request_id}/{req.pdf_coordinates_file}')
-
             req.text_structure_file = pdf_fn_in_storage_base + '.document_structure.json'
-            plain_text_structure = json.dumps(text_structure.text_structure.to_dict(), indent=2)
-            content = plain_text_structure.encode('utf-8')
-            log.info(f'Start doc-struc-json uploading to {req.request_id}/{req.text_structure_file}, '
-                     f'size={len(content)}')
-            webdav_client.upload_to(content, f'{req.request_id}/{req.text_structure_file}')
+
+            json_pdf_coords = json.dumps(text_structure.pdf_coordinates.to_dict(), indent=2)
+            json_text_struct = json.dumps(text_structure.text_structure.to_dict(), indent=2)
+
+            webdav_client.upload_to(json_pdf_coords.encode('utf-8'), f'{req.request_id}/{req.pdf_coordinates_file}')
+            webdav_client.upload_to(json_text_struct.encode('utf-8'), f'{req.request_id}/{req.text_structure_file}')
 
         if req.output_format == OutputFormat.msgpack:
             req.pdf_coordinates_file = pdf_fn_in_storage_base + '.pdf_coordinates.msgpack'
