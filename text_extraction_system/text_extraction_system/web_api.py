@@ -246,6 +246,17 @@ async def get_extracted_tables_as_msgpack(request_id: str):
     return _proxy_request(get_webdav_client(), request_id, load_request_metadata_or_raise(request_id).tables_file)
 
 
+@app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_tables.bin',
+         responses={
+             200: {
+                 'description': 'TableList object in protobuf format.',
+                 'content': {'application/octet-stream': {}},
+             }
+         }, tags=["Asynchronous Data Extraction"])
+async def get_extracted_tables_as_protobuf(request_id: str):
+    return _proxy_request(get_webdav_client(), request_id, load_request_metadata_or_raise(request_id).tables_file)
+
+
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/extracted_plain_text.txt', response_model=AnyStr,
          tags=["Asynchronous Data Extraction"])
 async def get_extracted_plain_text(request_id: str):
@@ -276,6 +287,19 @@ async def get_extracted_text_structure_as_msgpack(request_id: str):
                           load_request_metadata_or_raise(request_id).text_structure_file)
 
 
+@app.get('/api/v1/data_extraction_tasks/{request_id}/results/document_structure.bin',
+         responses={
+             200: {
+                 'description': 'PlainTextStructure object in protobuf format.',
+                 'content': {'application/octet-stream': {}},
+             }
+         }, tags=["Asynchronous Data Extraction"])
+async def get_extracted_text_structure_as_protobuf(request_id: str):
+    return _proxy_request(get_webdav_client(),
+                          request_id,
+                          load_request_metadata_or_raise(request_id).text_structure_file)
+
+
 @app.get('/api/v1/data_extraction_tasks/{request_id}/results/pdf_coordinates.json',
          response_model=PDFCoordinates, tags=["Asynchronous Data Extraction"])
 async def get_pdf_coordinates_of_each_character_in_extracted_plain_text_as_json(request_id: str):
@@ -292,6 +316,19 @@ async def get_pdf_coordinates_of_each_character_in_extracted_plain_text_as_json(
              }
          }, tags=["Asynchronous Data Extraction"])
 async def get_pdf_coordinates_of_each_character_in_extracted_plain_text_as_msgpack(request_id: str):
+    return _proxy_request(get_webdav_client(),
+                          request_id,
+                          load_request_metadata_or_raise(request_id).pdf_coordinates_file)
+
+
+@app.get('/api/v1/data_extraction_tasks/{request_id}/results/pdf_coordinates.bin',
+         responses={
+             200: {
+                 'description': 'PDFCoordinates object in protobuf format.',
+                 'content': {'application/octet-stream': {}},
+             }
+         }, tags=["Asynchronous Data Extraction"])
+async def get_pdf_coordinates_of_each_character_in_extracted_plain_text_as_protobuf(request_id: str):
     return _proxy_request(get_webdav_client(),
                           request_id,
                           load_request_metadata_or_raise(request_id).pdf_coordinates_file)

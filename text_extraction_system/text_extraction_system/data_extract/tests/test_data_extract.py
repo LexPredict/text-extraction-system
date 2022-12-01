@@ -1,9 +1,13 @@
+import gc
+import json
 import pathlib
 import tempfile
 
 import cv2
 import datetime
 from typing import List
+
+import msgpack
 from PIL import Image
 
 from text_extraction_system_api.dto import PlainTableOfContentsRecord, PlainTextPage
@@ -160,3 +164,95 @@ def test_normalize_angle_90():
     assert normalize_angle_90(88) == -2
     assert normalize_angle_90(-88) == 2
     assert normalize_angle_90(-92) == -2
+
+
+@with_default_settings
+def test_proto_memory_comparison():
+    fn = data_dir_path / 'finstat90_rotation_set.pdf'
+
+    with process_pdf_page(str(fn)) as res:  # type: PDFPageProcessingResults
+        num_file_rotate = (1, res.ocred_page_fn, None)
+        with merge_pdf_pages(str(fn), single_page_merge_num_file_rotate=num_file_rotate) \
+                as merged_pdf_fn:
+            with data_extract.extract_text_and_structure(merged_pdf_fn, language="en_US") \
+                    as (text, full_struct, _a, _b):
+
+                json_pdf_coords = json.dumps(full_struct.pdf_coordinates.to_dict(), indent=2)
+                json_text_structure = json.dumps(full_struct.text_structure.to_dict(), indent=2)
+
+                try:
+                    gc.disable()
+                    msgpack_pdf_coords = msgpack.packb(full_struct.pdf_coordinates.__dict__,
+                                                       use_bin_type=True,
+                                                       use_single_float=True)
+                    msgpack_text_struct = msgpack.packb(full_struct.text_structure.to_dict(),
+                                                        use_bin_type=True,
+                                                        use_single_float=True)
+                finally:
+                    gc.enable()
+
+                from google.protobuf.json_format import Parse
+
+                import text_extraction_system_api.python_pb2_files.contract_char_bboxes_pb2 as char_bboxes_pb2
+                import text_extraction_system_api.python_pb2_files.contract_pages_pb2 as pages_pb2
+
+                pdf_coords = full_struct.pdf_coordinates.to_dict()
+                pdf_coords["char_bboxes"] = [{'coords': item} for item in pdf_coords["char_bboxes"]]
+                proto_pdf_coords = Parse(json.dumps(pdf_coords), char_bboxes_pb2.CharBboxes()).SerializeToString()
+                proto_text_struct = Parse(json.dumps(full_struct.text_structure.to_dict()),
+                                          pages_pb2.Pages()).SerializeToString()
+
+                assert len(str(json_pdf_coords)) > len(str(msgpack_pdf_coords)) > len(str(proto_pdf_coords))
+                assert len(str(json_text_structure)) > len(str(msgpack_text_struct)) > len(str(proto_text_struct))
+
+                # Simple structures do not big memory boost for protobuf
+                assert len(str(msgpack_pdf_coords)) / len(str(proto_pdf_coords)) < 1.5
+
+                # Large structures do better memory boost for protobuf
+                assert len(str(msgpack_text_struct)) / len(str(proto_text_struct)) > 1.5
+
+
+@with_default_settings
+def test_proto_speed_comparison():
+    fn = data_dir_path / 'finstat90_rotation_set.pdf'
+    iterate_amount = 1000
+
+    with process_pdf_page(str(fn)) as res:  # type: PDFPageProcessingResults
+        num_file_rotate = (1, res.ocred_page_fn, None)
+        with merge_pdf_pages(str(fn), single_page_merge_num_file_rotate=num_file_rotate) \
+                as merged_pdf_fn:
+            with data_extract.extract_text_and_structure(merged_pdf_fn, language="en_US") \
+                    as (text, full_struct, _a, _b):
+                t1 = datetime.datetime.now()
+                for _ in range(iterate_amount):
+                    json.dumps(full_struct.pdf_coordinates.to_dict(), indent=2)
+                    json.dumps(full_struct.text_structure.to_dict(), indent=2)
+                json_execute_time = datetime.datetime.now() - t1
+
+                try:
+                    gc.disable()
+                    t1 = datetime.datetime.now()
+                    for _ in range(iterate_amount):
+                        msgpack.packb(full_struct.pdf_coordinates.__dict__, use_bin_type=True, use_single_float=True)
+                        msgpack.packb(full_struct.text_structure.to_dict(), use_bin_type=True, use_single_float=True)
+                    msgpack_execute_time = datetime.datetime.now() - t1
+                finally:
+                    gc.enable()
+
+                from google.protobuf.json_format import Parse
+
+                import text_extraction_system_api.python_pb2_files.contract_char_bboxes_pb2 as char_bboxes_pb2
+                import text_extraction_system_api.python_pb2_files.contract_pages_pb2 as pages_pb2
+
+                t1 = datetime.datetime.now()
+                pdf_coords = full_struct.pdf_coordinates.to_dict()
+                pdf_coords["char_bboxes"] = [{'coords': item} for item in pdf_coords["char_bboxes"]]
+                for _ in range(iterate_amount):
+                    Parse(json.dumps(pdf_coords), char_bboxes_pb2.CharBboxes()).SerializeToString()
+                    Parse(json.dumps(full_struct.text_structure.to_dict()), pages_pb2.Pages()).SerializeToString()
+                proto_execute_time = datetime.datetime.now() - t1
+
+                assert json_execute_time.total_seconds() > proto_execute_time.total_seconds() \
+                       > msgpack_execute_time.total_seconds()
+                # Protobuf is more than 2 times slower
+                assert proto_execute_time.total_seconds() / msgpack_execute_time.total_seconds() > 2

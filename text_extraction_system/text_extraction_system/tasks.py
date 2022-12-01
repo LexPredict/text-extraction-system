@@ -455,16 +455,13 @@ def extract_data_and_finish(req: RequestMetadata,
 
         if req.output_format == OutputFormat.json:
             req.pdf_coordinates_file = pdf_fn_in_storage_base + '.pdf_coordinates.json'
-            jsn = json.dumps(text_structure.pdf_coordinates.to_dict(), indent=2)
-            content = jsn.encode('utf-8')
-            log.info(f'Start pdf-coord-json uploading to {req.request_id}/{req.pdf_coordinates_file}, size={len(content)}')
-            webdav_client.upload_to(content, f'{req.request_id}/{req.pdf_coordinates_file}')
-
             req.text_structure_file = pdf_fn_in_storage_base + '.document_structure.json'
-            plain_text_structure = json.dumps(text_structure.text_structure.to_dict(), indent=2)
-            content = plain_text_structure.encode('utf-8')
-            log.info(f'Start doc-struc-json uploading to {req.request_id}/{req.text_structure_file}, size={len(content)}')
-            webdav_client.upload_to(content, f'{req.request_id}/{req.text_structure_file}')
+
+            json_pdf_coords = json.dumps(text_structure.pdf_coordinates.to_dict(), indent=2)
+            json_text_struct = json.dumps(text_structure.text_structure.to_dict(), indent=2)
+
+            webdav_client.upload_to(json_pdf_coords.encode('utf-8'), f'{req.request_id}/{req.pdf_coordinates_file}')
+            webdav_client.upload_to(json_text_struct.encode('utf-8'), f'{req.request_id}/{req.text_structure_file}')
 
         if req.output_format == OutputFormat.msgpack:
             req.pdf_coordinates_file = pdf_fn_in_storage_base + '.pdf_coordinates.msgpack'
@@ -472,18 +469,35 @@ def extract_data_and_finish(req: RequestMetadata,
 
             try:
                 gc.disable()
-                packed_pdf_coords = msgpack.packb(text_structure.pdf_coordinates.__dict__,
+                packed_pdf_coords = msgpack.packb(text_structure.pdf_coordinates.to_dict(),
                                                   use_bin_type=True,
                                                   use_single_float=True)
                 packed_text_struct = msgpack.packb(text_structure.text_structure.to_dict(),
                                                    use_bin_type=True,
                                                    use_single_float=True)
             finally:
-                webdav_client.upload_to(packed_pdf_coords,
-                                        f'{req.request_id}/{req.pdf_coordinates_file}')
-                webdav_client.upload_to(packed_text_struct,
-                                        f'{req.request_id}/{req.text_structure_file}')
+                webdav_client.upload_to(packed_pdf_coords, f'{req.request_id}/{req.pdf_coordinates_file}')
+                webdav_client.upload_to(packed_text_struct, f'{req.request_id}/{req.text_structure_file}')
                 gc.enable()
+
+        if req.output_format == OutputFormat.protobuf:
+            req.pdf_coordinates_file = pdf_fn_in_storage_base + '.pdf_coordinates.bin'
+            req.text_structure_file = pdf_fn_in_storage_base + '.document_structure.bin'
+
+            from google.protobuf.json_format import Parse
+            import text_extraction_system_api.python_pb2_files.contract_char_bboxes_pb2 as char_bboxes_pb2
+            import text_extraction_system_api.python_pb2_files.contract_pages_pb2 as pages_pb2
+
+            pdf_coords = text_structure.pdf_coordinates.to_dict()
+            pdf_coords["char_bboxes"] = [{'coords': item} for item in pdf_coords["char_bboxes"]]
+            proto_pdf_coords = Parse(json.dumps(pdf_coords), char_bboxes_pb2.CharBboxes()).SerializeToString()
+            proto_text_struct = Parse(json.dumps(text_structure.text_structure.to_dict()),
+                                      pages_pb2.Pages()).SerializeToString()
+
+            webdav_client.upload_to(proto_pdf_coords,
+                                    f'{req.request_id}/{req.pdf_coordinates_file}')
+            webdav_client.upload_to(proto_text_struct,
+                                    f'{req.request_id}/{req.text_structure_file}')
 
         if req.char_coords_debug_enable or req.deskew_enable:
             req.page_rotate_angles = page_rotate_angles
@@ -508,6 +522,13 @@ def extract_data_and_finish(req: RequestMetadata,
             if req.output_format == OutputFormat.msgpack:
                 req.tables_file = pdf_fn_in_storage_base + '.tables.msgpack'
                 packed = msgpack.packb(tables.to_dict(), use_bin_type=True, use_single_float=True)
+                webdav_client.upload_to(packed, f'{req.request_id}/{req.tables_file}')
+
+            if req.output_format == OutputFormat.protobuf:
+                req.tables_file = pdf_fn_in_storage_base + '.tables.bin'
+                # ToDo: replace with protobuf pack
+                # packed = msgpack.packb(tables.to_dict(), use_bin_type=True, use_single_float=True)
+                packed = ""
                 webdav_client.upload_to(packed, f'{req.request_id}/{req.tables_file}')
 
     if settings.delete_temp_files_on_request_finish:
