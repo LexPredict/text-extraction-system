@@ -258,8 +258,10 @@ def process_pdf(pdf_fn: str,
         for pdf_page_fn in pdf_page_fns:
             i += 1
             pdf_page_base_fn = os.path.basename(pdf_page_fn)
+            start = time.time()
             webdav_client.upload_file(f'{req.request_id}/{pages_for_processing}/{pdf_page_base_fn}',
                                       pdf_page_fn)
+            log.info(f'{req.original_file_name} | Uploaded page {i}, took {time.time() - start} seconds')
             task_signatures.append(process_pdf_page_task.s(req.request_id,
                                                            req.original_file_name,
                                                            pdf_page_base_fn,
@@ -446,18 +448,25 @@ def extract_data_and_finish(req: RequestMetadata,
         log.info(f'Extracted {len(text)} characters from {pdf_fn_in_storage_base}')
 
         req.plain_text_file = pdf_fn_in_storage_base + '.plain.txt'
-        webdav_client.upload_to(text.encode('utf-8'), f'{req.request_id}/{req.plain_text_file}')
+        content = text.encode('utf-8')
+        log.info(f'Start plain-text uploading to {req.request_id}/{req.plain_text_file}, size={len(content)}')
+        webdav_client.upload_to(content, f'{req.request_id}/{req.plain_text_file}')
         log.info(f'Plain text is uploaded to {req.request_id}/{req.plain_text_file}')
 
         if req.output_format == OutputFormat.json:
             req.pdf_coordinates_file = pdf_fn_in_storage_base + '.pdf_coordinates.json'
+            jsn = json.dumps(text_structure.pdf_coordinates.to_dict(), indent=2)
+            content = jsn.encode('utf-8')
+            log.info(f'Start pdf-coord-json uploading to {req.request_id}/{req.pdf_coordinates_file}, '
+                     f'size={len(content)}')
+            webdav_client.upload_to(content, f'{req.request_id}/{req.pdf_coordinates_file}')
+
             req.text_structure_file = pdf_fn_in_storage_base + '.document_structure.json'
-
-            json_pdf_coords = json.dumps(text_structure.pdf_coordinates.to_dict(), indent=2)
-            json_text_struct = json.dumps(text_structure.text_structure.to_dict(), indent=2)
-
-            webdav_client.upload_to(json_pdf_coords.encode('utf-8'), f'{req.request_id}/{req.pdf_coordinates_file}')
-            webdav_client.upload_to(json_text_struct.encode('utf-8'), f'{req.request_id}/{req.text_structure_file}')
+            plain_text_structure = json.dumps(text_structure.text_structure.to_dict(), indent=2)
+            content = plain_text_structure.encode('utf-8')
+            log.info(f'Start doc-struc-json uploading to {req.request_id}/{req.text_structure_file}, '
+                     f'size={len(content)}')
+            webdav_client.upload_to(content, f'{req.request_id}/{req.text_structure_file}')
 
         if req.output_format == OutputFormat.msgpack:
             req.pdf_coordinates_file = pdf_fn_in_storage_base + '.pdf_coordinates.msgpack'
