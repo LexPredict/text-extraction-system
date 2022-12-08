@@ -20,3 +20,7 @@ class LanguageConverter:
             data.append("")
         language, locale_code = data
         return language, locale_code
+
+
+def page_num_to_fn(page_num: int) -> str:
+    return f'{page_num:05}'

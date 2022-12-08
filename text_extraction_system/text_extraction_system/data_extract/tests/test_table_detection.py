@@ -1,4 +1,5 @@
 import pathlib
+import shutil
 import tempfile
 
 from text_extraction_system_api.dto import TableParser
@@ -8,6 +9,7 @@ from text_extraction_system.data_extract.camelot.camelot import extract_tables_f
 from text_extraction_system.ocr.tables.table_detection import TableLocationCell, \
     TableLocationCluster, TableLocation, TableDetectorSettings
 from text_extraction_system.ocr.tables.table_detection import DEFAULT_DETECTING_SETTINGS as DS
+from text_extraction_system.pdf.pdf import extract_page_ocr_images
 
 base_dir_path = pathlib.Path(__file__).parent.resolve()
 data_dir_path = base_dir_path / 'data'
@@ -20,7 +22,9 @@ pathlib.Path(tmp_results_path).mkdir(parents=True, exist_ok=True)
 @with_default_settings
 def test_corr_pdf():
     pdf_fn = data_dir_path / 'tables.pdf'
-    extract_tables_from_pdf_file(str(pdf_fn), True, TableParser.lattice, 60)
+    image_fns, temp_images_dir = extract_page_ocr_images(str(pdf_fn))
+    extract_tables_from_pdf_file(str(pdf_fn), image_fns, True, TableParser.lattice, 60)
+    shutil.rmtree(temp_images_dir)
 
 
 @with_default_settings

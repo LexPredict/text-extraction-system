@@ -14,9 +14,9 @@ from text_extraction_system_api.dto import PlainTableOfContentsRecord, PlainText
 
 from text_extraction_system.commons.tests.commons import with_default_settings
 from text_extraction_system.data_extract import data_extract
-from text_extraction_system.data_extract.data_extract import process_pdf_page, \
-    PDFPageProcessingResults, get_sections_from_table_of_contents, normalize_angle_90
-from text_extraction_system.pdf.pdf import merge_pdf_pages
+from text_extraction_system.data_extract.data_extract import process_pdf_page, get_sections_from_table_of_contents, \
+    normalize_angle_90
+from text_extraction_system.pdf.pdf import merge_pdf_pages, extract_page_ocr_images
 
 base_dir_path = pathlib.Path(__file__).parent.resolve()
 data_dir_path = base_dir_path / 'data'
@@ -45,8 +45,7 @@ def test_text_structure_extraction():
 def test_different_languages_extraction_with_no_ocr():
     fn = data_dir_path / 'two_langs_no_ocr.pdf'
 
-    with data_extract.extract_text_and_structure(str(fn), language="en_US") \
-            as (text, full_struct, _a, _b):
+    with data_extract.extract_text_and_structure(str(fn), language="en_US") as (text, full_struct, _a, _b):
         struct = full_struct.text_structure
         assert 'This is top secret' in text
         assert len(struct.pages) == 1
@@ -62,10 +61,10 @@ def test_different_languages_extraction_with_no_ocr():
 def test_text_too_short():
     fn = data_dir_path / 'finstat90_rotation_set.pdf'
 
-    with process_pdf_page(str(fn)) as res:  # type: PDFPageProcessingResults
+    image_fns, temp_images_dir = extract_page_ocr_images(str(fn))
+    with process_pdf_page(str(fn), image_fns[1]) as res:
         num_file_rotate = (1, res.ocred_page_fn, None)
-        with merge_pdf_pages(str(fn), single_page_merge_num_file_rotate=num_file_rotate) \
-                as merged_pdf_fn:
+        with merge_pdf_pages(str(fn), single_page_merge_num_file_rotate=num_file_rotate) as merged_pdf_fn:
             with data_extract.extract_text_and_structure(merged_pdf_fn, language="en_US") \
                     as (text, full_struct, _a, _b):
                 assert 'financial statements' in text.lower()
@@ -127,9 +126,7 @@ def test_rotate_image():
     if abs(round(angle/90)):
         h, w = w, h
 
-    rotated_image = cv2.warpAffine(src=src, M=rotate_matrix, dsize=(w, h),
-                                   borderValue=(255, 255, 255))
-
+    rotated_image = cv2.warpAffine(src=src, M=rotate_matrix, dsize=(w, h), borderValue=(255, 255, 255))
     try:
         cv2.imwrite(str(dst_path), rotated_image)
         assert (datetime.datetime.now() - t1).total_seconds() < 0.1
@@ -143,15 +140,13 @@ def test_speed():
     dst_path = tmp_results_path / 'dummy_text_9.png'
 
     rot_angle = 9.0
-
     t1 = datetime.datetime.now()
     img = Image.open(src_path)
     img = img.convert('RGB')
     img = img.rotate(rot_angle, fillcolor=(255, 255, 255), expand=False)
-
     try:
         img.save(dst_path)
-        assert (datetime.datetime.now() - t1).total_seconds() < 0.1
+        assert (datetime.datetime.now() - t1).total_seconds() < 0.2
     finally:
         dst_path.unlink()
 
@@ -170,10 +165,10 @@ def test_normalize_angle_90():
 def test_proto_memory_comparison():
     fn = data_dir_path / 'finstat90_rotation_set.pdf'
 
-    with process_pdf_page(str(fn)) as res:  # type: PDFPageProcessingResults
+    image_fns, temp_images_dir = extract_page_ocr_images(str(fn))
+    with process_pdf_page(str(fn), image_fns[1]) as res:
         num_file_rotate = (1, res.ocred_page_fn, None)
-        with merge_pdf_pages(str(fn), single_page_merge_num_file_rotate=num_file_rotate) \
-                as merged_pdf_fn:
+        with merge_pdf_pages(str(fn), single_page_merge_num_file_rotate=num_file_rotate) as merged_pdf_fn:
             with data_extract.extract_text_and_structure(merged_pdf_fn, language="en_US") \
                     as (text, full_struct, _a, _b):
 
@@ -182,11 +177,9 @@ def test_proto_memory_comparison():
 
                 try:
                     gc.disable()
-                    msgpack_pdf_coords = msgpack.packb(full_struct.pdf_coordinates.__dict__,
-                                                       use_bin_type=True,
+                    msgpack_pdf_coords = msgpack.packb(full_struct.pdf_coordinates.__dict__, use_bin_type=True,
                                                        use_single_float=True)
-                    msgpack_text_struct = msgpack.packb(full_struct.text_structure.to_dict(),
-                                                        use_bin_type=True,
+                    msgpack_text_struct = msgpack.packb(full_struct.text_structure.to_dict(), use_bin_type=True,
                                                         use_single_float=True)
                 finally:
                     gc.enable()
@@ -217,18 +210,12 @@ def test_proto_speed_comparison():
     fn = data_dir_path / 'finstat90_rotation_set.pdf'
     iterate_amount = 1000
 
-    with process_pdf_page(str(fn)) as res:  # type: PDFPageProcessingResults
+    image_fns, temp_images_dir = extract_page_ocr_images(str(fn))
+    with process_pdf_page(str(fn), image_fns[1]) as res:
         num_file_rotate = (1, res.ocred_page_fn, None)
-        with merge_pdf_pages(str(fn), single_page_merge_num_file_rotate=num_file_rotate) \
-                as merged_pdf_fn:
+        with merge_pdf_pages(str(fn), single_page_merge_num_file_rotate=num_file_rotate) as merged_pdf_fn:
             with data_extract.extract_text_and_structure(merged_pdf_fn, language="en_US") \
                     as (text, full_struct, _a, _b):
-                t1 = datetime.datetime.now()
-                for _ in range(iterate_amount):
-                    json.dumps(full_struct.pdf_coordinates.to_dict(), indent=2)
-                    json.dumps(full_struct.text_structure.to_dict(), indent=2)
-                json_execute_time = datetime.datetime.now() - t1
-
                 try:
                     gc.disable()
                     t1 = datetime.datetime.now()
@@ -252,7 +239,6 @@ def test_proto_speed_comparison():
                     Parse(json.dumps(full_struct.text_structure.to_dict()), pages_pb2.Pages()).SerializeToString()
                 proto_execute_time = datetime.datetime.now() - t1
 
-                assert json_execute_time.total_seconds() > proto_execute_time.total_seconds() \
-                       > msgpack_execute_time.total_seconds()
+                assert proto_execute_time.total_seconds() > msgpack_execute_time.total_seconds()
                 # Protobuf is more than 2 times slower
                 assert proto_execute_time.total_seconds() / msgpack_execute_time.total_seconds() > 2
