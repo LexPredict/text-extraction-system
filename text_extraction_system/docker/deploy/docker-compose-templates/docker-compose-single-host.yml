@@ -92,6 +92,8 @@ services:
       options:
         max-file: 5
         max-size: 10m
+    #extra_hosts:
+    #  - "host.docker.internal:host-gateway"
 
   tes-celery-beat:
     image: ${TEXT_EXTRACTION_SYSTEM_IMAGE}
