@@ -4,7 +4,7 @@ from typing import Generator
 from text_extraction_system import config
 
 
-class MockWebDavClient():
+class MockWebDavClient:
     def upload_to(self, *args, **kwargs):
         print('upload_to called')
 
@@ -29,5 +29,4 @@ def with_default_settings(func):
     def wrapper(*args, **kwargs):
         with default_settings():
             func(*args, **kwargs)
-
     return wrapper

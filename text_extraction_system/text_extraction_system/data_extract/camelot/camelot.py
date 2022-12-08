@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import List, Dict
 
 from camelot.core import Table as CamelotTable
 from camelot.parsers.lattice import Lattice
@@ -96,19 +96,21 @@ def get_extractor(pdf_page_image_fn: str,
 
 
 def extract_tables_from_pdf_file(pdf_fn: str,
+                                 image_fns: Dict[int, str],
                                  pdfminer_advanced_detection: bool = False,
                                  table_parser: TableParser = TableParser.lattice,
                                  min_accuracy: int = 60) -> List[CamelotTable]:
     res: List[CamelotTable] = list()
-    with extract_page_images(pdf_fn=pdf_fn, dpi=71) as image_fns:
-        page_num = 0
-        for ltpage in iterate_pages(pdf_fn, use_advanced_detection=pdfminer_advanced_detection):
-            page_image_fn = image_fns[page_num]
-            camelot_tables: List[CamelotTable] = extract_tables(
-                page_num, ltpage, page_image_fn, table_parser, min_accuracy)
-            if camelot_tables:
-                res += camelot_tables
-            page_num += 1
+    page_num = 0
+    for ltpage in iterate_pages(pdf_fn, use_advanced_detection=pdfminer_advanced_detection):
+        if page_num not in image_fns:
+            continue
+        page_image_fn = image_fns[page_num]
+        camelot_tables: List[CamelotTable] = extract_tables(
+            page_num, ltpage, page_image_fn, table_parser, min_accuracy)
+        if camelot_tables:
+            res += camelot_tables
+        page_num += 1
     return res or None
 
 
