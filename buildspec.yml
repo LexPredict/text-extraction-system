@@ -36,5 +36,3 @@ artifacts:
     - celery_imagedefinition.json
     - celery_beat_imagedefinition.json
   #  commands:
-      
-      

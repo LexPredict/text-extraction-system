@@ -11,6 +11,7 @@ from typing import Generator
 from typing import List, Optional, Tuple, Dict
 
 import pikepdf
+from pdf2image import convert_from_path
 from pdfminer.converter import PDFPageAggregator
 from pdfminer.layout import LAParams, LTTextBox, LTTextLine, LTImage, LTItem, LTLayoutContainer, \
     LTPage
@@ -22,6 +23,7 @@ from pdfminer.pdfparser import PDFParser
 from text_extraction_system.config import get_settings
 from text_extraction_system.pdf.utils import pikepdf_opened_w_error
 from text_extraction_system.processes import raise_from_process, render_process_msg
+from text_extraction_system.utils import page_num_to_fn
 
 log = getLogger(__name__)
 
@@ -65,6 +67,56 @@ def raise_from_pdfbox_error_messages(completed_process: CompletedProcess):
             raise Exception(f'PDFBox process output contains error messages\n{render_process_msg(completed_process)}')
 
 
+def extract_pdf_images(pdf_fn: str,
+                       temp_dir: str = None,
+                       start_page: int = None,
+                       end_page: int = None,
+                       pdf_password: str = None,
+                       timeout_sec: int = 1800,
+                       dpi: int = 300):
+    """
+    Converts all .pdf pages to .png images
+    """
+    if not temp_dir:
+        temp_dir = mkdtemp(prefix='pdf_images_')
+    java_modules_path = get_settings().java_modules_path
+    basefn = os.path.splitext(os.path.basename(pdf_fn))[0]
+
+    args = ['java', '-cp', f'{java_modules_path}/*',
+            'org.apache.pdfbox.tools.PDFToImage',
+            '-format', 'png',
+            '-dpi', f'{dpi}',
+            '-quality', '1',
+            '-prefix', f'{temp_dir}/{basefn}__']
+    if pdf_password:
+        args += ['-password', pdf_password]
+
+    if start_page is not None:
+        args += ['-startPage', str(start_page)]
+
+    if end_page is not None:
+        args += ['-endPage', str(end_page)]
+
+    args += [pdf_fn]
+
+    completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=timeout_sec,
+                                                         universal_newlines=True, stderr=PIPE, stdout=PIPE)
+    raise_from_process(log, completed_process, process_title=lambda: f'Extract page images from {pdf_fn}')
+
+    raise_from_pdfbox_error_messages(completed_process)
+
+    # Output of PDFToImage is a set of files with the names generated as:
+    # {prefix}+{page_num_1_based}.{ext}
+    # We used "{temp_dir}/{basefn}__" as the prefix.
+    # Now we need to get the page numbers from the filenames and return the list of file names
+    # ordered by page number.
+    page_by_num: Dict[int, str] = dict()
+    for fn in os.listdir(temp_dir):
+        page_num = PAGE_NUM_RE.search(os.path.splitext(fn)[0]).group(0)
+        page_by_num[int(page_num)] = os.path.join(temp_dir, fn)
+    return page_by_num
+
+
 @contextmanager
 def extract_page_images(pdf_fn: str,
                         start_page: int = None,
@@ -72,105 +124,138 @@ def extract_page_images(pdf_fn: str,
                         pdf_password: str = None,
                         timeout_sec: int = 1800,
                         dpi: int = 300) -> Generator[List[str], None, None]:
-    java_modules_path = get_settings().java_modules_path
-
     temp_dir = mkdtemp(prefix='pdf_images_')
-    basefn = os.path.splitext(os.path.basename(pdf_fn))[0]
     try:
-        args = ['java', '-cp', f'{java_modules_path}/*',
-                'org.apache.pdfbox.tools.PDFToImage',
-                '-format', 'png',
-                '-dpi', f'{dpi}',
-                '-quality', '1',
-                '-prefix', f'{temp_dir}/{basefn}__']
-        if pdf_password:
-            args += ['-password', pdf_password]
-
-        if start_page is not None:
-            args += ['-startPage', str(start_page)]
-
-        if end_page is not None:
-            args += ['-endPage', str(end_page)]
-
-        args += [pdf_fn]
-
-        completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=timeout_sec,
-                                                             universal_newlines=True, stderr=PIPE, stdout=PIPE)
-        raise_from_process(log, completed_process, process_title=lambda: f'Extract page images from {pdf_fn}')
-
-        raise_from_pdfbox_error_messages(completed_process)
-
-        # Output of PDFToImage is a set of files with the names generated as:
-        # {prefix}+{page_num_1_based}.{ext}
-        # We used "{temp_dir}/{basefn}__" as the prefix.
-        # Now we need to get the page numbers from the filenames and return the list of file names
-        # ordered by page number.
-        page_by_num: Dict[int, str] = dict()
-        for fn in os.listdir(temp_dir):
-            page_num = PAGE_NUM_RE.search(os.path.splitext(fn)[0]).group(0)
-            page_by_num[int(page_num)] = os.path.join(temp_dir, fn)
-
+        page_by_num = extract_pdf_images(pdf_fn, temp_dir, start_page, end_page, pdf_password, timeout_sec, dpi)
         yield [page_by_num[key] for key in sorted(page_by_num.keys())]
-
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-@contextmanager
-def extract_page_ocr_images(pdf_fn: str,
-                            start_page: int = None,
-                            end_page: int = None,
-                            pdf_password: str = None,
-                            timeout_sec: int = 1800,
-                            reset_page_rotation: bool = False,
-                            dpi: int = 300) -> Generator[Dict[int, str], None, None]:
-    java_modules_path = get_settings().java_modules_path
+# @contextmanager
+# def extract_page_ocr_images(pdf_fn: str,
+#                             start_page: int = None,
+#                             end_page: int = None,
+#                             pdf_password: str = None,
+#                             timeout_sec: int = 1800,
+#                             reset_page_rotation: bool = False,
+#                             dpi: int = 300) -> Generator[Dict[int, str], None, None]:
+#     java_modules_path = get_settings().java_modules_path
+#
+#     temp_dir_no_text = mkdtemp(prefix='pdf_images_')
+#     base_fn = os.path.splitext(os.path.basename(pdf_fn))[0]
+#     try:
+#         args = ['java', '-cp', f'{java_modules_path}/*',
+#                 'com.lexpredict.textextraction.getocrimages.GetOCRImages',
+#                 pdf_fn,
+#                 '--format', 'png',
+#                 '--dpi', f'{dpi}',
+#                 '--output-prefix-no-text', f'{temp_dir_no_text}/{base_fn}__']
+#         if pdf_password:
+#             args += ['--password', pdf_password]
+#
+#         if start_page is not None:
+#             args += ['--start-page', str(start_page)]
+#
+#         if end_page is not None:
+#             args += ['--end-page', str(end_page)]
+#
+#         if reset_page_rotation:
+#             args += ['--reset-page-rotation']
+#
+#         completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=timeout_sec,
+#                                                              universal_newlines=True, stderr=PIPE, stdout=PIPE)
+#         raise_from_process(log, completed_process,
+#                            process_title=lambda: f'Extract page images for OCR needs (with text removed) from {pdf_fn}')
+#
+#         raise_from_pdfbox_error_messages(completed_process)
+#
+#         # Output of GetOCRImages is a set of files with the names generated as:
+#         # {prefix}+{page_num_1_based}.{ext}
+#         # We used "{temp_dir}/{basefn}__" as the prefix.
+#         # Now we need to get the page numbers from the filenames and return the list of file names
+#         # ordered by page number.
+#         # For the "no-text" images: for the pages having no images which are not overlapped with
+#         # any text element it stores no page image.
+#         page_by_num_no_text: Dict[int, str] = dict()
+#         for fn in os.listdir(temp_dir_no_text):
+#             page_num = PAGE_NUM_RE.search(os.path.splitext(fn)[0]).group(0)
+#             page_no_text_fn = os.path.join(temp_dir_no_text, fn)
+#             page_by_num_no_text[int(page_num)] = page_no_text_fn
+#
+#         yield page_by_num_no_text
+#
+#     finally:
+#         shutil.rmtree(temp_dir_no_text, ignore_errors=True)
 
+
+def get_page_images_amount(pdf_fn: str, pdf_password: str = None) -> int:
+    doc = pikepdf.Pdf.open(pdf_fn) if not pdf_password else pikepdf.Pdf.open(pdf_fn, password=pdf_password)
+    res = 0
+    for i in range(0, len(doc.pages)):
+        if doc.pages[i].images.keys():
+            res += 1
+    return res
+
+
+def extract_page_ocr_images(pdf_fn: str, start_page: int = 1, end_page: int = 0, pdf_password: str = None,
+                            dpi: int = 300) -> Tuple[Dict[int, str], str]:
     temp_dir_no_text = mkdtemp(prefix='pdf_images_')
     base_fn = os.path.splitext(os.path.basename(pdf_fn))[0]
-    try:
-        args = ['java', '-cp', f'{java_modules_path}/*',
-                'com.lexpredict.textextraction.getocrimages.GetOCRImages',
-                pdf_fn,
-                '--format', 'png',
-                '--dpi', f'{dpi}',
-                '--output-prefix-no-text', f'{temp_dir_no_text}/{base_fn}__']
-        if pdf_password:
-            args += ['--password', pdf_password]
+    page_by_num_no_text: Dict[int, str] = dict()
 
-        if start_page is not None:
-            args += ['--start-page', str(start_page)]
+    doc = pikepdf.Pdf.open(pdf_fn) if not pdf_password else pikepdf.Pdf.open(pdf_fn, password=pdf_password)
+    for i in range(start_page-1, abs(end_page) or len(doc.pages)):
+        page = doc.pages[i]
+        if not page.images.keys():
+            continue
+        content_stream = pikepdf.parse_content_stream(page)
+        to_remove = [i for i, (_, op) in enumerate(content_stream)
+                     if op == pikepdf.Operator("BT") or op == pikepdf.Operator("ET")]
+        to_remove = [to_remove[i:i + 2] for i in range(0, len(to_remove), 2)][::-1]
+        for start, end in to_remove:
+            del content_stream[start:end]
+        new_content_stream = pikepdf.unparse_content_stream(content_stream)
+        doc.pages[i].Contents = doc.make_stream(new_content_stream)
 
-        if end_page is not None:
-            args += ['--end-page', str(end_page)]
+        # Create separate pdf-page
+        dst = pikepdf.Pdf.new()
+        dst.pages.append(doc.pages[i])
+        page_no_text_fn = os.path.join(temp_dir_no_text, f'{base_fn}__{page_num_to_fn(i+1)}.pdf')
+        dst.save(page_no_text_fn)
 
-        if reset_page_rotation:
-            args += ['--reset-page-rotation']
+        # Convert pdf to image
+        pdf_pages = convert_from_path(page_no_text_fn, dpi)
+        page_no_text_fn = f"{page_no_text_fn[:-3]}png"
+        pdf_pages[0].save(page_no_text_fn, 'PNG')
+        page_by_num_no_text[i+1] = page_no_text_fn
+    return page_by_num_no_text, temp_dir_no_text
 
-        completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=timeout_sec,
-                                                             universal_newlines=True, stderr=PIPE, stdout=PIPE)
-        raise_from_process(log, completed_process,
-                           process_title=lambda: f'Extract page images for OCR needs (with text removed) from {pdf_fn}')
 
-        raise_from_pdfbox_error_messages(completed_process)
+@contextmanager
+def extract_full_images_from_pdf(pdf_fn: str, start_page: int = 1, end_page: int = 0, pdf_password: str = None,
+                                 dpi: int = 300) -> Generator[Dict[int, str], None, None]:
+    temp_dir_no_text = mkdtemp(prefix='pdf_full_images_')
+    base_fn = os.path.splitext(os.path.basename(pdf_fn))[0]
+    page_by_num_no_text: Dict[int, str] = dict()
 
-        # Output of GetOCRImages is a set of files with the names generated as:
-        # {prefix}+{page_num_1_based}.{ext}
-        # We used "{temp_dir}/{basefn}__" as the prefix.
-        # Now we need to get the page numbers from the filenames and return the list of file names
-        # ordered by page number.
-        # For the "no-text" images: for the pages having no images which are not overlapped with
-        # any text element it stores no page image.
-        page_by_num_no_text: Dict[int, str] = dict()
-        for fn in os.listdir(temp_dir_no_text):
-            page_num = PAGE_NUM_RE.search(os.path.splitext(fn)[0]).group(0)
-            page_no_text_fn = os.path.join(temp_dir_no_text, fn)
-            page_by_num_no_text[int(page_num)] = page_no_text_fn
+    doc = pikepdf.Pdf.open(pdf_fn) if not pdf_password else pikepdf.Pdf.open(pdf_fn, password=pdf_password)
+    for i in range(start_page-1, abs(end_page) or len(doc.pages)):
+        if not doc.pages[i].images.keys():
+            continue
+        # Create separate pdf-page
+        dst = pikepdf.Pdf.new()
+        dst.pages.append(doc.pages[i])
+        page_no_text_fn = os.path.join(temp_dir_no_text, f'{base_fn}__{page_num_to_fn(i+1)}.pdf')
+        dst.save(page_no_text_fn)
 
-        yield page_by_num_no_text
-
-    finally:
-        shutil.rmtree(temp_dir_no_text, ignore_errors=True)
+        # Convert pdf to image
+        pdf_pages = convert_from_path(page_no_text_fn, dpi)
+        page_no_text_fn = f"{page_no_text_fn[:-3]}png"
+        pdf_pages[0].save(page_no_text_fn, 'PNG')
+        page_by_num_no_text[i+1] = page_no_text_fn
+    yield page_by_num_no_text
+    shutil.rmtree(temp_dir_no_text, ignore_errors=True)
 
 
 def calc_covers(lt_obj: LTItem) -> Tuple[int, int]:

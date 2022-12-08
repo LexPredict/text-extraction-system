@@ -304,84 +304,62 @@ class PDFPageProcessingResults:
 
 @contextmanager
 def process_pdf_page(pdf_fn: str,
+                     page_image_without_text_fn: str,
                      ocr_enabled: bool = True,
                      ocr_language: str = None,
                      ocr_timeout_sec: int = 60,
-                     pdf_password: str = None,
-                     detect_orientation_tesseract=False) -> Generator[PDFPageProcessingResults, None, None]:
+                     detect_orientation_tesseract=False) -> PDFPageProcessingResults:
     if not ocr_enabled:
         yield PDFPageProcessingResults(page_requires_ocr=False)
         return
 
-    # Try extracting "no-text" image of the pdf page into PNG file.
-    # It removes all elements from the page except images having no overlapping
-    # with any text element.
-    # This is used to avoid the text duplication by OCR.
-    with extract_page_ocr_images(pdf_fn,
-                                 start_page=1,
-                                 end_page=1,
-                                 pdf_password=pdf_password,
-                                 dpi=DPI,
-                                 reset_page_rotation=False) \
-            as image_fns:
-        # note: extract_page_ocr_images method might have returned nothing
-        # (extraction fails) or an image w/o any text
-        page_image_without_text_fn = image_fns.get(1) if image_fns else None
-        rot_angle = 0
+    rot_angle = 0
+    orientation = None
+    if detect_orientation_tesseract:
+        try:
+            orientation = get_page_orientation(page_image_without_text_fn,
+                                               language=ocr_language or TESSERACT_DEFAULT_LANGUAGE)
+        except Exception as e:
+            error_text = OCRException.TOO_FEW_CHARACTERS_ERROR if OCRException.TOO_FEW_CHARACTERS_ERROR in str(e) else e
+            log.error(f'Cant get page orientation by Tesseract: {error_text}')
 
-        if page_image_without_text_fn:
-            orientation = None
-            if detect_orientation_tesseract:
-                try:
-                    orientation = get_page_orientation(
-                        page_image_without_text_fn,
-                        language=ocr_language or TESSERACT_DEFAULT_LANGUAGE)
-                except Exception as e:
-                    error_text = OCRException.TOO_FEW_CHARACTERS_ERROR \
-                        if OCRException.TOO_FEW_CHARACTERS_ERROR in str(e) else e
-                    log.error(f'Cant get page orientation by Tesseract: {error_text}')
+        # TODO: presently orientation "probability" threshold is taken arbitrary
+        ORIENTATION_THRESHOLD = 3
+        if orientation and orientation[0] and orientation[1] > ORIENTATION_THRESHOLD:
+            # rotate the document
+            # rotate_pdf_pages(pdf_fn, pdf_fn, orientation[0])
+            # rotate the image
+            rotate_image(orientation[0], page_image_without_text_fn, page_image_without_text_fn)
 
-                # TODO: presently orientation "probability" threshold is taken arbitrary
-                ORIENTATION_THRESHOLD = 3
-                if orientation and orientation[0] and orientation[1] > ORIENTATION_THRESHOLD:
-                    # rotate the document
-                    # rotate_pdf_pages(pdf_fn, pdf_fn, orientation[0])
-                    # rotate the image
-                    rotate_image(orientation[0], page_image_without_text_fn, page_image_without_text_fn)
+    # the image might be rotated. Then we try to determine the image rotation angle
+    # based on opencv algorithms and rotate the image back.
+    # Even if the image is still rotated, OCR will extract the text. That's fine
+    # if the image rotation angle is a multiple of 90 degree.
+    rot_status = determine_rotation(page_image_without_text_fn, RotationDetectionMethod.DILATED_ROWS)
 
-            # the image might be rotated. Then we try to determine the image rotation angle
-            # based on opencv algorithms and rotate the image back.
-            # Even if the image is still rotated, OCR will extract the text. That's fine
-            # if the image rotation angle is a multiple of 90 degree.
-            rot_status = determine_rotation(page_image_without_text_fn,
-                                            RotationDetectionMethod.DILATED_ROWS)
+    if should_correct_rotation(pdf_fn, rot_status):
+        # we don't rotate images by more than 45 degree angle
+        rot_angle = normalize_angle_90(rot_status.angle)
 
-            if should_correct_rotation(pdf_fn, rot_status):
-                # we don't rotate images by more than 45 degree angle
-                rot_angle = normalize_angle_90(rot_status.angle)
+        # rotate the document
+        rotate_pdf_pages(pdf_fn, pdf_fn, rot_angle)
 
-                # rotate the document
-                rotate_pdf_pages(pdf_fn, pdf_fn, rot_angle)
+        # rotate extracted image
+        rotate_image(rot_angle, page_image_without_text_fn, page_image_without_text_fn)
 
-                # rotate extracted image
-                rotate_image(rot_angle, page_image_without_text_fn, page_image_without_text_fn)
-
-            # this returns a text-based PDF with glyph-less text only
-            # to be used for merging in front of the original PDF page layout
-            with ocr_page_to_pdf(page_image_fn=page_image_without_text_fn,
-                                 language=ocr_language,
-                                 timeout=ocr_timeout_sec,
-                                 glyphless_text_only=True,
-                                 tesseract_page_orientation_detection=True) as ocred_text_layer_pdf_fn:
-                # we return only the transparent text layer PDF and not the merged page
-                # because in the final step we will need to merge these transparent layer in front
-                # of the pages in the original PDF file to keep its small size and structure/bookmarks.
-                yield PDFPageProcessingResults(page_requires_ocr=True,
-                                               ocred_page_fn=ocred_text_layer_pdf_fn,
-                                               rotation_angle=rot_angle)
-                return
-    # if we don't need OCR then
-    yield PDFPageProcessingResults(page_requires_ocr=False)
+    # this returns a text-based PDF with glyph-less text only
+    # to be used for merging in front of the original PDF page layout
+    with ocr_page_to_pdf(page_image_fn=page_image_without_text_fn,
+                         language=ocr_language,
+                         timeout=ocr_timeout_sec,
+                         glyphless_text_only=True,
+                         tesseract_page_orientation_detection=True) as ocred_text_layer_pdf_fn:
+        # we return only the transparent text layer PDF and not the merged page
+        # because in the final step we will need to merge these transparent layer in front
+        # of the pages in the original PDF file to keep its small size and structure/bookmarks.
+        yield PDFPageProcessingResults(page_requires_ocr=True,
+                                       ocred_page_fn=ocred_text_layer_pdf_fn,
+                                       rotation_angle=rot_angle)
 
 
 def normalize_angle_90(rot_angle: float) -> float:
