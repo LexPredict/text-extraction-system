@@ -132,63 +132,6 @@ def extract_page_images(pdf_fn: str,
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-# @contextmanager
-# def extract_page_ocr_images(pdf_fn: str,
-#                             start_page: int = None,
-#                             end_page: int = None,
-#                             pdf_password: str = None,
-#                             timeout_sec: int = 1800,
-#                             reset_page_rotation: bool = False,
-#                             dpi: int = 300) -> Generator[Dict[int, str], None, None]:
-#     java_modules_path = get_settings().java_modules_path
-#
-#     temp_dir_no_text = mkdtemp(prefix='pdf_images_')
-#     base_fn = os.path.splitext(os.path.basename(pdf_fn))[0]
-#     try:
-#         args = ['java', '-cp', f'{java_modules_path}/*',
-#                 'com.lexpredict.textextraction.getocrimages.GetOCRImages',
-#                 pdf_fn,
-#                 '--format', 'png',
-#                 '--dpi', f'{dpi}',
-#                 '--output-prefix-no-text', f'{temp_dir_no_text}/{base_fn}__']
-#         if pdf_password:
-#             args += ['--password', pdf_password]
-#
-#         if start_page is not None:
-#             args += ['--start-page', str(start_page)]
-#
-#         if end_page is not None:
-#             args += ['--end-page', str(end_page)]
-#
-#         if reset_page_rotation:
-#             args += ['--reset-page-rotation']
-#
-#         completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=timeout_sec,
-#                                                              universal_newlines=True, stderr=PIPE, stdout=PIPE)
-#         raise_from_process(log, completed_process,
-#                            process_title=lambda: f'Extract page images for OCR needs (with text removed) from {pdf_fn}')
-#
-#         raise_from_pdfbox_error_messages(completed_process)
-#
-#         # Output of GetOCRImages is a set of files with the names generated as:
-#         # {prefix}+{page_num_1_based}.{ext}
-#         # We used "{temp_dir}/{basefn}__" as the prefix.
-#         # Now we need to get the page numbers from the filenames and return the list of file names
-#         # ordered by page number.
-#         # For the "no-text" images: for the pages having no images which are not overlapped with
-#         # any text element it stores no page image.
-#         page_by_num_no_text: Dict[int, str] = dict()
-#         for fn in os.listdir(temp_dir_no_text):
-#             page_num = PAGE_NUM_RE.search(os.path.splitext(fn)[0]).group(0)
-#             page_no_text_fn = os.path.join(temp_dir_no_text, fn)
-#             page_by_num_no_text[int(page_num)] = page_no_text_fn
-#
-#         yield page_by_num_no_text
-#
-#     finally:
-#         shutil.rmtree(temp_dir_no_text, ignore_errors=True)
-
-
 def get_page_images_amount(pdf_fn: str, pdf_password: str = None) -> int:
     doc = pikepdf.Pdf.open(pdf_fn) if not pdf_password else pikepdf.Pdf.open(pdf_fn, password=pdf_password)
     res = 0
