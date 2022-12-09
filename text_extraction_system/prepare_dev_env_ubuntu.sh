@@ -5,9 +5,8 @@ OS_VERSION=$(awk -F= '/^VERSION_ID/{print $2}' /etc/os-release)
 PYTHON3_VERSION="$(python3 -V 2>&1)"
 
 # Install python, office, maven and tesseract
-sudo apt-get install virtualenv python3-dev libreoffice maven tesseract-ocr tesseract-ocr-eng \
-                     tesseract-ocr-ita tesseract-ocr-fra tesseract-ocr-spa tesseract-ocr-deu \
-                     tesseract-ocr-rus
+sudo apt-get install virtualenv python3-dev libreoffice maven poppler-utils tesseract-ocr tesseract-ocr-eng \
+                     tesseract-ocr-ita tesseract-ocr-fra tesseract-ocr-spa tesseract-ocr-deu tesseract-ocr-rus
 
 # Prepare python virtual env
 virtualenv -p /usr/bin/python3 .venv
