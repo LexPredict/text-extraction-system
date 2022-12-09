@@ -434,7 +434,7 @@ def finish_pdf_processing(task,
 
         finally:
             shutil.rmtree(temp_dir)
-            shutil.rmtree(temp_images_dir)
+            shutil.rmtree(temp_images_dir, ignore_errors=True)
 
 
 def extract_data_and_finish(req: RequestMetadata,
