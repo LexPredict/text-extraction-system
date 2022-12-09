@@ -5,6 +5,7 @@ results_fn = 'results.zip'
 pages_ocred = 'pages_ocred'
 pages_for_processing = 'pages_for_processing'
 pages_tables = 'pages_tables'
+pages_images = 'pages_images'
 from_original_doc = 'from_original_doc.pickle'
 task_ids = 'task_ids'
 

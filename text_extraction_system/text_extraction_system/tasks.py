@@ -19,10 +19,9 @@ from webdav3.exceptions import RemoteResourceNotFound
 from text_extraction_system.celery_log import JSONFormatter, set_log_extra
 from text_extraction_system.config import get_settings
 from text_extraction_system.constants import pages_ocred, task_ids, pages_for_processing, pages_tables, \
-    queue_celery_beat
+    queue_celery_beat, pages_images
 from text_extraction_system.data_extract.camelot.camelot import extract_tables_from_pdf_file
-from text_extraction_system.data_extract.data_extract import extract_text_and_structure, process_pdf_page, \
-    PDFPageProcessingResults
+from text_extraction_system.data_extract.data_extract import extract_text_and_structure, process_pdf_page
 from text_extraction_system.data_extract.tables import get_table_dtos_from_camelot_output
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
 from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
@@ -238,9 +237,7 @@ def process_document(task,
         return True
 
 
-def process_pdf(pdf_fn: str,
-                req: RequestMetadata,
-                webdav_client: WebDavClient):
+def process_pdf(pdf_fn: str, req: RequestMetadata, webdav_client: WebDavClient):
     log.info(f'{req.original_file_name} | Pre-processing PDF document')
     log.info(f'{req.original_file_name} | Splitting to pages to parallelize processing...')
 
@@ -249,17 +246,16 @@ def process_pdf(pdf_fn: str,
     ocr_language = lang_converter.convert_language_to_tesseract_view(language)
 
     images_amount = get_page_images_amount(pdf_fn)
-    deliver_progress(req.request_callback_info, RequestProgress(pages=images_amount,
-                                                                current_page=0,
-                                                                progress=25))
+    deliver_progress(req.request_callback_info, RequestProgress(pages=images_amount, current_page=0, progress=25))
+
     image_fns, temp_images_dir = extract_page_ocr_images(pdf_fn)
-    deliver_progress(req.request_callback_info, RequestProgress(pages=images_amount,
-                                                                current_page=0,
-                                                                progress=30))
+    deliver_progress(req.request_callback_info, RequestProgress(pages=images_amount, current_page=0, progress=30))
     with split_pdf_to_page_blocks(pdf_fn, pages_per_block=1) as pdf_page_fns:
         webdav_client.mkdir(f'{req.request_id}/{pages_for_processing}')
         webdav_client.mkdir(f'{req.request_id}/{pages_ocred}')
         webdav_client.mkdir(f'{req.request_id}/{pages_tables}')
+        webdav_client.mkdir(f'{req.request_id}/{pages_images}')
+
         task_signatures = list()
         i = 0
         ordered_page_number = 1
@@ -267,12 +263,12 @@ def process_pdf(pdf_fn: str,
             i += 1
             if i not in image_fns:
                 continue
+            webdav_client.upload_file(f'{req.request_id}/{pages_images}/{i}.png', image_fns[i])
             pdf_page_base_fn = os.path.basename(pdf_page_fn)
             webdav_client.upload_file(f'{req.request_id}/{pages_for_processing}/{pdf_page_base_fn}',
                                       pdf_page_fn)
             task_signatures.append(process_pdf_page_task.s(req.request_id,
                                                            req.original_file_name,
-                                                           image_fns[i],
                                                            pdf_page_base_fn,
                                                            i,
                                                            ordered_page_number,
@@ -285,19 +281,18 @@ def process_pdf(pdf_fn: str,
         log.info(f'{req.original_file_name} | Scheduling {len(task_signatures)} sub-tasks...')
         request_callback_info_dict = req.request_callback_info.to_dict()
         c = chord(task_signatures)(
-            finish_pdf_processing.s(req.request_id, req.original_file_name, image_fns, temp_images_dir,
-                                    request_callback_info_dict)
+            finish_pdf_processing.s(req.request_id, req.original_file_name, image_fns, request_callback_info_dict)
                                  .set(link_error=[ocr_error_callback.s(req.request_id, request_callback_info_dict)]))
         register_task_id(webdav_client, req.request_id, c.id)
         for ar in c.parent.children:
             register_task_id(webdav_client, req.request_id, ar.id)
+    shutil.rmtree(temp_images_dir, ignore_errors=True)
 
 
 @celery_app.task(acks_late=True, bind=True)
 def process_pdf_page_task(_task,
                           request_id: str,
                           original_file_name: str,
-                          image_file_name: str,
                           pdf_page_base_fn: str,
                           page_number: int,
                           estimation_page_number: int,
@@ -326,19 +321,21 @@ def process_pdf_page_task(_task,
     try:
         with webdav_client.get_as_local_fn(f'{req.request_id}/{pages_for_processing}/{pdf_page_base_fn}') \
                 as (local_pdf_page_fn, _remote_path):
-            with process_pdf_page(local_pdf_page_fn,
-                                  page_image_without_text_fn=image_file_name,
-                                  ocr_enabled=req.ocr_enable,
-                                  ocr_language=ocr_language,
-                                  ocr_timeout_sec=req.page_ocr_timeout_sec,
-                                  detect_orientation_tesseract=detect_orientation_tesseract) as page_proc_res:
-                file_name = page_num_to_fn(page_number)
-                if page_proc_res.rotation_angle:
-                    file_name = f'{file_name}.{page_proc_res.rotation_angle}'
-                remote_path = f'{req.request_id}/{pages_ocred}/{file_name}.pdf'
+            with webdav_client.get_as_local_fn(f'{req.request_id}/{pages_images}/{page_number}.png') \
+                    as (local_image_page_fn, _):
+                with process_pdf_page(local_pdf_page_fn,
+                                      page_image_without_text_fn=local_image_page_fn,
+                                      ocr_enabled=req.ocr_enable,
+                                      ocr_language=ocr_language,
+                                      ocr_timeout_sec=req.page_ocr_timeout_sec,
+                                      detect_orientation_tesseract=detect_orientation_tesseract) as page_proc_res:
+                    file_name = page_num_to_fn(page_number)
+                    if page_proc_res.rotation_angle:
+                        file_name = f'{file_name}.{page_proc_res.rotation_angle}'
+                    remote_path = f'{req.request_id}/{pages_ocred}/{file_name}.pdf'
 
-                if page_proc_res.page_requires_ocr:
-                    webdav_client.upload_file(remote_path=remote_path, local_path=page_proc_res.ocred_page_fn)
+                    if page_proc_res.page_requires_ocr:
+                        webdav_client.upload_file(remote_path=remote_path, local_path=page_proc_res.ocred_page_fn)
     except Exception as e:
         raise Exception(f'{original_file_name} |  Exception caught while processing '
                         f'PDF page {page_number}: {pdf_page_base_fn}') from e
@@ -368,7 +365,6 @@ def finish_pdf_processing(task,
                           request_id: str,
                           original_file_name: str,
                           image_fns: Dict[int, str],
-                          temp_images_dir: str,
                           req_callback_info: Dict[str, Any]):
     req_callback_info = RequestCallbackInfo(**req_callback_info)
     with handle_errors(request_id, req_callback_info):
@@ -434,7 +430,7 @@ def finish_pdf_processing(task,
 
         finally:
             shutil.rmtree(temp_dir)
-            shutil.rmtree(temp_images_dir, ignore_errors=True)
+            webdav_client.clean(f'{req.request_id}/{pages_images}/')
 
 
 def extract_data_and_finish(req: RequestMetadata,
@@ -514,10 +510,10 @@ def extract_data_and_finish(req: RequestMetadata,
             webdav_client.upload(f'{req.request_id}/{req.corrected_pdf}', orig_or_corrected_pdf_fn)
 
         if req.table_extraction_enable:
-            log.info(f'Extracting tables from {req.pdf_file}...')
-            camelot_tables = extract_tables_from_pdf_file(orig_or_corrected_pdf_fn, image_fns,
-                                                          table_parser=req.table_parser)
-        else:
+        #     log.info(f'Extracting tables from {req.pdf_file}...')
+        #     camelot_tables = extract_tables_from_pdf_file(orig_or_corrected_pdf_fn, image_fns,
+        #                                                   table_parser=req.table_parser)
+        # else:
             log.info(f'Table extraction is turned off.')
 
     if camelot_tables:
