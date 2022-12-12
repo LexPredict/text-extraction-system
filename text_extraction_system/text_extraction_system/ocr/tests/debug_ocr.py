@@ -24,16 +24,14 @@ def p2():
     from text_extraction_system.ocr.ocr import ocr_page_to_pdf
     import shutil
     orig_pdf_fn = '/home/mikhail/lexpredict/misc/angles/A2A3E26061E43CD60156598713530D98C.pdf'
-    page = 1
 
     with split_pdf_to_page_blocks(orig_pdf_fn) as page_fns:
         page_fn = page_fns[49]
         with extract_page_ocr_images(page_fn, 1, 1, dpi=300) as images:
-            with ocr_page_to_pdf(images.get(1),
-                                 glyphless_text_only=True,
+            with ocr_page_to_pdf(images.get(1), glyphless_text_only=True,
                                  tesseract_page_orientation_detection=True) as ocred_page_pdf:  # type: str
-                with merge_pdf_pages(orig_pdf_fn, single_page_merge_num_file_rotate=(1, ocred_page_pdf, None)) as final_pdf:
-                    shutil.copy(page_fn, '/home/mikhail/lexpredict/misc/angles/A2A3E26061E43CD60156598713530D98C__00050.ocred.pdf')
+                with merge_pdf_pages(orig_pdf_fn, single_page_merge_num_file_rotate=(1, ocred_page_pdf, None)):
+                    shutil.copy(page_fn, f'{orig_pdf_fn[:-4]}__00050.ocred.pdf')
 
 
 #p2()

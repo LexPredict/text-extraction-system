@@ -1,5 +1,3 @@
-from enum import Enum
-
 metadata_fn = 'metadata.json'
 results_fn = 'results.zip'
 pages_ocred = 'pages_ocred'

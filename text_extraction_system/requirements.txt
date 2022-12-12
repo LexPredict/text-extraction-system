@@ -64,6 +64,7 @@ python-multipart==0.0.5
 redis==3.5.3
 regex==2022.3.2
 requests==2.27.1
+ruff==0.0.177
 scikit-image==0.19.3
 scikit-learn==0.23.1
 scipy==1.8.1

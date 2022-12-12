@@ -40,6 +40,7 @@ Pillow==9.2.0
 redis==3.5.3
 regex==2022.6.2
 requests==2.22.0
+ruff==0.0.177
 scikit-learn==1.1.1
 scipy==1.8.1
 uvicorn==0.12.1

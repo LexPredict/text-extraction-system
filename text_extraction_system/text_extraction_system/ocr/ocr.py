@@ -66,7 +66,7 @@ def get_page_orientation(page_image_fn: str,
     Script confidence: 1.44
     """
     if not results_text:
-        log.debug(f'tesseract --psm 0 returned 0 bytes')
+        log.debug('tesseract --psm 0 returned 0 bytes')
         return None
     angle_strs = [m.group(0).strip() for m in RE_ORIENTATION_ANGLE.finditer(results_text)]
     if not angle_strs:
@@ -126,7 +126,7 @@ def ocr_page_to_pdf(page_image_fn: str,
         if proc is not None:
             try:
                 proc.kill()
-            except:
+            except Exception:
                 pass
         shutil.rmtree(page_dir)
 
@@ -227,7 +227,7 @@ def image_to_osd(page_image_fn: str, timeout: int = 180, dpi: int = 300) -> OSD:
         if proc is not None:
             try:
                 proc.kill()
-            except:
+            except Exception:
                 pass
 
 

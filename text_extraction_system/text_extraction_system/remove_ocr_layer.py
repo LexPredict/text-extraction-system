@@ -40,7 +40,7 @@ def remove_ocr_layer(pdf_file_name: str,
         raise_from_pdfbox_error_messages(completed_process)
 
         shutil.move(dst_pdf_fn, pdf_file_name)
-    except Exception as e:
+    except Exception:
         raise
     finally:
         shutil.rmtree(temp_dir)

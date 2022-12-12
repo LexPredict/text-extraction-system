@@ -38,23 +38,17 @@ class TestAnnotationsAfterOCR(unittest.TestCase):
                     assert tfn_pdf.pages[0]['/Annots']
                     assert tfn_pdf.pages[0]['/Annots'] == fn_pdf.pages[0]['/Annots']
 
-            text_struct: PlainTextStructure = self.client.get_extracted_text_structure_as_msgpack(
-                rs.request_id)
+            text_struct: PlainTextStructure = self.client.get_extracted_text_structure_as_msgpack(rs.request_id)
             assert len(text_struct.pages) == 3
             assert len(text_struct.paragraphs) == 9
-
             log.info('Text extraction results look good. All assertions passed.')
 
-        request_id = self.client.schedule_data_extraction_task(
-            fn,
-            call_back_url=self.call_back_url,
-            call_back_additional_info='hello world',
-            doc_language='en',
-            log_extra={'hello': 'world', 'test': True},
-            output_format=OutputFormat.msgpack)
-        self.srv.wait_for_test_results(timeout_sec=120,
-                                       assert_func=assert_func,
-                                       assert_func_args=[request_id])
+        request_id = self.client.schedule_data_extraction_task(fn, call_back_url=self.call_back_url,
+                                                               call_back_additional_info='hello world',
+                                                               doc_language='en',
+                                                               log_extra={'hello': 'world', 'test': True},
+                                                               output_format=OutputFormat.msgpack)
+        self.srv.wait_for_test_results(timeout_sec=120, assert_func=assert_func, assert_func_args=[request_id])
 
         # the following additionally tests if we are able to delete directories
         self.client.delete_data_extraction_task_files(request_id)

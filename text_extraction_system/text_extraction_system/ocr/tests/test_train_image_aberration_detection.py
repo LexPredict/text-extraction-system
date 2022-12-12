@@ -86,7 +86,7 @@ class Testrotation_detection(TestCase):
         if best_index >= 0:
             print(f'Best detecting params: {x[best_index]}')
         else:
-            print(f'No better detecting params found')
+            print('No better detecting params found')
 
     def get_file_names(self) -> List[str]:
         file_names = [f for f in os.listdir(self.IMAGE_FOLDER) if os.path.isfile(os.path.join(self.IMAGE_FOLDER, f))]

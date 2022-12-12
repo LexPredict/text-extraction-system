@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 import logging
 import socket
 from contextlib import contextmanager
@@ -17,10 +16,8 @@ log = logging.getLogger(__name__)
 class MockServerRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         self.server.request_received = True
-
         try:
-            log.info(f'POST request received to the test call-back server: '
-                     f'{self.path}\n{self.request}')
+            log.info(f'POST request received to the test call-back server: {self.path}\n{self.request}')
             content_len = int(self.headers.get('content-length', 0))
             if hasattr(self.server, "test_func") and callable(getattr(self.server, "test_func")):
                 self.server.test_func(self.rfile.read(content_len), self.headers)
@@ -30,7 +27,6 @@ class MockServerRequestHandler(BaseHTTPRequestHandler):
             self.wfile.write(b'Thanks!')
         except Exception as e:
             self.server.test_problem = e
-
         self.server.__shutdown_request = True
 
 
@@ -43,16 +39,13 @@ def get_free_port():
 
 
 class DocumentCallbackServer(metaclass=SingletonMeta):
-    def __init__(self,
-                 bind_host: str = test_settings.call_back_server_bind_host,
-                 bind_port: int = test_settings.call_back_server_bind_port,
-                 start: bool = True) -> None:
+    def __init__(self, bind_host: str = test_settings.call_back_server_bind_host,
+                 bind_port: int = test_settings.call_back_server_bind_port, start: bool = True) -> None:
         super().__init__()
         self.bind_host = bind_host
         self.bind_port = bind_port
         self.mock_server = HTTPServer((self.bind_host, self.bind_port), MockServerRequestHandler)
-        self.mock_server.test_func = lambda rfile, headers: \
-            log.info('Text extraction results are ready...')
+        self.mock_server.test_func = lambda rfile, headers: log.info('Text extraction results are ready...')
         self.mock_server.request_received = False
         self.mock_server.test_problem = None
         self.mock_server_thread = Thread(target=self.mock_server.serve_forever)
@@ -72,8 +65,7 @@ class DocumentCallbackServer(metaclass=SingletonMeta):
         if self.mock_server_thread.is_alive() and not self.mock_server.request_received:
             log.info(f'Waiting {timeout_sec} seconds for call back...')
         start_time = time()
-        while self.mock_server_thread.is_alive() \
-                and not self.mock_server.request_received \
+        while self.mock_server_thread.is_alive() and not self.mock_server.request_received \
                 and time() - start_time < timeout_sec:
             sleep(0.5)
         try:
@@ -87,9 +79,7 @@ class DocumentCallbackServer(metaclass=SingletonMeta):
             self.mock_server.test_problem = None
             log.info(f'Done in {time() - start_time} seconds')
 
-    def wait_for_test_results(self,
-                              timeout_sec: int,
-                              assert_func: Callable[[Any, Dict[str, Any], ], None],
+    def wait_for_test_results(self, timeout_sec: int, assert_func: Callable[[Any, Dict[str, Any], ], None],
                               assert_func_args: List):
         with self.prepare_test_results(timeout_sec=timeout_sec):
             assert_func(*assert_func_args)

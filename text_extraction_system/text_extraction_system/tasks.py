@@ -88,10 +88,8 @@ def setup_loggers(*args, **kwargs):
     logger.handlers.clear()
 
     if conf.log_to_stdout:
-        if conf.log_to_stdout_json:
-            formatter = JSONFormatter()
-        else:
-            formatter = logging.Formatter('%(levelname)s %(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        formatter = JSONFormatter() if conf.log_to_stdout_json \
+            else logging.Formatter('%(levelname)s %(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
         sh = logging.StreamHandler()
         sh.setFormatter(formatter)
         logger.addHandler(sh)
@@ -115,22 +113,11 @@ def setup_loggers(*args, **kwargs):
 
 
 @before_task_publish.connect
-def on_before_task_publish(sender,
-                           body,
-                           exchange,
-                           routing_key,
-                           headers,
-                           properties,
-                           declare,
-                           retry_policy, *args, **kwargs):
+def on_before_task_publish(sender, body, exchange, routing_key, headers, properties, declare, retry_policy,
+                           *args, **kwargs):
     # log.info(f'Registering task: #{headers["id"]} - {headers["task"]}')
-    store_pending_task_info_in_webdav(body=body,
-                                      exchange=exchange,
-                                      routing_key=routing_key,
-                                      headers=headers,
-                                      properties=properties,
-                                      declare=declare,
-                                      retry_policy=retry_policy)
+    store_pending_task_info_in_webdav(body=body, exchange=exchange, routing_key=routing_key, headers=headers,
+                                      properties=properties, declare=declare, retry_policy=retry_policy)
 
 
 @task_success.connect
@@ -281,8 +268,8 @@ def process_pdf(pdf_fn: str, req: RequestMetadata, webdav_client: WebDavClient):
         log.info(f'{req.original_file_name} | Scheduling {len(task_signatures)} sub-tasks...')
         request_callback_info_dict = req.request_callback_info.to_dict()
         c = chord(task_signatures)(
-            finish_pdf_processing.s(req.request_id, req.original_file_name, image_fns, request_callback_info_dict)
-                                 .set(link_error=[ocr_error_callback.s(req.request_id, request_callback_info_dict)]))
+            finish_pdf_processing.s(req.request_id, req.original_file_name, request_callback_info_dict).set(
+                link_error=[ocr_error_callback.s(req.request_id, request_callback_info_dict)]))
         register_task_id(webdav_client, req.request_id, c.id)
         for ar in c.parent.children:
             register_task_id(webdav_client, req.request_id, ar.id)
@@ -364,7 +351,6 @@ def finish_pdf_processing(task,
                           ocred_page_nums: List[int],
                           request_id: str,
                           original_file_name: str,
-                          image_fns: Dict[int, str],
                           req_callback_info: Dict[str, Any]):
     req_callback_info = RequestCallbackInfo(**req_callback_info)
     with handle_errors(request_id, req_callback_info):
@@ -400,11 +386,7 @@ def finish_pdf_processing(task,
                 page_name = os.path.splitext(remote_base_fn)[0]
                 # page_name is either '00004' or '00004.-0.75' where the part after the first dot
                 # is the detected page rotation angle
-                if '.' in page_name:
-                    page_num = int(page_name[:5])
-                else:
-                    page_num = int(page_name)
-
+                page_num = int(page_name[:5] if '.' in page_name else page_name)
                 pdf_pages_ocred.append(page_num)
                 requires_page_merge = True
 
@@ -412,21 +394,19 @@ def finish_pdf_processing(task,
                 req.pdf_pages_ocred = pdf_pages_ocred
                 original_pdf_in_storage = req.converted_to_pdf or req.original_document
                 local_orig_pdf_fn = os.path.join(temp_dir, original_pdf_in_storage)
-
                 webdav_client.download_file(f'{req.request_id}/{original_pdf_in_storage}', local_orig_pdf_fn)
 
                 # merge-in the OCRed pages into the original PDF by adding them as layers on the original pages
                 # merge_pdf_pages() expects the page PDF in pages_dir to be named as
-                # either <page_num>.<rotation_angle>.pdf
-                # or <page_num>.pdf
+                # either <page_num>.<rotation_angle>.pdf or <page_num>.pdf
                 with merge_pdf_pages(local_orig_pdf_fn, pages_dir) as local_merged_pdf_fn:
                     req.ocred_pdf = os.path.splitext(original_pdf_in_storage)[0] + '.ocred.pdf'
                     webdav_client.upload_file(f'{req.request_id}/{req.ocred_pdf}', local_merged_pdf_fn)
-                    extract_data_and_finish(req, webdav_client, local_merged_pdf_fn, image_fns)
+                    extract_data_and_finish(req, webdav_client, local_merged_pdf_fn)
             else:
                 remote_fn = req.converted_to_pdf or req.original_document
                 with webdav_client.get_as_local_fn(f'{req.request_id}/{remote_fn}') as (local_pdf_fn, _remote_path):
-                    extract_data_and_finish(req, webdav_client, local_pdf_fn, image_fns)
+                    extract_data_and_finish(req, webdav_client, local_pdf_fn)
 
         finally:
             shutil.rmtree(temp_dir)
@@ -435,8 +415,7 @@ def finish_pdf_processing(task,
 
 def extract_data_and_finish(req: RequestMetadata,
                             webdav_client: WebDavClient,
-                            local_pdf_fn: str,
-                            image_fns: Dict[int, str]):
+                            local_pdf_fn: str,):
     req.pdf_file = req.ocred_pdf or req.converted_to_pdf or req.original_document
     pdf_fn_in_storage_base = os.path.splitext(req.original_document)[0]
     camelot_tables: Optional[List[CamelotTable]] = None
@@ -510,11 +489,10 @@ def extract_data_and_finish(req: RequestMetadata,
             webdav_client.upload(f'{req.request_id}/{req.corrected_pdf}', orig_or_corrected_pdf_fn)
 
         if req.table_extraction_enable:
-        #     log.info(f'Extracting tables from {req.pdf_file}...')
-        #     camelot_tables = extract_tables_from_pdf_file(orig_or_corrected_pdf_fn, image_fns,
-        #                                                   table_parser=req.table_parser)
-        # else:
-            log.info(f'Table extraction is turned off.')
+            log.info(f'Extracting tables from {req.pdf_file}...')
+            camelot_tables = extract_tables_from_pdf_file(orig_or_corrected_pdf_fn, table_parser=req.table_parser)
+        else:
+            log.info('Table extraction is turned off.')
 
     if camelot_tables:
         tables = get_table_dtos_from_camelot_output(camelot_tables)

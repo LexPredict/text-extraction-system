@@ -14,5 +14,4 @@ if __name__ == '__main__':
         'call_back_celery_task_name': 'document.process_text_extraction_results'
     }
     requests.post(test_settings.api_url + '/api/v1/data_extraction_tasks/',
-                  files=dict(file=(os.path.basename(fn), open(fn, 'rb'))),
-                  data=call_back_data)
+                  files=dict(file=(os.path.basename(fn), open(fn, 'rb'))), data=call_back_data)

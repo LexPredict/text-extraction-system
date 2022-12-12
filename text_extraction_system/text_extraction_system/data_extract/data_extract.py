@@ -11,17 +11,15 @@ from io import StringIO
 from logging import getLogger
 from subprocess import CompletedProcess, PIPE
 from tempfile import mkdtemp
-from typing import Tuple, Generator, Optional, Dict, Any, List
+from typing import Tuple, Optional, Dict, Any, List
 
 import msgpack
 from lexnlp.nlp.en.segments.paragraphs import get_paragraph_spans
 from lexnlp.nlp.en.segments.sections import get_document_sections_with_titles
 from lexnlp.nlp.en.segments.sentences import get_sentence_span_list
 from lexnlp.nlp.en.segments.titles import get_titles
-from pdfminer.converter import PDFPageAggregator
-from pdfminer.converter import TextConverter
-from pdfminer.layout import LAParams
-from pdfminer.layout import LTPage
+from pdfminer.converter import PDFPageAggregator, TextConverter
+from pdfminer.layout import LAParams, LTPage
 from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
 from pdfminer.pdfpage import PDFPage
@@ -31,15 +29,13 @@ from text_extraction_system.config import get_settings
 from text_extraction_system.constants import TESSERACT_DEFAULT_LANGUAGE
 from text_extraction_system.data_extract.lang import get_lang_detector
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf, get_page_orientation, OCRException
-from text_extraction_system.ocr.rotation_detection import determine_rotation, \
-    RotationDetectionMethod, PageRotationStatus
-from text_extraction_system.pdf.pdf import extract_page_ocr_images, \
-    raise_from_pdfbox_error_messages, rotate_pdf_pages
+from text_extraction_system.ocr.rotation_detection import determine_rotation, RotationDetectionMethod, \
+    PageRotationStatus
+from text_extraction_system.pdf.pdf import raise_from_pdfbox_error_messages, rotate_pdf_pages
 from text_extraction_system.processes import raise_from_process
 from text_extraction_system.utils import LanguageConverter
-from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, \
-    PlainTextStructure, PlainTextSentence, TextAndPDFCoordinates, PDFCoordinates, \
-    PlainTableOfContentsRecord
+from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, PlainTextStructure, \
+    PlainTextSentence, TextAndPDFCoordinates, PDFCoordinates, PlainTableOfContentsRecord
 from text_extraction_system_api.pdf_coordinates.pdf_coords_common import find_page_by_smb_index
 from text_extraction_system_api.pdf_coordinates.coord_text_map import CoordTextMap
 
