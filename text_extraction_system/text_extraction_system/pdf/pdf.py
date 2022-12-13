@@ -194,8 +194,10 @@ def extract_page_images_from_pdf(pdf_fn: str, should_clean_text: bool = True, st
 def calc_covers(lt_obj: LTItem) -> Tuple[int, int]:
     text_cover = 0
     image_cover = 0
-    if isinstance(lt_obj, (LTTextBox, LTTextLine, LTImage)):
+    if isinstance(lt_obj, (LTTextBox, LTTextLine)):
         text_cover += (lt_obj.x1 - lt_obj.x0) * (lt_obj.y1 - lt_obj.y0)
+    elif isinstance(lt_obj, LTImage):
+        image_cover += (lt_obj.x1 - lt_obj.x0) * (lt_obj.y1 - lt_obj.y0)
     elif isinstance(lt_obj, LTLayoutContainer):
         for item in lt_obj:
             t, i = calc_covers(item)
