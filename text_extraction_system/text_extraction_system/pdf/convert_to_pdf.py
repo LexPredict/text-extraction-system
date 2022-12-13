@@ -28,8 +28,7 @@ def convert_image_to_pdf(src_fn: str,
     """
     Converts image to pdf file using custom Java solution
     """
-    args = ['java', '-cp', f'{get_settings().java_modules_path}/*',
-            'com.lexpredict.textextraction.MakePDFFromImages',
+    args = ['java', '-cp', f'{get_settings().java_modules_path}/*', 'com.lexpredict.textextraction.MakePDFFromImages',
             out_fn, src_fn]
     return run_process(args, timeout_sec)
 

@@ -42,6 +42,8 @@ log.txt
 *.pid
 
 .cache/
+.ruff_cache/
+.pytest_cache/
 
 .DS_Store
 

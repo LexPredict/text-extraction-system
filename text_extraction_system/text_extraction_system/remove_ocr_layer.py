@@ -21,8 +21,7 @@ def remove_ocr_layer(pdf_file_name: str,
         dst_pdf_fn = os.path.join(temp_dir, os.path.basename(pdf_file_name))
 
         java_modules_path = get_settings().java_modules_path
-        args = ['java', '-cp', f'{java_modules_path}/*',
-                'com.lexpredict.textextraction.RemovePdfText',
+        args = ['java', '-cp', f'{java_modules_path}/*', 'com.lexpredict.textextraction.RemovePdfText',
                 '-orig', pdf_file_name,
                 '-dst', dst_pdf_fn]
 
@@ -40,7 +39,7 @@ def remove_ocr_layer(pdf_file_name: str,
         raise_from_pdfbox_error_messages(completed_process)
 
         shutil.move(dst_pdf_fn, pdf_file_name)
-    except Exception as e:
+    except Exception:
         raise
     finally:
         shutil.rmtree(temp_dir)

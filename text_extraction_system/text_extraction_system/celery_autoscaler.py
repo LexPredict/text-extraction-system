@@ -21,8 +21,8 @@ class ShutdownWhenNoTasksAutoscaler(Autoscaler):
         from text_extraction_system.config import get_settings
         self.cool_down_period_sec = get_settings().celery_shutdown_when_no_tasks_longer_than_sec
         self.no_tasks_start: Optional[float] = None
-        print(
-            f'Configuring celery to shutdown when there were no tasks for more than f{self.cool_down_period_sec} seconds.')
+        print(f'Configuring celery to shutdown when there were no tasks for more than '
+              f'f{self.cool_down_period_sec} seconds.')
 
     def _maybe_scale(self, req=None):
         res = super()._maybe_scale(req)

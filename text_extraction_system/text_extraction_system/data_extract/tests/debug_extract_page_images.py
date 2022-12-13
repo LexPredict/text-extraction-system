@@ -1,7 +1,7 @@
 import os
 import shutil
 
-from text_extraction_system.pdf.pdf import split_pdf_to_page_blocks, extract_page_images
+from text_extraction_system.pdf.pdf import extract_page_images
 from text_extraction_system.commons.tests.commons import default_settings
 
 fn = os.path.join(os.path.dirname(__file__), 'data', 'table-based-text_noocr.pdf')

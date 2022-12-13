@@ -194,8 +194,7 @@ class TestBasicAPICallbackMethods(unittest.TestCase):
             call_back_additional_info='hello world',
             log_extra={'hello': 'world', 'test': True})
 
-        from time import sleep
-        sleep(10)
+        time.sleep(10)
         del_res = self.client.purge_data_extraction_task(request_id)
         assert del_res.task_ids
         assert del_res.successfully_revoked

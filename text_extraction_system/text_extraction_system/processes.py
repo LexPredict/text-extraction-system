@@ -208,7 +208,7 @@ def terminate_processes_by_ids(pids: List[int],
                 count_skipped += 1
         except psutil.NoSuchProcess:
             count_skipped += 1
-        except:
+        except Exception:
             count_failed += 1
     if log_func:
         log_func(f'terminate_processes(): {count_terminated} spawned processed are terminated, '

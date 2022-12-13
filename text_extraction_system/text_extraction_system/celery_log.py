@@ -115,7 +115,7 @@ class HumanReadableTraceBackException(TracebackException):
         ex = self  # type: HumanReadableTraceBackException
 
         while True:
-            error_stack.extend([l.strip('\n') for l in self.format_stack(ex.stack)])
+            error_stack.extend([log_item.strip('\n') for log_item in self.format_stack(ex.stack)])
             if ex.__cause__ is not None:
                 ex = ex.__cause__
             elif ex.__context__ is not None and not ex.__suppress_context__:

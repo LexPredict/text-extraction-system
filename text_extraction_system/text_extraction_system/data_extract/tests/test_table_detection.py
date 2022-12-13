@@ -73,7 +73,7 @@ def test_remove_distant_cells():
 
 
 @with_default_settings
-def test_remove_distant_cells():
+def test_remove_distant_cells_2():
     cell = TableLocationCell(15, 100, 30, 20)
     c = TableLocationCluster(cell, 'm', DS)
     c.add_cell_to_cluster(TableLocationCell(18, 130, 30, 20))

@@ -33,19 +33,12 @@ from text_extraction_system.tasks import process_document, celery_app, register_
 from text_extraction_system_api import dto
 from text_extraction_system_api.dto import OutputFormat, TableList, PlainTextStructure, RequestStatus, \
     RequestStatuses, SystemInfo, TaskCancelResult, PDFCoordinates, STATUS_DONE, STATUS_FAILURE, UserRequestsSummary, \
-    STATUS_PENDING, UserRequestsQuery, TableParser, RequestEstimate, RequestProgress
+    STATUS_PENDING, UserRequestsQuery, TableParser
 
 app = FastAPI()
-
 apiRouter = APIRouter()
-
 app.mount("/static", StaticFiles(directory="text_extraction_system/templates"), name="static")
-
-app.include_router(
-    apiRouter,
-    prefix="/api",
-)
-
+app.include_router(apiRouter, prefix="/api",)
 templates = Jinja2Templates(directory="text_extraction_system/templates")
 
 
@@ -518,7 +511,8 @@ def _proxy_request(webdav_client,
             content = type_conversion(content)
         return Response(content=content, status_code=resp.status_code, headers=headers)
     except RemoteResourceNotFound:
-        raise HTTPException(HTTP_404_NOT_FOUND, f'No such request or there is no filename `{fn}` in the request results')
+        raise HTTPException(HTTP_404_NOT_FOUND,
+                            f'No such request or there is no filename `{fn}` in the request results')
 
 
 def _wait_for_pdf_extraction_finish(request_id: str, timeout_sec: int) -> bool:

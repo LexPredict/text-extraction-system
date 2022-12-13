@@ -1,5 +1,3 @@
-from enum import Enum
-
 metadata_fn = 'metadata.json'
 results_fn = 'results.zip'
 pages_ocred = 'pages_ocred'
@@ -10,6 +8,9 @@ task_ids = 'task_ids'
 
 tasks_pending = 'tasks_pending'
 queue_celery_beat = 'beat'
+
+PAGE_SEPARATOR = '\n\n\f'
+DPI: int = 300
 
 TESSERACT_LANGUAGES = {
     "en": "eng",
