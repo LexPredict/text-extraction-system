@@ -180,13 +180,13 @@ def extract_page_images_from_pdf(pdf_fn: str, should_clean_text: bool = True, st
         # Create separate pdf-page
         dst = pikepdf.Pdf.new()
         dst.pages.append(doc.pages[i])
-        page_image_fn = os.path.join(temp_dir_images, f'{base_fn}__{page_num_to_fn(i)}.pdf')
+        page_image_fn = os.path.join(temp_dir_images, f'{base_fn}__{page_num_to_fn(i+1)}.pdf')
         dst.save(page_image_fn)
         # Convert pdf to image
         pdf_pages = convert_from_path(page_image_fn, dpi)
         page_image_fn = f"{page_image_fn[:-3]}png"
         pdf_pages[0].save(page_image_fn, 'PNG')
-        page_by_num_image[i] = page_image_fn
+        page_by_num_image[i+1] = page_image_fn
     yield page_by_num_image
     shutil.rmtree(temp_dir_images, ignore_errors=True)
 
@@ -208,10 +208,8 @@ def calc_covers(lt_obj: LTItem) -> Tuple[int, int]:
 
 def build_block_fn(src_fn: str, page_start: int, page_end: int) -> str:
     fn: str = os.path.basename(src_fn)
-    if page_start == page_end:
-        fn = f'{os.path.splitext(fn)[0]}_{(page_start + 1):04}.pdf'
-    else:
-        fn = f'{os.path.splitext(fn)[0]}_{(page_start + 1):04}_{(page_end + 1):04}.pdf'
+    append_name = f'_{(page_end + 1):04}' if page_start != page_end else ''
+    fn = f'{os.path.splitext(fn)[0]}_{(page_start + 1):04}{append_name}.pdf'
     return fn
 
 
@@ -253,12 +251,47 @@ def split_pdf_to_page_blocks(src_pdf_fn: str,
 
 
 @contextmanager
+def get_page_from_pdf(pdf_fn: str, page_number: int = 0) -> Generator[str, None, None]:
+    pdf_page_fn = f'{pdf_fn[:-4]}__{page_num_to_fn(page_number)}.pdf'
+    dst = pikepdf.Pdf.new()
+    try:
+        with pikepdf.Pdf.open(pdf_fn) as doc:
+            dst.pages.append(doc.pages[page_number])
+            dst.save(pdf_page_fn)
+            dst.close()
+        yield pdf_page_fn
+    except IndexError:
+        yield None
+    finally:
+        if os.path.isfile(pdf_page_fn):
+            os.remove(pdf_page_fn)
+
+
+@contextmanager
+def extract_pdf_pages(pdf_fn: str) -> Generator[Dict[int, str], None, None]:
+    temp_dir = mkdtemp()
+    try:
+        res: Dict[int, str] = dict()
+        base_name = os.path.basename(pdf_fn)
+        with pikepdf.Pdf.open(pdf_fn) as doc:
+            for page_index in range(len(doc.pages)):
+                dst = pikepdf.Pdf.new()
+                dst.pages.append(doc.pages[page_index])
+                pdf_page_fn = os.path.join(temp_dir, f'{base_name[:-4]}__{page_num_to_fn(page_index)}.pdf')
+                dst.save(pdf_page_fn)
+                dst.close()
+                res[page_index] = pdf_page_fn
+        yield res
+    finally:
+        shutil.rmtree(temp_dir)
+
+
+@contextmanager
 def merge_pdf_pages(original_pdf_fn: str,
                     page_pdf_dir: str = None,
                     single_page_merge_num_file_rotate: Tuple[int, str, Optional[float]] = None,
                     original_pdf_password: str = None,
-                    timeout_sec: int = 3000) \
-        -> Generator[str, None, None]:
+                    timeout_sec: int = 3000) -> Generator[str, None, None]:
     temp_dir = mkdtemp()
     try:
         dst_pdf_fn = os.path.join(temp_dir, os.path.basename(original_pdf_fn))

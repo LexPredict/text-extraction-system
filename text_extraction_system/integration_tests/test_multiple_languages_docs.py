@@ -47,7 +47,7 @@ class TestDifferentLanguagesOCRExtract(unittest.TestCase):
                 assert 'Top.' not in text
                 assert 'являлся Тор.' in text
             assert len(text_struct.pages) == 1
-            assert len(text_struct.paragraphs) == 1
+            assert 3 > len(text_struct.paragraphs) > 0
             for i in text_struct.paragraphs:
                 assert i.language == text_struct.language
             assert len(text_struct.sentences) == 3

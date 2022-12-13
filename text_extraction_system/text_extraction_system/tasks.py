@@ -21,11 +21,12 @@ from text_extraction_system.config import get_settings
 from text_extraction_system.constants import pages_ocred, task_ids, pages_for_processing, pages_tables, \
     queue_celery_beat
 from text_extraction_system.data_extract.camelot.camelot import extract_tables_from_pdf_file
-from text_extraction_system.data_extract.data_extract import extract_text_and_structure, process_pdf_page
+from text_extraction_system.data_extract.data_extract import extract_text_and_structure, process_pdf_page, \
+    get_pdf_pages_characters_amount
 from text_extraction_system.data_extract.tables import get_table_dtos_from_camelot_output
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
 from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
-from text_extraction_system.pdf.pdf import merge_pdf_pages, extract_page_ocr_images, get_pdf_pages_amount
+from text_extraction_system.pdf.pdf import merge_pdf_pages, get_pdf_pages_amount, extract_page_images_from_pdf
 from text_extraction_system.remove_ocr_layer import remove_ocr_layer
 from text_extraction_system.request_metadata import RequestCallbackInfo, RequestMetadata, save_request_metadata, \
     load_request_metadata
@@ -53,17 +54,11 @@ class CeleryConfig:
     def worker_autoscaler(self) -> Optional[str]:
         if settings.celery_shutdown_when_no_tasks_longer_than_sec:
             return 'text_extraction_system.celery_autoscaler:ShutdownWhenNoTasksAutoscaler'
-        else:
-            return 'celery.worker.autoscale:Autoscaler'
+        return 'celery.worker.autoscale:Autoscaler'
 
 
-celery_app = Celery(
-    'celery_app',
-    backend=settings.celery_backend,
-    broker=settings.celery_broker,
-    config_source=CeleryConfig(),
-)
-
+celery_app = Celery('celery_app', backend=settings.celery_backend, broker=settings.celery_broker,
+                    config_source=CeleryConfig())
 init_task_tracking()
 
 
@@ -82,26 +77,20 @@ def setup_recursion_limit(*args, **kwargs):
 @after_setup_logger.connect
 def setup_loggers(*args, **kwargs):
     conf = get_settings()
-
     logger = logging.getLogger()
     logger.handlers.clear()
-
     if conf.log_to_stdout:
-        if conf.log_to_stdout_json:
-            formatter = JSONFormatter()
-        else:
-            formatter = logging.Formatter('%(levelname)s %(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        formatter = JSONFormatter() if conf.log_to_stdout_json \
+            else logging.Formatter('%(levelname)s %(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
         sh = logging.StreamHandler()
         sh.setFormatter(formatter)
         logger.addHandler(sh)
-
     if conf.log_to_file:
         formatter = JSONFormatter()
         from logging.handlers import RotatingFileHandler
         sh = RotatingFileHandler(filename=conf.log_to_file, encoding='utf-8', maxBytes=10 * 1024 * 1024, backupCount=5)
         sh.setFormatter(formatter)
         logger.addHandler(sh)
-
     # make pdfminer a bit more silent
     from pdfminer.pdfinterp import log as pdfinterp_log
     from pdfminer.pdfpage import log as pdfpage_log
@@ -114,22 +103,11 @@ def setup_loggers(*args, **kwargs):
 
 
 @before_task_publish.connect
-def on_before_task_publish(sender,
-                           body,
-                           exchange,
-                           routing_key,
-                           headers,
-                           properties,
-                           declare,
-                           retry_policy, *args, **kwargs):
+def on_before_task_publish(sender, body, exchange, routing_key, headers, properties, declare, retry_policy,
+                           *args, **kwargs):
     # log.info(f'Registering task: #{headers["id"]} - {headers["task"]}')
-    store_pending_task_info_in_webdav(body=body,
-                                      exchange=exchange,
-                                      routing_key=routing_key,
-                                      headers=headers,
-                                      properties=properties,
-                                      declare=declare,
-                                      retry_policy=retry_policy)
+    store_pending_task_info_in_webdav(body=body, exchange=exchange, routing_key=routing_key, headers=headers,
+                                      properties=properties, declare=declare, retry_policy=retry_policy)
 
 
 @task_success.connect
@@ -169,16 +147,12 @@ def deliver_error(request_id: str,
     try:
         req = load_request_metadata(request_id)
         if not req:
-            log.warning(f'{request_callback_info.original_file_name} | Not delivering error '
-                        f'because the request files do not exist in storage: '
-                        f'(#{request_id})\n'
-                        f'This usually means the request is canceled.')
+            log.warning(f'{request_callback_info.original_file_name} | Not delivering error because the request files '
+                        f'do not exist in storage: (#{request_id})\nThis usually means the request is canceled.')
             return
         req.status = STATUS_FAILURE
-
         if problem or exc:
             req.append_error(problem, exc)
-
         save_request_metadata(req)
     except Exception as req_upd_err:
         log.error(f'{request_callback_info.original_file_name} | Unable to store failed status into '
@@ -226,8 +200,7 @@ def process_document(task,
                     remove_ocr_layer(fn)
             else:
                 log.info(f'{req.original_file_name} | Converting to PDF...')
-                with convert_to_pdf(fn, timeout_sec=req.convert_to_pdf_timeout_sec) \
-                        as local_converted_pdf_fn:
+                with convert_to_pdf(fn, timeout_sec=req.convert_to_pdf_timeout_sec) as local_converted_pdf_fn:
                     req.converted_to_pdf = os.path.splitext(req.original_document)[0] + '.converted.pdf'
                     webdav_client.upload_file(remote_path=f'{request_id}/{req.converted_to_pdf}',
                                               local_path=local_converted_pdf_fn)
@@ -251,7 +224,8 @@ def process_pdf(pdf_fn: str, req: RequestMetadata, webdav_client: WebDavClient):
 
     task_signatures = list()
     pages_amount = get_pdf_pages_amount(pdf_fn)
-    with extract_page_ocr_images(pdf_fn, start_page=1, end_page=pages_amount) as image_fns:
+    characters_amounts = get_pdf_pages_characters_amount(pdf_fn)
+    with extract_page_images_from_pdf(pdf_fn) as image_fns:
         for image_num, image_fn in image_fns.items():
             image_base_fn = os.path.basename(image_fn)
             start = time.time()
@@ -260,6 +234,7 @@ def process_pdf(pdf_fn: str, req: RequestMetadata, webdav_client: WebDavClient):
             task_signatures.append(process_pdf_image_task.s(req.request_id,
                                                            req.original_file_name,
                                                            image_base_fn,
+                                                           characters_amounts[image_num-1],
                                                            image_num,
                                                            ocr_language,
                                                            req.request_callback_info.log_extra,
@@ -280,6 +255,7 @@ def process_pdf_image_task(_task,
                            request_id: str,
                            original_file_name: str,
                            image_base_fn: str,
+                           chars_amount: int,
                            page_number: int,
                            ocr_language: str,
                            log_extra: Dict[str, str] = None,
@@ -298,29 +274,25 @@ def process_pdf_image_task(_task,
         return None
     if req.status != STATUS_PENDING:
         log.info(
-            f'{original_file_name} | Canceling pdf page processing sub-task for page {page_number}:'
-            f' {image_base_fn} (request #{request_id})\n'
-            f'because the request is already in status {req.status}.')
+            f'{original_file_name} | Canceling pdf page processing sub-task for page {page_number}: {image_base_fn} '
+            f'(request #{request_id})\nbecause the request is already in status {req.status}.')
         return None
     log.info(f'{original_file_name} | Processing PDF page {page_number}...')
     try:
         with webdav_client.get_as_local_fn(f'{req.request_id}/{pages_for_processing}/{image_base_fn}') \
                 as (local_pdf_page_fn, _remote_path):
             with process_pdf_page(local_pdf_page_fn,
+                                  chars_amount=chars_amount,
                                   ocr_enabled=req.ocr_enable,
                                   ocr_language=ocr_language,
                                   ocr_timeout_sec=req.page_ocr_timeout_sec,
-                                  detect_orientation_tesseract=detect_orientation_tesseract) \
-                    as page_proc_res:
+                                  detect_orientation_tesseract=detect_orientation_tesseract) as page_proc_res:
                 file_name = page_num_to_fn(page_number)
                 if page_proc_res.rotation_angle:
                     file_name = f'{file_name}.{page_proc_res.rotation_angle}'
                 remote_path = f'{req.request_id}/{pages_ocred}/{file_name}.pdf'
-
                 if page_proc_res.page_requires_ocr:
-                    webdav_client.upload_file(
-                        remote_path=remote_path,
-                        local_path=page_proc_res.ocred_page_fn)
+                    webdav_client.upload_file(remote_path=remote_path, local_path=page_proc_res.ocred_page_fn)
     except Exception as e:
         raise Exception(f'{original_file_name} |  Exception caught while processing '
                         f'PDF page {page_number}: {image_base_fn}') from e
@@ -328,11 +300,8 @@ def process_pdf_image_task(_task,
         # Time to process all pages + time to preprocess document + predicted time to postprocess document
         estimate_time = int((time.time() - start_processing_time) * pages_amount
                             + (start_processing_time - req.request_date.timestamp()) * 2)
-        deliver_estimate(req.request_callback_info, RequestEstimate(pages=pages_amount,
-                                                                    estimate=estimate_time))
-
-    deliver_progress(req.request_callback_info, RequestProgress(pages=pages_amount,
-                                                                current_page=page_number,
+        deliver_estimate(req.request_callback_info, RequestEstimate(pages=pages_amount, estimate=estimate_time))
+    deliver_progress(req.request_callback_info, RequestProgress(pages=pages_amount, current_page=page_number,
                                                                 progress=int(100 * page_number / pages_amount)))
     return page_number
 
@@ -543,7 +512,6 @@ def deliver_results(req: RequestCallbackInfo, req_status: RequestStatus):
         except Exception as err:
             log.error(f'{req.original_file_name} | Unable to POST the extraction results to {req.call_back_url}',
                       exc_info=err)
-
     if req.call_back_celery_broker:
         try:
             log.info(f'{req.original_file_name} | Sending the extraction results as a celery task:\n'
@@ -563,7 +531,6 @@ def deliver_results(req: RequestCallbackInfo, req_status: RequestStatus):
                       f'broker: {req.call_back_celery_broker}\n'
                       f'queue: {req.call_back_celery_queue}\n'
                       f'task_name: {req.call_back_celery_task_name}\n', exc_info=err)
-
     status_extra = ', '.join(['plain text' if req_status.plain_text_extracted else '',
                               'coords extracted' if req_status.pdf_coordinates_extracted else '',
                               'pages OCRed' if req_status.pdf_pages_ocred else ''])

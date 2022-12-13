@@ -79,7 +79,7 @@ class TestBasicAPICallbackMethods(unittest.TestCase):
             assert rs.text_structure_extracted
 
             table_list_json: TableList = self.client.get_extracted_tables_as_msgpack(rs.request_id)
-            assert len(table_list_json.tables) == 6
+            assert len(table_list_json.tables) == 5
 
             log.info('Text extraction results look good. All assertions passed.')
 
@@ -132,7 +132,7 @@ class TestBasicAPICallbackMethods(unittest.TestCase):
             assert rs.text_structure_extracted
 
             table_list_json: TableList = self.client.get_extracted_tables_as_json(rs.request_id)
-            assert len(table_list_json.tables) == 6
+            assert len(table_list_json.tables) == 5
 
             log.info('Text extraction results look good. All assertions passed.')
 

@@ -9,7 +9,7 @@ from pdfminer.layout import LTPage
 from text_extraction_system_api.dto import TableParser
 
 from text_extraction_system.ocr.tables.table_detection import TableDetector
-from text_extraction_system.pdf.pdf import extract_page_images, iterate_pages
+from text_extraction_system.pdf.pdf import iterate_pages, extract_page_images_from_pdf
 
 
 class CustomizedLattice(Lattice):
@@ -40,15 +40,11 @@ class CustomizedLattice(Lattice):
 class CustomizedStream(Stream):
 
     def _generate_layout(self, filename, layout_kwargs):
-        # Copied from camelot/parsers/base/BaseParser._generate_layout()
-        # with removing the actual layout generation because we already
-        # have the layout for other needs.
-
+        # Copied from camelot/parsers/base/BaseParser._generate_layout() with removing the actual layout generation
+        # because we already have the layout for other needs.
         self.filename = filename
         self.layout_kwargs = layout_kwargs
-
         # self.layout, self.dimensions = get_page_layout(filename, **layout_kwargs)
-
         self.images = get_text_objects(self.layout, ltype="image")
         self.horizontal_text = get_text_objects(self.layout, ltype="horizontal_text")
         self.vertical_text = get_text_objects(self.layout, ltype="vertical_text")
@@ -70,8 +66,7 @@ def extract_tables(pageno: int,
     height = page_layout.bbox[3]
     dim = (width, height)
     extractor.dimensions = dim
-    # putting a dummy file name to avoid Camelot arguing
-    # Camelot extracts the page number from the file name.
+    # putting a dummy file name to avoid Camelot arguing. Camelot extracts the page number from the file name.
     try:
         tables = extractor.extract_tables(f'page-{pageno}.pdf', suppress_stdout=True)
     except Exception:
@@ -100,10 +95,12 @@ def extract_tables_from_pdf_file(pdf_fn: str,
                                  table_parser: TableParser = TableParser.lattice,
                                  min_accuracy: int = 60) -> List[CamelotTable]:
     res: List[CamelotTable] = list()
-    with extract_page_images(pdf_fn=pdf_fn, dpi=71) as image_fns:
+    with extract_page_images_from_pdf(pdf_fn, dpi=71) as image_fns:
         page_num = 0
         for ltpage in iterate_pages(pdf_fn, use_advanced_detection=pdfminer_advanced_detection):
-            page_image_fn = image_fns[page_num]
+            if page_num + 1 not in image_fns:
+                continue
+            page_image_fn = image_fns[page_num+1]
             camelot_tables: List[CamelotTable] = extract_tables(
                 page_num, ltpage, page_image_fn, table_parser, min_accuracy)
             if camelot_tables:
@@ -123,8 +120,7 @@ def extract_tables_from_pdf_file_stream(pdf_fn: str, pdfminer_advanced_detection
     return res or None
 
 
-def extract_tables_borderless(pageno: int,
-                              page_layout: LTPage) -> List[CamelotTable]:
+def extract_tables_borderless(pageno: int, page_layout: LTPage) -> List[CamelotTable]:
     stream: CustomizedStream = CustomizedStream(row_tol=500)
     stream.layout = page_layout
     width = page_layout.bbox[2]

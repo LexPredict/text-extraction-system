@@ -1,4 +1,5 @@
 import gc
+import io
 import os
 import shutil
 import subprocess
@@ -29,7 +30,8 @@ from text_extraction_system.config import get_settings
 from text_extraction_system.constants import TESSERACT_DEFAULT_LANGUAGE
 from text_extraction_system.data_extract.lang import get_lang_detector
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf, get_page_orientation, OCRException
-from text_extraction_system.ocr.rotation_detection import PageRotationStatus
+from text_extraction_system.ocr.rotation_detection import PageRotationStatus, determine_rotation, \
+    RotationDetectionMethod
 from text_extraction_system.pdf.pdf import raise_from_pdfbox_error_messages
 from text_extraction_system.processes import raise_from_process
 from text_extraction_system.utils import LanguageConverter
@@ -276,8 +278,8 @@ class PDFPageProcessingResults:
 
 
 @contextmanager
-def process_pdf_page(page_image_without_text_fn: str, ocr_enabled: bool = True, ocr_language: str = None,
-                     ocr_timeout_sec: int = 60, detect_orientation_tesseract=False) \
+def process_pdf_page(page_image_without_text_fn: str, chars_amount: int = 0, ocr_enabled: bool = True,
+                     ocr_language: str = None, ocr_timeout_sec: int = 60, detect_orientation_tesseract=False) \
         -> Generator[PDFPageProcessingResults, None, None]:
     if not ocr_enabled:
         yield PDFPageProcessingResults(page_requires_ocr=False)
@@ -297,16 +299,14 @@ def process_pdf_page(page_image_without_text_fn: str, ocr_enabled: bool = True, 
         if orientation and orientation[0] and orientation[1] > ORIENTATION_THRESHOLD:
             rotate_image(orientation[0], page_image_without_text_fn, page_image_without_text_fn)
 
-    # ToDo: move detecting rotation to process_pdf method
-    # # The image might be rotated. Then we try to determine the image rotation angle
-    # # based on opencv algorithms and rotate the image back.
-    # # Even if the image is still rotated, OCR will extract the text. That's fine
-    # # if the image rotation angle is a multiple of 90 degree.
-    # rot_status = determine_rotation(page_image_without_text_fn, RotationDetectionMethod.DILATED_ROWS)
-    # if should_correct_rotation(pdf_fn, rot_status):
-    #     # we don't rotate images by more than 45 degree angle
-    #     rot_angle = normalize_angle_90(rot_status.angle)
-    #     rotate_image(rot_angle, page_image_without_text_fn, page_image_without_text_fn)
+    # The image might be rotated. Then we try to determine the image rotation angle based on opencv
+    # algorithms and rotate the image back. Even if the image is still rotated, OCR will extract the text.
+    # That's fine if the image rotation angle is a multiple of 90 degree.
+    rot_status = determine_rotation(page_image_without_text_fn, RotationDetectionMethod.DILATED_ROWS)
+    if should_correct_rotation(chars_amount, rot_status):
+        # we don't rotate images by more than 45 degree angle
+        rot_angle = normalize_angle_90(rot_status.angle)
+        rotate_image(rot_angle, page_image_without_text_fn, page_image_without_text_fn)
 
     # It returns a text-based PDF with glyph-less text to be used for merging in front of the original PDF page layout
     with ocr_page_to_pdf(page_image_fn=page_image_without_text_fn, language=ocr_language, timeout=ocr_timeout_sec,
@@ -335,7 +335,7 @@ def rotate_page_back(page_image_without_text_fn: str, rot_angle: float):
     img.save(page_image_without_text_fn)
 
 
-def should_correct_rotation(pdf_fn: str, rot_status: PageRotationStatus) -> bool:
+def should_correct_rotation(chars_amount: int, rot_status: PageRotationStatus) -> bool:
     """
     The page may contain much text and just a small image, that our CV2 based logic
     may detect as rotated. And then we rotate the page itself.
@@ -347,26 +347,28 @@ def should_correct_rotation(pdf_fn: str, rot_status: PageRotationStatus) -> bool
         return False
     if rot_status.occupied_area_percent is None:
         return True
-
-    java_modules_path = get_settings().java_modules_path
-    args = ['java', '-cp', f'{java_modules_path}/*', 'com.lexpredict.textextraction.PDFSymbolsCalculator',
-            '--original-pdf', pdf_fn]
-
-    # compare area, occupied by image parts (that might be text) and the rest of the page
-    try:
-        p = subprocess.Popen(args, stderr=PIPE, stdout=PIPE)
-        (out, err) = p.communicate()
-        symbol_count = int(out.decode("utf-8"))
-    except Exception as e:
-        log.error(f'Error in should_correct_rotation({pdf_fn}) while calling PDFSymbolsCalculator: {e}')
-        symbol_count = 0
-
-    word_percent = 100 * symbol_count / 2700  # 2700 is an estimation for avg words per page
-    if word_percent > 40:
-        return False
-    if word_percent > 10 and rot_status.occupied_area_percent < 10:
+    word_percent = 100 * chars_amount / 2700  # 2700 is an estimation for avg words per page
+    if word_percent > 40 or word_percent > 10 > rot_status.occupied_area_percent:
         return False
     return word_percent < 3
+
+
+def get_pdf_pages_characters_amount(pdf_fn: str) -> Dict[int, int]:
+    rsrcmgr = PDFResourceManager()
+    retstr = io.StringIO()
+    codec = 'utf-8'
+    laparams = LAParams()
+    device = TextConverter(rsrcmgr, retstr, codec=codec, laparams=laparams)
+    interpreter = PDFPageInterpreter(rsrcmgr, device)
+    chars_amount: Dict[int, int] = dict()
+    with open(pdf_fn, 'rb') as fp:
+        for pageNumber, page in enumerate(PDFPage.get_pages(fp)):
+            interpreter.process_page(page)
+            data = retstr.getvalue()
+            chars_amount[pageNumber] = len(data)
+            retstr.truncate(0)
+            retstr.seek(0)
+    return chars_amount
 
 
 def rotate_image(angle: float, src_path: str, dst_path: str) -> None:
