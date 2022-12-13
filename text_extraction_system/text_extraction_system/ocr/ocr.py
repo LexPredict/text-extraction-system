@@ -11,7 +11,7 @@ import regex as re
 
 from PIL import Image
 
-from text_extraction_system.constants import TESSERACT_DEFAULT_LANGUAGE
+from text_extraction_system.constants import TESSERACT_DEFAULT_LANGUAGE, DPI
 
 log = getLogger(__name__)
 
@@ -46,15 +46,12 @@ def get_page_orientation(page_image_fn: str,
             proc.kill()
             _outs, _errs = proc.communicate()
             raise OCRException(f'Timeout waiting for tesseract to finish:\n{args}') from te
-
         if err:
             err = err.decode('utf8', 'ignore')
         if proc.returncode != 0:
             raise OCRException(f'Tesseract returned non-zero code.\n'
-                               f'Command line:\n'
-                               f'{args}\n'
-                               f'Process stderr:\n'
-                               f'{err}')
+                               f'Command line:\n{args}\n'
+                               f'Process stderr:\n{err}')
         with open(ocr_results_path + '.osd', 'r') as f_results:
             results_text = f_results.read()
     """Example result:
@@ -66,7 +63,7 @@ def get_page_orientation(page_image_fn: str,
     Script confidence: 1.44
     """
     if not results_text:
-        log.debug(f'tesseract --psm 0 returned 0 bytes')
+        log.debug('tesseract --psm 0 returned 0 bytes')
         return None
     angle_strs = [m.group(0).strip() for m in RE_ORIENTATION_ANGLE.finditer(results_text)]
     if not angle_strs:
@@ -94,7 +91,6 @@ def ocr_page_to_pdf(page_image_fn: str,
                 '-c', f'textonly_pdf={"1" if glyphless_text_only else "0"}']
         if language:
             args.extend(['-l', str(language)])
-
         args.append(page_image_fn)
         args.append(dstfn)
         env = os.environ.copy()
@@ -106,7 +102,6 @@ def ocr_page_to_pdf(page_image_fn: str,
             proc.kill()
             _outs, _errs = proc.communicate()
             raise OCRException(f'Timeout waiting for tesseract to finish:\n{args}') from te
-
         if err:
             err = err.decode('utf8', 'ignore')
         if data:
@@ -115,10 +110,8 @@ def ocr_page_to_pdf(page_image_fn: str,
         log.debug(f'{args}\nstdout:\n{data}stderr:\n{err}')
         if proc.returncode != 0:
             raise OCRException(f'Tesseract returned non-zero code.\n'
-                               f'Command line:\n'
-                               f'{args}\n'
-                               f'Process stdout:\n'
-                               f'{err}'
+                               f'Command line:\n{args}\n'
+                               f'Process stdout:\n{err}'
                                f'Process stderr:\n'
                                f'{err}')
         yield dstfn + '.pdf'
@@ -126,7 +119,7 @@ def ocr_page_to_pdf(page_image_fn: str,
         if proc is not None:
             try:
                 proc.kill()
-            except:
+            except Exception:
                 pass
         shutil.rmtree(page_dir)
 
@@ -134,7 +127,7 @@ def ocr_page_to_pdf(page_image_fn: str,
 @contextmanager
 def rotate_image(image_fn: str,
                  angle: Optional[float] = None,
-                 dpi: int = 300,
+                 dpi: int = DPI,
                  align_to_closest_90: bool = True) -> Generator[str, None, None]:
     if not angle:
         yield image_fn
@@ -190,7 +183,7 @@ def osd_to_dict(osd: str):
     return res
 
 
-def image_to_osd(page_image_fn: str, timeout: int = 180, dpi: int = 300) -> OSD:
+def image_to_osd(page_image_fn: str, timeout: int = 180, dpi: int = DPI) -> OSD:
     proc = None
     try:
         args = ['tesseract', page_image_fn, 'stdout', '--psm', '0', '--dpi', str(dpi)]
@@ -227,7 +220,7 @@ def image_to_osd(page_image_fn: str, timeout: int = 180, dpi: int = 300) -> OSD:
         if proc is not None:
             try:
                 proc.kill()
-            except:
+            except Exception:
                 pass
 
 

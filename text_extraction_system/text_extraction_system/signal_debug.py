@@ -21,7 +21,7 @@ if __name__ == '__main__':
         try:
             signal.signal(sig_num, receive_signal)
             print(f'Added handler for {SIGNAL_NAMES_BY_NUM[sig_num]} ({sig_num})')
-        except:
+        except Exception:
             print(f'Can not add handler for {SIGNAL_NAMES_BY_NUM[sig_num]} ({sig_num})')
 
     print(f'PID of this process: {os.getpid()}')

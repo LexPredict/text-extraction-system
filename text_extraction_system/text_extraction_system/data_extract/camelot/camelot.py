@@ -74,7 +74,7 @@ def extract_tables(pageno: int,
     # Camelot extracts the page number from the file name.
     try:
         tables = extractor.extract_tables(f'page-{pageno}.pdf', suppress_stdout=True)
-    except:
+    except Exception:
         tables = []
     return [t for t in tables if t.accuracy >= min_accuracy]
 

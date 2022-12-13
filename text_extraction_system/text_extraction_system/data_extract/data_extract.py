@@ -18,10 +18,8 @@ from lexnlp.nlp.en.segments.paragraphs import get_paragraph_spans
 from lexnlp.nlp.en.segments.sections import get_document_sections_with_titles
 from lexnlp.nlp.en.segments.sentences import get_sentence_span_list
 from lexnlp.nlp.en.segments.titles import get_titles
-from pdfminer.converter import PDFPageAggregator
-from pdfminer.converter import TextConverter
-from pdfminer.layout import LAParams
-from pdfminer.layout import LTPage
+from pdfminer.converter import PDFPageAggregator, TextConverter
+from pdfminer.layout import LAParams, LTPage
 from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
 from pdfminer.pdfpage import PDFPage
@@ -31,21 +29,16 @@ from text_extraction_system.config import get_settings
 from text_extraction_system.constants import TESSERACT_DEFAULT_LANGUAGE
 from text_extraction_system.data_extract.lang import get_lang_detector
 from text_extraction_system.ocr.ocr import ocr_page_to_pdf, get_page_orientation, OCRException
-from text_extraction_system.ocr.rotation_detection import determine_rotation, \
-    RotationDetectionMethod, PageRotationStatus
-from text_extraction_system.pdf.pdf import extract_page_ocr_images, \
-    raise_from_pdfbox_error_messages, rotate_pdf_pages
+from text_extraction_system.ocr.rotation_detection import PageRotationStatus
+from text_extraction_system.pdf.pdf import raise_from_pdfbox_error_messages
 from text_extraction_system.processes import raise_from_process
 from text_extraction_system.utils import LanguageConverter
-from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, \
-    PlainTextStructure, PlainTextSentence, TextAndPDFCoordinates, PDFCoordinates, \
-    PlainTableOfContentsRecord
+from text_extraction_system_api.dto import PlainTextParagraph, PlainTextSection, PlainTextPage, PlainTextStructure, \
+    PlainTextSentence, TextAndPDFCoordinates, PDFCoordinates, PlainTableOfContentsRecord
 from text_extraction_system_api.pdf_coordinates.pdf_coords_common import find_page_by_smb_index
 from text_extraction_system_api.pdf_coordinates.coord_text_map import CoordTextMap
 
 log = getLogger(__name__)
-PAGE_SEPARATOR = '\n\n\f'
-DPI: int = 300
 
 
 @contextmanager
@@ -56,13 +49,12 @@ def extract_text_and_structure(pdf_fn: str,
                                correct_pdf: bool = False,
                                render_coords_debug: bool = False,
                                read_sections_from_toc: bool = True) \
-        -> Tuple[
-            str, TextAndPDFCoordinates, str, Dict[int, float]]:  # text, structure, corrected_pdf_fn, page_rotate_angles
+        -> Tuple[str, TextAndPDFCoordinates, str, Dict[int, float]]:
+    # return: text, structure, corrected_pdf_fn, page_rotate_angles
     # pdf_fn file already contains text, no OCR is required at this step
 
     if render_coords_debug:
         correct_pdf = True
-
     java_modules_path = get_settings().java_modules_path
 
     # Convert language to language code
@@ -73,16 +65,13 @@ def extract_text_and_structure(pdf_fn: str,
     out_fn = os.path.join(temp_dir, os.path.splitext(os.path.basename(pdf_fn))[0] + '.msgpack')
     out_pdf_fn = pdf_fn
     try:
-        args = ['java', '-cp', f'{java_modules_path}/*',
-                'com.lexpredict.textextraction.GetTextFromPDF',
+        args = ['java', '-cp', f'{java_modules_path}/*', 'com.lexpredict.textextraction.GetTextFromPDF',
                 pdf_fn,
                 out_fn,
                 '-f', 'pages_msgpack']
-
         if pdf_password:
             args.append('-p')
             args.append(pdf_password)
-
         if correct_pdf:
             out_pdf_fn = os.path.join(temp_dir, os.path.splitext(os.path.basename(pdf_fn))[0] + '_corr.pdf')
             args.append('-corrected_output')
@@ -121,11 +110,8 @@ def extract_text_and_structure(pdf_fn: str,
                                              paragraphs=[],
                                              sections=[],
                                              table_of_contents=[])
-            yield text, \
-                  TextAndPDFCoordinates(text_structure=text_struct, pdf_coordinates=pdf_coordinates), \
-                  out_pdf_fn, \
-                  None
-
+            yield text, TextAndPDFCoordinates(text_structure=text_struct, pdf_coordinates=pdf_coordinates), \
+                  out_pdf_fn, None
             return
 
         # we store the rotation angles for each of the pages
@@ -145,27 +131,19 @@ def extract_text_and_structure(pdf_fn: str,
             tc = PlainTableOfContentsRecord(
                 title=p['title'], level=p['level'], left=p['left'], top=p['top'], page=p['page'])
             table_of_contents.append(tc)
-
         sentence_spans = get_sentence_span_list(text)
 
         lang = get_lang_detector()
-
-        sentences = [PlainTextSentence(start=start,
-                                       end=end,
-                                       language=language or lang.predict_lang(segment))
+        sentences = [PlainTextSentence(start=start, end=end, language=language or lang.predict_lang(segment))
                      for start, end, segment in sentence_spans]
 
         # There was a try-except in Contraxsuite catching some lexnlp exception.
         # Not putting it here because it should be solved on lexnlp side.
-        paragraphs = [PlainTextParagraph(start=start,
-                                         end=end,
-                                         language=language or lang.predict_lang(segment))
+        paragraphs = [PlainTextParagraph(start=start, end=end, language=language or lang.predict_lang(segment))
                       for start, end, segment, in get_paragraph_spans(text)]
 
         if read_sections_from_toc and table_of_contents:
-            sections = get_sections_from_table_of_contents(table_of_contents,
-                                                           pdfbox_res['charBBoxes'],
-                                                           pages)
+            sections = get_sections_from_table_of_contents(table_of_contents, pdfbox_res['charBBoxes'], pages)
         else:
             sections = [PlainTextSection(title=sect.title,
                                          start=sect.start,
@@ -196,10 +174,9 @@ def extract_text_and_structure(pdf_fn: str,
 
         char_bboxes = pdfbox_res['charBBoxes']
         pdf_coordinates = PDFCoordinates(char_bboxes=char_bboxes)
-        yield text, TextAndPDFCoordinates(text_structure=text_struct,
-                                          pdf_coordinates=pdf_coordinates), out_pdf_fn, page_rotate_angles
+        yield text, TextAndPDFCoordinates(text_structure=text_struct, pdf_coordinates=pdf_coordinates), out_pdf_fn, \
+            page_rotate_angles
         return
-
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -221,8 +198,6 @@ def get_sections_from_table_of_contents(
         toc_items: List[PlainTableOfContentsRecord],
         char_bboxes: List[List[float]],
         pages: List[PlainTextPage]) -> List[PlainTextSection]:
-    """
-    """
     sects: List[PlainTextSection] = []
     for ti in toc_items:
         sect = PlainTextSection(start=0,
@@ -277,8 +252,7 @@ def extract_text_pdfminer(pdf_fn: str) -> str:
     return output_string.getvalue()
 
 
-def get_first_page_layout(pdf_opened_file,
-                          use_advanced_detection: bool = True) -> LTPage:
+def get_first_page_layout(pdf_opened_file, use_advanced_detection: bool = True) -> LTPage:
     # TODO: this method is for testing purposes only
     parser = PDFParser(pdf_opened_file)
     doc = PDFDocument(parser)
@@ -290,7 +264,6 @@ def get_first_page_layout(pdf_opened_file,
     for page in PDFPage.create_pages(doc):
         interpreter.process_page(page)
         return device.get_result()
-
     raise Exception('Unable to build LTPage from opened file')
 
 
@@ -303,85 +276,45 @@ class PDFPageProcessingResults:
 
 
 @contextmanager
-def process_pdf_page(pdf_fn: str,
-                     ocr_enabled: bool = True,
-                     ocr_language: str = None,
-                     ocr_timeout_sec: int = 60,
-                     pdf_password: str = None,
-                     detect_orientation_tesseract=False) -> Generator[PDFPageProcessingResults, None, None]:
+def process_pdf_page(page_image_without_text_fn: str, ocr_enabled: bool = True, ocr_language: str = None,
+                     ocr_timeout_sec: int = 60, detect_orientation_tesseract=False) \
+        -> Generator[PDFPageProcessingResults, None, None]:
     if not ocr_enabled:
         yield PDFPageProcessingResults(page_requires_ocr=False)
         return
+    rot_angle = 0
+    orientation = None
+    if detect_orientation_tesseract:
+        try:
+            orientation = get_page_orientation(page_image_without_text_fn,
+                                               language=ocr_language or TESSERACT_DEFAULT_LANGUAGE)
+        except Exception as e:
+            error_text = OCRException.TOO_FEW_CHARACTERS_ERROR if OCRException.TOO_FEW_CHARACTERS_ERROR in str(e) else e
+            log.error(f'Cant get page orientation by Tesseract: {error_text}')
 
-    # Try extracting "no-text" image of the pdf page into PNG file.
-    # It removes all elements from the page except images having no overlapping
-    # with any text element.
-    # This is used to avoid the text duplication by OCR.
-    with extract_page_ocr_images(pdf_fn,
-                                 start_page=1,
-                                 end_page=1,
-                                 pdf_password=pdf_password,
-                                 dpi=DPI,
-                                 reset_page_rotation=False) \
-            as image_fns:
-        # note: extract_page_ocr_images method might have returned nothing
-        # (extraction fails) or an image w/o any text
-        page_image_without_text_fn = image_fns.get(1) if image_fns else None
-        rot_angle = 0
+        # TODO: presently orientation "probability" threshold is taken arbitrary
+        ORIENTATION_THRESHOLD = 3
+        if orientation and orientation[0] and orientation[1] > ORIENTATION_THRESHOLD:
+            rotate_image(orientation[0], page_image_without_text_fn, page_image_without_text_fn)
 
-        if page_image_without_text_fn:
-            orientation = None
-            if detect_orientation_tesseract:
-                try:
-                    orientation = get_page_orientation(
-                        page_image_without_text_fn,
-                        language=ocr_language or TESSERACT_DEFAULT_LANGUAGE)
-                except Exception as e:
-                    error_text = OCRException.TOO_FEW_CHARACTERS_ERROR \
-                        if OCRException.TOO_FEW_CHARACTERS_ERROR in str(e) else e
-                    log.error(f'Cant get page orientation by Tesseract: {error_text}')
+    # ToDo: move detecting rotation to process_pdf method
+    # # The image might be rotated. Then we try to determine the image rotation angle
+    # # based on opencv algorithms and rotate the image back.
+    # # Even if the image is still rotated, OCR will extract the text. That's fine
+    # # if the image rotation angle is a multiple of 90 degree.
+    # rot_status = determine_rotation(page_image_without_text_fn, RotationDetectionMethod.DILATED_ROWS)
+    # if should_correct_rotation(pdf_fn, rot_status):
+    #     # we don't rotate images by more than 45 degree angle
+    #     rot_angle = normalize_angle_90(rot_status.angle)
+    #     rotate_image(rot_angle, page_image_without_text_fn, page_image_without_text_fn)
 
-                # TODO: presently orientation "probability" threshold is taken arbitrary
-                ORIENTATION_THRESHOLD = 3
-                if orientation and orientation[0] and orientation[1] > ORIENTATION_THRESHOLD:
-                    # rotate the document
-                    # rotate_pdf_pages(pdf_fn, pdf_fn, orientation[0])
-                    # rotate the image
-                    rotate_image(orientation[0], page_image_without_text_fn, page_image_without_text_fn)
-
-            # the image might be rotated. Then we try to determine the image rotation angle
-            # based on opencv algorithms and rotate the image back.
-            # Even if the image is still rotated, OCR will extract the text. That's fine
-            # if the image rotation angle is a multiple of 90 degree.
-            rot_status = determine_rotation(page_image_without_text_fn,
-                                            RotationDetectionMethod.DILATED_ROWS)
-
-            if should_correct_rotation(pdf_fn, rot_status):
-                # we don't rotate images by more than 45 degree angle
-                rot_angle = normalize_angle_90(rot_status.angle)
-
-                # rotate the document
-                rotate_pdf_pages(pdf_fn, pdf_fn, rot_angle)
-
-                # rotate extracted image
-                rotate_image(rot_angle, page_image_without_text_fn, page_image_without_text_fn)
-
-            # this returns a text-based PDF with glyph-less text only
-            # to be used for merging in front of the original PDF page layout
-            with ocr_page_to_pdf(page_image_fn=page_image_without_text_fn,
-                                 language=ocr_language,
-                                 timeout=ocr_timeout_sec,
-                                 glyphless_text_only=True,
-                                 tesseract_page_orientation_detection=True) as ocred_text_layer_pdf_fn:
-                # we return only the transparent text layer PDF and not the merged page
-                # because in the final step we will need to merge these transparent layer in front
-                # of the pages in the original PDF file to keep its small size and structure/bookmarks.
-                yield PDFPageProcessingResults(page_requires_ocr=True,
-                                               ocred_page_fn=ocred_text_layer_pdf_fn,
-                                               rotation_angle=rot_angle)
-                return
-    # if we don't need OCR then
-    yield PDFPageProcessingResults(page_requires_ocr=False)
+    # It returns a text-based PDF with glyph-less text to be used for merging in front of the original PDF page layout
+    with ocr_page_to_pdf(page_image_fn=page_image_without_text_fn, language=ocr_language, timeout=ocr_timeout_sec,
+                         glyphless_text_only=True, tesseract_page_orientation_detection=True) as ocrd_text_layer_pdf_fn:
+        # We return only the transparent text layer PDF and not the merged page because in the final step we will need
+        # to merge these transparent layer in front of the pages in the original PDF file.
+        yield PDFPageProcessingResults(page_requires_ocr=True, ocred_page_fn=ocrd_text_layer_pdf_fn,
+                                       rotation_angle=rot_angle)
 
 
 def normalize_angle_90(rot_angle: float) -> float:
@@ -390,10 +323,7 @@ def normalize_angle_90(rot_angle: float) -> float:
     rot_angle = abs(rot_angle)
     if rot_angle > 45:
         rot_angle = rot_angle - 90
-        rot_angle = rot_sign * rot_angle
-    else:
-        rot_angle = rot_sign * rot_angle
-    return rot_angle
+    return rot_sign * rot_angle
 
 
 def rotate_page_back(page_image_without_text_fn: str, rot_angle: float):
@@ -419,8 +349,7 @@ def should_correct_rotation(pdf_fn: str, rot_status: PageRotationStatus) -> bool
         return True
 
     java_modules_path = get_settings().java_modules_path
-    args = ['java', '-cp', f'{java_modules_path}/*',
-            'com.lexpredict.textextraction.PDFSymbolsCalculator',
+    args = ['java', '-cp', f'{java_modules_path}/*', 'com.lexpredict.textextraction.PDFSymbolsCalculator',
             '--original-pdf', pdf_fn]
 
     # compare area, occupied by image parts (that might be text) and the rest of the page

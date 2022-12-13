@@ -43,7 +43,8 @@ opencv-python==4.4.0.46
 openpyxl==3.0.10
 packaging==21.3
 pandas==1.4.2
-pikepdf==2.12.1
+pdf2image==1.16.0
+pikepdf==6.2.5
 pip==20.0.2
 pipdeptree==2.2.1
 pluggy==0.13.1

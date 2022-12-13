@@ -127,9 +127,9 @@ def re_schedule_unknown_pending_tasks(log: Logger, app) -> List[Tuple[str, str]]
               f'registered at Webdav but not found in Redis queue.\n' \
               f'Time spent: {time_spent}\n'
         if restarted_tasks:
-            msg += f'Restarted tasks:\n' + '\n'.join([' - '.join(item) for item in restarted_tasks])
+            msg += 'Restarted tasks:\n' + '\n'.join([' - '.join(item) for item in restarted_tasks])
         if failed_to_restart_tasks:
-            msg += f'Failed to restart tasks:\n' + '\n'.join([' - '.join(item) for item in failed_to_restart_tasks])
+            msg += 'Failed to restart tasks:\n' + '\n'.join([' - '.join(item) for item in failed_to_restart_tasks])
         log.info(msg)
     return restarted_tasks
 

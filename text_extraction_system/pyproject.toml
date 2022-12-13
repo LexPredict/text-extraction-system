@@ -1,0 +1,17 @@
+[tool.ruff]
+line-length = 120
+
+# Enable Flake's "E" and "F" codes by default.
+select = ["E", "F"]
+ignore = []
+
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".eggs", ".git", ".mypy_cache", ".nox", ".ruff_cache", ".tox", ".venv", "__pypackages__", "_build", "build", "dist",
+    "node_modules", "venv", ".venv",
+]
+per-file-ignores = {}
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+target-version = "py38"
