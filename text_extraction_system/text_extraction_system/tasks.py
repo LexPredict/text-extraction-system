@@ -56,17 +56,11 @@ class CeleryConfig:
     def worker_autoscaler(self) -> Optional[str]:
         if settings.celery_shutdown_when_no_tasks_longer_than_sec:
             return 'text_extraction_system.celery_autoscaler:ShutdownWhenNoTasksAutoscaler'
-        else:
-            return 'celery.worker.autoscale:Autoscaler'
+        return 'celery.worker.autoscale:Autoscaler'
 
 
-celery_app = Celery(
-    'celery_app',
-    backend=settings.celery_backend,
-    broker=settings.celery_broker,
-    config_source=CeleryConfig(),
-)
-
+celery_app = Celery('celery_app', backend=settings.celery_backend, broker=settings.celery_broker,
+                    config_source=CeleryConfig())
 init_task_tracking()
 
 
@@ -85,26 +79,20 @@ def setup_recursion_limit(*args, **kwargs):
 @after_setup_logger.connect
 def setup_loggers(*args, **kwargs):
     conf = get_settings()
-
     logger = logging.getLogger()
     logger.handlers.clear()
-
     if conf.log_to_stdout:
-        if conf.log_to_stdout_json:
-            formatter = JSONFormatter()
-        else:
-            formatter = logging.Formatter('%(levelname)s %(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        formatter = JSONFormatter() if conf.log_to_stdout_json \
+            else logging.Formatter('%(levelname)s %(asctime)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
         sh = logging.StreamHandler()
         sh.setFormatter(formatter)
         logger.addHandler(sh)
-
     if conf.log_to_file:
         formatter = JSONFormatter()
         from logging.handlers import RotatingFileHandler
         sh = RotatingFileHandler(filename=conf.log_to_file, encoding='utf-8', maxBytes=10 * 1024 * 1024, backupCount=5)
         sh.setFormatter(formatter)
         logger.addHandler(sh)
-
     # make pdfminer a bit more silent
     from pdfminer.pdfinterp import log as pdfinterp_log
     from pdfminer.pdfpage import log as pdfpage_log
@@ -117,22 +105,11 @@ def setup_loggers(*args, **kwargs):
 
 
 @before_task_publish.connect
-def on_before_task_publish(sender,
-                           body,
-                           exchange,
-                           routing_key,
-                           headers,
-                           properties,
-                           declare,
-                           retry_policy, *args, **kwargs):
+def on_before_task_publish(sender, body, exchange, routing_key, headers, properties, declare, retry_policy,
+                           *args, **kwargs):
     # log.info(f'Registering task: #{headers["id"]} - {headers["task"]}')
-    store_pending_task_info_in_webdav(body=body,
-                                      exchange=exchange,
-                                      routing_key=routing_key,
-                                      headers=headers,
-                                      properties=properties,
-                                      declare=declare,
-                                      retry_policy=retry_policy)
+    store_pending_task_info_in_webdav(body=body, exchange=exchange, routing_key=routing_key, headers=headers,
+                                      properties=properties, declare=declare, retry_policy=retry_policy)
 
 
 @task_success.connect
@@ -172,16 +149,12 @@ def deliver_error(request_id: str,
     try:
         req = load_request_metadata(request_id)
         if not req:
-            log.warning(f'{request_callback_info.original_file_name} | Not delivering error '
-                        f'because the request files do not exist in storage: '
-                        f'(#{request_id})\n'
-                        f'This usually means the request is canceled.')
+            log.warning(f'{request_callback_info.original_file_name} | Not delivering error because the request files '
+                        f'do not exist in storage: (#{request_id})\nThis usually means the request is canceled.')
             return
         req.status = STATUS_FAILURE
-
         if problem or exc:
             req.append_error(problem, exc)
-
         save_request_metadata(req)
     except Exception as req_upd_err:
         log.error(f'{request_callback_info.original_file_name} | Unable to store failed status into '
@@ -256,12 +229,10 @@ def process_pdf(pdf_fn: str, req: RequestMetadata, webdav_client: WebDavClient):
     pages_amount = get_pdf_pages_amount(pdf_fn)
     with extract_page_ocr_images(pdf_fn, start_page=1, end_page=pages_amount) as image_fns:
         for image_num, image_fn in image_fns.items():
-            # ToDo: move detecting rotation to process_pdf method
-            # The image might be rotated. Then we try to determine the image rotation angle
-            # based on opencv algorithms and rotate the image back.
-            # Even if the image is still rotated, OCR will extract the text. That's fine
+            # The image might be rotated. Then we try to determine the image rotation angle based on opencv algorithms
+            # and rotate the image back. Even if the image is still rotated, OCR will extract the text. That's fine
             # if the image rotation angle is a multiple of 90 degree.
-            with get_page_from_pdf(pdf_fn, image_num) as pdf_page_fn:
+            with get_page_from_pdf(pdf_fn, image_num-1) as pdf_page_fn:
                 rot_status = determine_rotation(image_fn, RotationDetectionMethod.DILATED_ROWS)
                 if should_correct_rotation(pdf_page_fn, rot_status):
                     # we don't rotate images by more than 45 degree angle
@@ -558,7 +529,6 @@ def deliver_results(req: RequestCallbackInfo, req_status: RequestStatus):
         except Exception as err:
             log.error(f'{req.original_file_name} | Unable to POST the extraction results to {req.call_back_url}',
                       exc_info=err)
-
     if req.call_back_celery_broker:
         try:
             log.info(f'{req.original_file_name} | Sending the extraction results as a celery task:\n'
@@ -578,7 +548,6 @@ def deliver_results(req: RequestCallbackInfo, req_status: RequestStatus):
                       f'broker: {req.call_back_celery_broker}\n'
                       f'queue: {req.call_back_celery_queue}\n'
                       f'task_name: {req.call_back_celery_task_name}\n', exc_info=err)
-
     status_extra = ', '.join(['plain text' if req_status.plain_text_extracted else '',
                               'coords extracted' if req_status.pdf_coordinates_extracted else '',
                               'pages OCRed' if req_status.pdf_pages_ocred else ''])
