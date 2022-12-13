@@ -180,13 +180,13 @@ def extract_page_images_from_pdf(pdf_fn: str, should_clean_text: bool = True, st
         # Create separate pdf-page
         dst = pikepdf.Pdf.new()
         dst.pages.append(doc.pages[i])
-        page_image_fn = os.path.join(temp_dir_images, f'{base_fn}__{page_num_to_fn(i)}.pdf')
+        page_image_fn = os.path.join(temp_dir_images, f'{base_fn}__{page_num_to_fn(i+1)}.pdf')
         dst.save(page_image_fn)
         # Convert pdf to image
         pdf_pages = convert_from_path(page_image_fn, dpi)
         page_image_fn = f"{page_image_fn[:-3]}png"
         pdf_pages[0].save(page_image_fn, 'PNG')
-        page_by_num_image[i] = page_image_fn
+        page_by_num_image[i+1] = page_image_fn
     yield page_by_num_image
     shutil.rmtree(temp_dir_images, ignore_errors=True)
 
@@ -258,12 +258,32 @@ def get_page_from_pdf(pdf_fn: str, page_number: int = 0) -> Generator[str, None,
         with pikepdf.Pdf.open(pdf_fn) as doc:
             dst.pages.append(doc.pages[page_number])
             dst.save(pdf_page_fn)
+            dst.close()
         yield pdf_page_fn
     except IndexError:
-        ...
+        yield None
     finally:
         if os.path.isfile(pdf_page_fn):
             os.remove(pdf_page_fn)
+
+
+@contextmanager
+def extract_pdf_pages(pdf_fn: str) -> Generator[Dict[int, str], None, None]:
+    temp_dir = mkdtemp()
+    try:
+        res: Dict[int, str] = dict()
+        base_name = os.path.basename(pdf_fn)
+        with pikepdf.Pdf.open(pdf_fn) as doc:
+            for page_index in range(len(doc.pages)):
+                dst = pikepdf.Pdf.new()
+                dst.pages.append(doc.pages[page_index])
+                pdf_page_fn = os.path.join(temp_dir, f'{base_name[:-4]}__{page_num_to_fn(page_index)}.pdf')
+                dst.save(pdf_page_fn)
+                dst.close()
+                res[page_index] = pdf_page_fn
+        yield res
+    finally:
+        shutil.rmtree(temp_dir)
 
 
 @contextmanager

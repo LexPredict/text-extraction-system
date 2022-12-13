@@ -22,13 +22,11 @@ from text_extraction_system.constants import pages_ocred, task_ids, pages_for_pr
     queue_celery_beat
 from text_extraction_system.data_extract.camelot.camelot import extract_tables_from_pdf_file
 from text_extraction_system.data_extract.data_extract import extract_text_and_structure, process_pdf_page, \
-    should_correct_rotation, normalize_angle_90, rotate_image
+    get_pdf_pages_characters_amount
 from text_extraction_system.data_extract.tables import get_table_dtos_from_camelot_output
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
-from text_extraction_system.ocr.rotation_detection import RotationDetectionMethod, determine_rotation
 from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
-from text_extraction_system.pdf.pdf import merge_pdf_pages, extract_page_ocr_images, get_pdf_pages_amount, \
-    get_page_from_pdf
+from text_extraction_system.pdf.pdf import merge_pdf_pages, get_pdf_pages_amount, extract_page_images_from_pdf
 from text_extraction_system.remove_ocr_layer import remove_ocr_layer
 from text_extraction_system.request_metadata import RequestCallbackInfo, RequestMetadata, save_request_metadata, \
     load_request_metadata
@@ -202,8 +200,7 @@ def process_document(task,
                     remove_ocr_layer(fn)
             else:
                 log.info(f'{req.original_file_name} | Converting to PDF...')
-                with convert_to_pdf(fn, timeout_sec=req.convert_to_pdf_timeout_sec) \
-                        as local_converted_pdf_fn:
+                with convert_to_pdf(fn, timeout_sec=req.convert_to_pdf_timeout_sec) as local_converted_pdf_fn:
                     req.converted_to_pdf = os.path.splitext(req.original_document)[0] + '.converted.pdf'
                     webdav_client.upload_file(remote_path=f'{request_id}/{req.converted_to_pdf}',
                                               local_path=local_converted_pdf_fn)
@@ -227,18 +224,9 @@ def process_pdf(pdf_fn: str, req: RequestMetadata, webdav_client: WebDavClient):
 
     task_signatures = list()
     pages_amount = get_pdf_pages_amount(pdf_fn)
-    with extract_page_ocr_images(pdf_fn, start_page=1, end_page=pages_amount) as image_fns:
+    characters_amounts = get_pdf_pages_characters_amount(pdf_fn)
+    with extract_page_images_from_pdf(pdf_fn) as image_fns:
         for image_num, image_fn in image_fns.items():
-            # The image might be rotated. Then we try to determine the image rotation angle based on opencv algorithms
-            # and rotate the image back. Even if the image is still rotated, OCR will extract the text. That's fine
-            # if the image rotation angle is a multiple of 90 degree.
-            with get_page_from_pdf(pdf_fn, image_num-1) as pdf_page_fn:
-                rot_status = determine_rotation(image_fn, RotationDetectionMethod.DILATED_ROWS)
-                if should_correct_rotation(pdf_page_fn, rot_status):
-                    # we don't rotate images by more than 45 degree angle
-                    rot_angle = normalize_angle_90(rot_status.angle)
-                    rotate_image(rot_angle, image_fn, image_fn)
-
             image_base_fn = os.path.basename(image_fn)
             start = time.time()
             webdav_client.upload_file(f'{req.request_id}/{pages_for_processing}/{image_base_fn}', image_fn)
@@ -246,6 +234,7 @@ def process_pdf(pdf_fn: str, req: RequestMetadata, webdav_client: WebDavClient):
             task_signatures.append(process_pdf_image_task.s(req.request_id,
                                                            req.original_file_name,
                                                            image_base_fn,
+                                                           characters_amounts[image_num-1],
                                                            image_num,
                                                            ocr_language,
                                                            req.request_callback_info.log_extra,
@@ -266,6 +255,7 @@ def process_pdf_image_task(_task,
                            request_id: str,
                            original_file_name: str,
                            image_base_fn: str,
+                           chars_amount: int,
                            page_number: int,
                            ocr_language: str,
                            log_extra: Dict[str, str] = None,
@@ -284,29 +274,25 @@ def process_pdf_image_task(_task,
         return None
     if req.status != STATUS_PENDING:
         log.info(
-            f'{original_file_name} | Canceling pdf page processing sub-task for page {page_number}:'
-            f' {image_base_fn} (request #{request_id})\n'
-            f'because the request is already in status {req.status}.')
+            f'{original_file_name} | Canceling pdf page processing sub-task for page {page_number}: {image_base_fn} '
+            f'(request #{request_id})\nbecause the request is already in status {req.status}.')
         return None
     log.info(f'{original_file_name} | Processing PDF page {page_number}...')
     try:
         with webdav_client.get_as_local_fn(f'{req.request_id}/{pages_for_processing}/{image_base_fn}') \
                 as (local_pdf_page_fn, _remote_path):
             with process_pdf_page(local_pdf_page_fn,
+                                  chars_amount=chars_amount,
                                   ocr_enabled=req.ocr_enable,
                                   ocr_language=ocr_language,
                                   ocr_timeout_sec=req.page_ocr_timeout_sec,
-                                  detect_orientation_tesseract=detect_orientation_tesseract) \
-                    as page_proc_res:
+                                  detect_orientation_tesseract=detect_orientation_tesseract) as page_proc_res:
                 file_name = page_num_to_fn(page_number)
                 if page_proc_res.rotation_angle:
                     file_name = f'{file_name}.{page_proc_res.rotation_angle}'
                 remote_path = f'{req.request_id}/{pages_ocred}/{file_name}.pdf'
-
                 if page_proc_res.page_requires_ocr:
-                    webdav_client.upload_file(
-                        remote_path=remote_path,
-                        local_path=page_proc_res.ocred_page_fn)
+                    webdav_client.upload_file(remote_path=remote_path, local_path=page_proc_res.ocred_page_fn)
     except Exception as e:
         raise Exception(f'{original_file_name} |  Exception caught while processing '
                         f'PDF page {page_number}: {image_base_fn}') from e
@@ -314,11 +300,8 @@ def process_pdf_image_task(_task,
         # Time to process all pages + time to preprocess document + predicted time to postprocess document
         estimate_time = int((time.time() - start_processing_time) * pages_amount
                             + (start_processing_time - req.request_date.timestamp()) * 2)
-        deliver_estimate(req.request_callback_info, RequestEstimate(pages=pages_amount,
-                                                                    estimate=estimate_time))
-
-    deliver_progress(req.request_callback_info, RequestProgress(pages=pages_amount,
-                                                                current_page=page_number,
+        deliver_estimate(req.request_callback_info, RequestEstimate(pages=pages_amount, estimate=estimate_time))
+    deliver_progress(req.request_callback_info, RequestProgress(pages=pages_amount, current_page=page_number,
                                                                 progress=int(100 * page_number / pages_amount)))
     return page_number
 

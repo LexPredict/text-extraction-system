@@ -9,7 +9,7 @@ from pdfminer.layout import LTPage
 from text_extraction_system_api.dto import TableParser
 
 from text_extraction_system.ocr.tables.table_detection import TableDetector
-from text_extraction_system.pdf.pdf import extract_page_images, iterate_pages
+from text_extraction_system.pdf.pdf import iterate_pages, extract_page_images_from_pdf
 
 
 class CustomizedLattice(Lattice):
@@ -95,10 +95,12 @@ def extract_tables_from_pdf_file(pdf_fn: str,
                                  table_parser: TableParser = TableParser.lattice,
                                  min_accuracy: int = 60) -> List[CamelotTable]:
     res: List[CamelotTable] = list()
-    with extract_page_images(pdf_fn=pdf_fn, dpi=71) as image_fns:
+    with extract_page_images_from_pdf(pdf_fn, dpi=71) as image_fns:
         page_num = 0
         for ltpage in iterate_pages(pdf_fn, use_advanced_detection=pdfminer_advanced_detection):
-            page_image_fn = image_fns[page_num]
+            if page_num + 1 not in image_fns:
+                continue
+            page_image_fn = image_fns[page_num+1]
             camelot_tables: List[CamelotTable] = extract_tables(
                 page_num, ltpage, page_image_fn, table_parser, min_accuracy)
             if camelot_tables:
