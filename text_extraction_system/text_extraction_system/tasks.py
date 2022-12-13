@@ -21,11 +21,14 @@ from text_extraction_system.config import get_settings
 from text_extraction_system.constants import pages_ocred, task_ids, pages_for_processing, pages_tables, \
     queue_celery_beat
 from text_extraction_system.data_extract.camelot.camelot import extract_tables_from_pdf_file
-from text_extraction_system.data_extract.data_extract import extract_text_and_structure, process_pdf_page
+from text_extraction_system.data_extract.data_extract import extract_text_and_structure, process_pdf_page, \
+    should_correct_rotation, normalize_angle_90, rotate_image
 from text_extraction_system.data_extract.tables import get_table_dtos_from_camelot_output
 from text_extraction_system.file_storage import get_webdav_client, WebDavClient
+from text_extraction_system.ocr.rotation_detection import RotationDetectionMethod, determine_rotation
 from text_extraction_system.pdf.convert_to_pdf import convert_to_pdf
-from text_extraction_system.pdf.pdf import merge_pdf_pages, extract_page_ocr_images, get_pdf_pages_amount
+from text_extraction_system.pdf.pdf import merge_pdf_pages, extract_page_ocr_images, get_pdf_pages_amount, \
+    get_page_from_pdf
 from text_extraction_system.remove_ocr_layer import remove_ocr_layer
 from text_extraction_system.request_metadata import RequestCallbackInfo, RequestMetadata, save_request_metadata, \
     load_request_metadata
@@ -253,6 +256,18 @@ def process_pdf(pdf_fn: str, req: RequestMetadata, webdav_client: WebDavClient):
     pages_amount = get_pdf_pages_amount(pdf_fn)
     with extract_page_ocr_images(pdf_fn, start_page=1, end_page=pages_amount) as image_fns:
         for image_num, image_fn in image_fns.items():
+            # ToDo: move detecting rotation to process_pdf method
+            # The image might be rotated. Then we try to determine the image rotation angle
+            # based on opencv algorithms and rotate the image back.
+            # Even if the image is still rotated, OCR will extract the text. That's fine
+            # if the image rotation angle is a multiple of 90 degree.
+            with get_page_from_pdf(pdf_fn, image_num) as pdf_page_fn:
+                rot_status = determine_rotation(image_fn, RotationDetectionMethod.DILATED_ROWS)
+                if should_correct_rotation(pdf_page_fn, rot_status):
+                    # we don't rotate images by more than 45 degree angle
+                    rot_angle = normalize_angle_90(rot_status.angle)
+                    rotate_image(rot_angle, image_fn, image_fn)
+
             image_base_fn = os.path.basename(image_fn)
             start = time.time()
             webdav_client.upload_file(f'{req.request_id}/{pages_for_processing}/{image_base_fn}', image_fn)

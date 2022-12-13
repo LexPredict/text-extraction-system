@@ -45,7 +45,7 @@ class TestLoadingRotatedDocs(unittest.TestCase):
 
     def test_extract_text_rotated1(self):
         fn = os.path.join(os.path.dirname(__file__), 'data', 'rotated1.pdf.tiff')
-        text = self.client.extract_plain_text_from_document(fn)
+        text = self.client.extract_plain_text_from_document(fn, doc_language="en")
         expected = '''certain angle '''
         assert expected in text
 

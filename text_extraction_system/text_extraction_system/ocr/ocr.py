@@ -112,8 +112,7 @@ def ocr_page_to_pdf(page_image_fn: str,
             raise OCRException(f'Tesseract returned non-zero code.\n'
                                f'Command line:\n{args}\n'
                                f'Process stdout:\n{err}'
-                               f'Process stderr:\n'
-                               f'{err}')
+                               f'Process stderr:\n{err}')
         yield dstfn + '.pdf'
     finally:
         if proc is not None:

@@ -194,10 +194,8 @@ def extract_page_images_from_pdf(pdf_fn: str, should_clean_text: bool = True, st
 def calc_covers(lt_obj: LTItem) -> Tuple[int, int]:
     text_cover = 0
     image_cover = 0
-    if isinstance(lt_obj, (LTTextBox, LTTextLine)):
+    if isinstance(lt_obj, (LTTextBox, LTTextLine, LTImage)):
         text_cover += (lt_obj.x1 - lt_obj.x0) * (lt_obj.y1 - lt_obj.y0)
-    elif isinstance(lt_obj, LTImage):
-        image_cover += (lt_obj.x1 - lt_obj.x0) * (lt_obj.y1 - lt_obj.y0)
     elif isinstance(lt_obj, LTLayoutContainer):
         for item in lt_obj:
             t, i = calc_covers(item)
@@ -208,10 +206,8 @@ def calc_covers(lt_obj: LTItem) -> Tuple[int, int]:
 
 def build_block_fn(src_fn: str, page_start: int, page_end: int) -> str:
     fn: str = os.path.basename(src_fn)
-    if page_start == page_end:
-        fn = f'{os.path.splitext(fn)[0]}_{(page_start + 1):04}.pdf'
-    else:
-        fn = f'{os.path.splitext(fn)[0]}_{(page_start + 1):04}_{(page_end + 1):04}.pdf'
+    append_name = f'_{(page_end + 1):04}' if page_start != page_end else ''
+    fn = f'{os.path.splitext(fn)[0]}_{(page_start + 1):04}{append_name}.pdf'
     return fn
 
 
@@ -253,12 +249,27 @@ def split_pdf_to_page_blocks(src_pdf_fn: str,
 
 
 @contextmanager
+def get_page_from_pdf(pdf_fn: str, page_number: int = 0) -> Generator[str, None, None]:
+    pdf_page_fn = f'{pdf_fn[:-4]}__{page_num_to_fn(page_number)}.pdf'
+    dst = pikepdf.Pdf.new()
+    try:
+        with pikepdf.Pdf.open(pdf_fn) as doc:
+            dst.pages.append(doc.pages[page_number])
+            dst.save(pdf_page_fn)
+        yield pdf_page_fn
+    except IndexError:
+        ...
+    finally:
+        if os.path.isfile(pdf_page_fn):
+            os.remove(pdf_page_fn)
+
+
+@contextmanager
 def merge_pdf_pages(original_pdf_fn: str,
                     page_pdf_dir: str = None,
                     single_page_merge_num_file_rotate: Tuple[int, str, Optional[float]] = None,
                     original_pdf_password: str = None,
-                    timeout_sec: int = 3000) \
-        -> Generator[str, None, None]:
+                    timeout_sec: int = 3000) -> Generator[str, None, None]:
     temp_dir = mkdtemp()
     try:
         dst_pdf_fn = os.path.join(temp_dir, os.path.basename(original_pdf_fn))
