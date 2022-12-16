@@ -154,8 +154,22 @@ def extract_page_ocr_images(pdf_fn: str,
         shutil.rmtree(temp_dir_no_text, ignore_errors=True)
 
 
-def get_pdf_pages_amount(pdf_fn: str):
+def get_pdf_pages_amount(pdf_fn: str) -> int:
+    """Calculates amount of pages in .pdf document
+    """
     return len(pikepdf.Pdf.open(pdf_fn).pages)
+
+
+def get_pdf_images_pages_amount(pdf_fn: str) -> int:
+    """Calculates amount of pages with images in .pdf document
+    """
+    result = 0
+    with pikepdf.Pdf.open(pdf_fn) as doc:
+        for page in doc.pages:
+            if not page.images.keys():
+                continue
+            result += 1
+    return result
 
 
 @contextmanager
