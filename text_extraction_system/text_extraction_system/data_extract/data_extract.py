@@ -44,12 +44,8 @@ log = getLogger(__name__)
 
 
 @contextmanager
-def extract_text_and_structure(pdf_fn: str,
-                               pdf_password: str = None,
-                               timeout_sec: int = 3600,
-                               language: str = "",
-                               correct_pdf: bool = False,
-                               render_coords_debug: bool = False,
+def extract_text_and_structure(pdf_fn: str, pdf_password: str = None, timeout_sec: int = 3600, language: str = "",
+                               correct_pdf: bool = False, render_coords_debug: bool = False,
                                read_sections_from_toc: bool = True) \
         -> Tuple[str, TextAndPDFCoordinates, str, Dict[int, float]]:
     # return: text, structure, corrected_pdf_fn, page_rotate_angles
@@ -68,31 +64,22 @@ def extract_text_and_structure(pdf_fn: str,
     out_pdf_fn = pdf_fn
     try:
         args = ['java', '-cp', f'{java_modules_path}/*', 'com.lexpredict.textextraction.GetTextFromPDF',
-                pdf_fn,
-                out_fn,
-                '-f', 'pages_msgpack']
+                pdf_fn, out_fn, '-f', 'pages_msgpack']
         if pdf_password:
-            args.append('-p')
-            args.append(pdf_password)
+            args.extend(['-p', pdf_password])
         if correct_pdf:
             out_pdf_fn = os.path.join(temp_dir, os.path.splitext(os.path.basename(pdf_fn))[0] + '_corr.pdf')
-            args.append('-corrected_output')
-            args.append(out_pdf_fn)
-
+            args.extend(['-corrected_output', out_pdf_fn])
             if render_coords_debug:
                 args.append('-render_char_rects')
-
         completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=timeout_sec,
                                                              universal_newlines=True, stderr=PIPE, stdout=PIPE)
         try:
-            log.info('Page rotation data:')
-            log.info(completed_process.stdout)
+            log.info(f'Page rotation data:\n{completed_process.stdout}')
         except Exception as e:
             log.error(f"Can't get page rotation data: {e}")
         raise_from_process(log, completed_process, process_title=lambda: f'Extract text and structure from {pdf_fn}')
-
         raise_from_pdfbox_error_messages(completed_process)
-
         with open(out_fn, 'rb') as pages_f:
             try:
                 gc.disable()
@@ -100,41 +87,32 @@ def extract_text_and_structure(pdf_fn: str,
                 pdfbox_res: Dict[str, Any] = msgpack.unpack(pages_f, raw=False)
             finally:
                 gc.enable()
-
         # Remove Null characters because of incompatibility with PostgreSQL
         text = pdfbox_res['text'].replace("\x00", "")
         if len(text) == 0:
             pdf_coordinates = PDFCoordinates(char_bboxes=pdfbox_res['charBBoxes'])
-            text_struct = PlainTextStructure(title='',
-                                             language=language or 'en',  # FastText returns English for empty strings
-                                             pages=[],
-                                             sentences=[],
-                                             paragraphs=[],
-                                             sections=[],
-                                             table_of_contents=[])
-            yield text, TextAndPDFCoordinates(text_structure=text_struct, pdf_coordinates=pdf_coordinates), \
-                  out_pdf_fn, None
+            text_struct = PlainTextStructure(title='', language=language or 'en', pages=[], sentences=[], paragraphs=[],
+                                             sections=[], table_of_contents=[])
+            yield text, TextAndPDFCoordinates(text_structure=text_struct,
+                                              pdf_coordinates=pdf_coordinates), out_pdf_fn, None
             return
 
         # we store the rotation angles for each of the pages
         page_rotate_angles: List[float] = [pdfpage['deskewAngle'] for pdfpage in pdfbox_res['pages']]
-
         pages = []
         num: int = 0
         for i, p in enumerate(pdfbox_res['pages']):
             rotation = int(round(page_rotate_angles[i]))
-            p_res = PlainTextPage(number=num, start=p['location'][0], end=p['location'][1],
-                                  bbox=p['bbox'], rotation=rotation)
+            p_res = PlainTextPage(number=num, start=p['location'][0], end=p['location'][1], bbox=p['bbox'],
+                                  rotation=rotation)
             pages.append(p_res)
             num += 1
-
         table_of_contents = []
         for p in pdfbox_res['tableOfContents']:
-            tc = PlainTableOfContentsRecord(
-                title=p['title'], level=p['level'], left=p['left'], top=p['top'], page=p['page'])
+            tc = PlainTableOfContentsRecord(title=p['title'], level=p['level'], left=p['left'], top=p['top'],
+                                            page=p['page'])
             table_of_contents.append(tc)
         sentence_spans = get_sentence_span_list(text)
-
         lang = get_lang_detector()
         sentences = [PlainTextSentence(start=start, end=end, language=language or lang.predict_lang(segment))
                      for start, end, segment in sentence_spans]
@@ -147,77 +125,48 @@ def extract_text_and_structure(pdf_fn: str,
         if read_sections_from_toc and table_of_contents:
             sections = get_sections_from_table_of_contents(table_of_contents, pdfbox_res['charBBoxes'], pages)
         else:
-            sections = [PlainTextSection(title=sect.title,
-                                         start=sect.start,
-                                         end=sect.end,
-                                         title_start=sect.title_start,
-                                         title_end=sect.title_end,
-                                         level=sect.level,
-                                         abs_level=sect.abs_level,
-                                         left=0,
-                                         top=0,
-                                         page=0)
+            sections = [PlainTextSection(title=sect.title, start=sect.start, end=sect.end, title_start=sect.title_start,
+                                         title_end=sect.title_end, level=sect.level, abs_level=sect.abs_level, left=0,
+                                         top=0, page=0)
                         for sect in get_document_sections_with_titles(text, sentence_list=sentence_spans)]
             set_section_coordinates(sections, pdfbox_res['charBBoxes'], pages)
-
         try:
             title = next(get_titles(text))
         except StopIteration:
             title = None
-
-        text_struct = PlainTextStructure(
-            title=title,
-            language=language or lang.predict_lang(text),
-            pages=pages,
-            sentences=sentences,
-            paragraphs=paragraphs,
-            sections=sections,
-            table_of_contents=table_of_contents)
-
+        text_struct = PlainTextStructure(title=title, language=language or lang.predict_lang(text), pages=pages,
+            sentences=sentences, paragraphs=paragraphs, sections=sections, table_of_contents=table_of_contents)
         char_bboxes = pdfbox_res['charBBoxes']
         pdf_coordinates = PDFCoordinates(char_bboxes=char_bboxes)
-        yield text, TextAndPDFCoordinates(text_structure=text_struct, pdf_coordinates=pdf_coordinates), out_pdf_fn, \
-            page_rotate_angles
+        yield text, TextAndPDFCoordinates(text_structure=text_struct,
+                                          pdf_coordinates=pdf_coordinates), out_pdf_fn, page_rotate_angles
         return
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-def set_section_coordinates(sections: List[PlainTextSection],
-                            char_bboxes: List[List[float]],
+def set_section_coordinates(sections: List[PlainTextSection], char_bboxes: List[List[float]],
                             pages: List[PlainTextPage]):
-    # calculates left / top coordinates and the page number
-    # for each section found by ML in plain text
+    # calculates left / top coordinates and the page number for each section found by ML in plain text
     page_bounds = [(p.start, p.end) for p in pages]
     for sect in sections:
         char_index = sect.start if sect.start < len(char_bboxes) else len(char_bboxes) - 1
-        sect.left = char_bboxes[char_index][0]
-        sect.top = char_bboxes[char_index][1]
+        sect.left, sect.top = char_bboxes[char_index][0], char_bboxes[char_index][1]
         sect.page = find_page_by_smb_index(page_bounds, sect.start) or 0
 
 
-def get_sections_from_table_of_contents(
-        toc_items: List[PlainTableOfContentsRecord],
-        char_bboxes: List[List[float]],
-        pages: List[PlainTextPage]) -> List[PlainTextSection]:
+def get_sections_from_table_of_contents(toc_items: List[PlainTableOfContentsRecord],
+                                        char_bboxes: List[List[float]],
+                                        pages: List[PlainTextPage]) -> List[PlainTextSection]:
     sects: List[PlainTextSection] = []
     for ti in toc_items:
-        sect = PlainTextSection(start=0,
-                                end=0,
-                                title=ti.title,
-                                title_start=0,
-                                title_end=0,
-                                level=ti.level,
-                                abs_level=ti.level,
-                                left=ti.left,
-                                top=ti.top,
-                                page=ti.page)
+        sect = PlainTextSection(start=0, end=0, title=ti.title, title_start=0, title_end=0, level=ti.level,
+                                abs_level=ti.level, left=ti.left, top=ti.top, page=ti.page)
         # find coordinates (start / end) by left and top
         page = pages[ti.page]
         top = ti.top  # NB: we don't invert Y-coordinate here
         start = CoordTextMap.find_closest_symbol_pos(char_bboxes, ti.left, top, page.start, page.end)
-        sect.start = start
-        sect.end = start + 1
+        sect.start, sect.end = start, start + 1
         sects.append(sect)
     sects.sort(key=lambda s: s.start)
 
@@ -225,18 +174,14 @@ def get_sections_from_table_of_contents(
     for i, sect in enumerate(sects):
         last_page = pages[-1]
         sect.end = last_page.end
-        # find the next section on the same level
-        # or assume the section ends with the last document symbol
+        # find the next section on the same level or assume the section ends with the last document symbol
         for j in range(i + 1, len(sects)):
             if sects[j].level > sect.level:
                 continue
             sect.end = sects[j].start
             break
-
-        sect.title_start = sect.start
-        sect.title_end = sect.title_start + len(sect.title)
+        sect.title_start, sect.title_end = sect.start, sect.title_start + len(sect.title)
         # TODO: detect title start - title end
-
     return sects
 
 
@@ -262,7 +207,6 @@ def get_first_page_layout(pdf_opened_file, use_advanced_detection: bool = True) 
     laparams = LAParams(all_texts=True) if use_advanced_detection else LAParams(all_texts=True, boxes_flow=None)
     device = PDFPageAggregator(rsrcmgr, laparams=laparams)
     interpreter = PDFPageInterpreter(rsrcmgr, device)
-
     for page in PDFPage.create_pages(doc):
         interpreter.process_page(page)
         return device.get_result()
@@ -337,9 +281,8 @@ def rotate_page_back(page_image_without_text_fn: str, rot_angle: float):
 
 def should_correct_rotation(chars_amount: int, rot_status: PageRotationStatus) -> bool:
     """
-    The page may contain much text and just a small image, that our CV2 based logic
-    may detect as rotated. And then we rotate the page itself.
-    This functions prevents rotating the page if:
+    The page may contain much text and just a small image, that our CV2 based logic may detect as rotated. And then we
+    rotate the page itself. This functions prevents rotating the page if:
     - either the page contains enough text
     - or the image occupies a tiny part of the page.
     """

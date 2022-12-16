@@ -521,7 +521,6 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
                 if (deskewSkewAngle != 0) {
                     try (PDPageContentStream cs = new PDPageContentStream(document,
                             page, PDPageContentStream.AppendMode.PREPEND, false)) {
-
                         cs.transform(rotateMatrix(page.getCropBox(), -deskewSkewAngle));
                     }
                 }
@@ -535,8 +534,9 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
         PDRectangle area = page.getMediaBox();
         PDFPlainTextPage pp = new PDFPlainTextPage();
         pp.bbox = new double[]{
-                r(area.getLowerLeftX()), r(area.getLowerLeftY()),
-                r(area.getWidth()), r(area.getHeight())};
+            r(area.getLowerLeftX()), r(area.getLowerLeftY()),
+            r(area.getWidth()), r(area.getHeight())
+        };
         int pageEnd = this.charBBoxes == null ? 0 : this.charBBoxes.size();
         pp.location = new int[]{pageStart, pageEnd};
         pp.deskewAngle = (double) deskewFullAngle;
@@ -587,10 +587,7 @@ public class PDFToTextWithCoordinates extends PDFTextStripper {
 
         pdf2text.setShouldSeparateByBeads(true);
         pdf2text.removeNonPrintable = true;
-
-        // This prevents false-matches in paragraph detection
-        // See TestPDF2Text.test_paragraphs()
-        pdf2text.setDropThreshold(3.5f);
+        pdf2text.setDropThreshold(2.5f);
 
         //pdf2text.setPageStart(pdf2text.getLineSeparator());
         //pdf2text.setArticleStart(pdf2text.getLineSeparator());
