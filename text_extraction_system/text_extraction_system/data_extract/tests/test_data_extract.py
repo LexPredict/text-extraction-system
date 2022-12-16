@@ -146,7 +146,7 @@ def test_speed():
 
     try:
         img.save(dst_path)
-        assert (datetime.datetime.now() - t1).total_seconds() < 0.1
+        assert (datetime.datetime.now() - t1).total_seconds() < 0.5
     finally:
         dst_path.unlink()
 
