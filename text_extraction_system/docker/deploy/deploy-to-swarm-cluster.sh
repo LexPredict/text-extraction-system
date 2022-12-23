@@ -15,3 +15,5 @@ docker stack deploy --compose-file ./temp/${DOCKER_COMPOSE_FILE} ${TEXT_EXTRACTI
 rm -rf ./temp
 echo "Deploy routines have been completed"
 
+echo "Running OpenOffice server.."
+soffice -headless -accept="socket,host=localhost,port=8100;urp;" -nofirststartwizard
