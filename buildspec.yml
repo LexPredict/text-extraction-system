@@ -1,0 +1,37 @@
+version: 0.2
+env:
+  variables:
+    AWS_ACCOUNT_ID: ""
+    ECR_REPOSITORY_URI: ""
+    LC_CTYPE: "C.UTF-8"
+    ENV_BUCKET: ""
+    ENV_FILE: ""
+    ENV_ID: ""
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws --version
+      - aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com
+      - COMMIT_HASH=$(echo ${CODEBUILD_RESOLVED_SOURCE_VERSION} | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+      - echo '*** ---- Add env file --- '
+      - aws s3 cp s3://${ENV_BUCKET}/${ENV_FILE} ./text_extraction_system/docker/build/build_setenv_local.sh
+  build:
+    commands:
+      - echo '*** --- Run build script... --- '
+      - cd ./text_extraction_system/docker/build/ && ./prepare-image.sh
+      - cd ../../../
+      - echo '*** --- Pushing the Docker images... ---'
+      - docker push ${ECR_REPOSITORY_URI}:latest
+      #- docker push ${ECR_REPOSITORY_URI}:${IMAGE_TAG}
+      - echo '*** --- Generate ImageDefinition Files --- '
+      - printf '[{"name":"mc-tes-web-api","imageUri":"%s"}]' ${ECR_REPOSITORY_URI}:latest > api_imagedefinition.json
+      - printf '[{"name":"mc-tes-celery","imageUri":"%s"}]' ${ECR_REPOSITORY_URI}:latest > celery_imagedefinition.json
+      - printf '[{"name":"mc-tes-celery-beat","imageUri":"%s"}]' ${ECR_REPOSITORY_URI}:latest > celery_beat_imagedefinition.json
+artifacts:
+  files: 
+    - api_imagedefinition.json
+    - celery_imagedefinition.json
+    - celery_beat_imagedefinition.json
