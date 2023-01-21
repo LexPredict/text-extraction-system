@@ -5,15 +5,31 @@ OS_VERSION=$(awk -F= '/^VERSION_ID/{print $2}' /etc/os-release)
 PYTHON3_VERSION="$(python3 -V 2>&1)"
 
 # Install python, office, maven and tesseract
-sudo apt-get install virtualenv python3-dev libreoffice maven tesseract-ocr tesseract-ocr-eng \
-                     tesseract-ocr-ita tesseract-ocr-fra tesseract-ocr-spa tesseract-ocr-deu \
-                     tesseract-ocr-rus
+sudo apt-get install virtualenv python3-dev maven tesseract-ocr tesseract-ocr-eng tesseract-ocr-ita tesseract-ocr-fra \
+                     tesseract-ocr-spa tesseract-ocr-deu tesseract-ocr-rus
+
+# Remove LibreOffice
+sudo apt remove libreoffice-base-core libreoffice-impress libreoffice-calc libreoffice-math libreoffice-common \
+                libreoffice-ogltrans libreoffice-core libreoffice-pdfimport libreoffice-draw libreoffice-style-breeze \
+                libreoffice-gnome libreoffice-style-colibre libreoffice-gtk3 libreoffice-style-elementary \
+                libreoffice-help-common libreoffice-style-tango libreoffice-help-en-us libreoffice-writer
+sudo apt autoremove
+
+# Install OpenOffice
+wget https://sourceforge.net/projects/openofficeorg.mirror/files/4.1.12/binaries/en-US/Apache_OpenOffice_4.1.12_Linux_x86-64_install-deb_en-US.tar.gz
+tar -zxvf Apache_OpenOffice_4.1.12_Linux_x86-64_install-deb_en-US.tar.gz
+sudo rm -rf Apache_OpenOffice_4.1.12_Linux_x86-64_install-deb_en-US.tar.gz
+cd en-US/DEBS/
+sudo dpkg -i *.deb
+cd desktop-integration
+sudo dpkg -i *.deb
+cd ../../..
+sudo rm -rf en-US
 
 # Prepare python virtual env
 virtualenv -p /usr/bin/python3 .venv
 source .venv/bin/activate
-pip install -U wheel
-pip install -U setuptools
+pip install -U pip pipenv wheel setuptools
 pip install -U -r requirements.txt
 
 # Install additional python packages
@@ -21,9 +37,7 @@ pip install -U --no-deps -e ../../lexpredict-contraxsuite-core/
 pip install -U -e ../text_extraction_system_api
 
 # NLTK should be installed within lexpredict-contraxsuite-core. The following downloads its models
-python3 -m nltk.downloader averaged_perceptron_tagger punkt stopwords words maxent_ne_chunker \
-                           wordnet omw-1.4
-
+python3 -m nltk.downloader averaged_perceptron_tagger punkt stopwords words maxent_ne_chunker wordnet omw-1.4
 deactivate
 
 # Downloading model for language detection

@@ -1,30 +1,23 @@
 import logging
 import os
 import shutil
+import subprocess
 import tempfile
 from contextlib import contextmanager
-from subprocess import CompletedProcess
+from subprocess import CompletedProcess, PIPE
 from typing import Generator
 
 from PIL import Image
 
 from text_extraction_system.config import get_settings
-from text_extraction_system.locking.socket_lock import get_lock
-from text_extraction_system.pdf.errors import InputFileDoesNotExist, \
-    OutputPDFDoesNotExistAfterConversion
-from text_extraction_system.pdf.utils import separate_filename_basename_and_extension, \
-    run_process, prepare_large_data_file
+from text_extraction_system.pdf.errors import InputFileDoesNotExist, OutputPDFDoesNotExistAfterConversion
+from text_extraction_system.pdf.utils import separate_filename_basename_and_extension, run_process
 from text_extraction_system.processes import raise_from_process, render_process_msg
 
 log = logging.getLogger(__name__)
 
-SOFFICE_CALL_BASE_ARGUMENTS = ['--headless', '--invisible', '--nodefault', '--view',
-                               '--nolockcheck', '--nologo', '--norestore', '--nofirststartwizard', ]
 
-
-def convert_image_to_pdf(src_fn: str,
-                         out_fn: str,
-                         timeout_sec: int = 1800) -> CompletedProcess:
+def convert_image_to_pdf(src_fn: str, out_fn: str, timeout_sec: int = 1800) -> CompletedProcess:
     """
     Converts image to pdf file using custom Java solution
     """
@@ -33,33 +26,8 @@ def convert_image_to_pdf(src_fn: str,
     return run_process(args, timeout_sec)
 
 
-def soffice_convert_to_pdf(src_fn: str,
-                           directory: str,
-                           soffice_single_process_locking: bool = True,
-                           timeout_sec: int = 1800) -> CompletedProcess:
-    """
-    Converts image to pdf file using custom Java solution
-    """
-    with prepare_large_data_file(src_fn, directory) as prepared_fn:
-        args = ['soffice', *SOFFICE_CALL_BASE_ARGUMENTS,
-                '--convert-to', 'pdf',
-                prepared_fn,
-                '--outdir', directory]
-
-        # Soffice does not allow running multiple copies of the process in environment.
-        # The following is a workaround mostly for in-container usage.
-        if soffice_single_process_locking:
-            with get_lock('soffice_single_process',
-                          wait_required_listener=lambda: log.info(
-                              'Waiting for another conversion task to finish first...')):
-                return run_process(args, timeout_sec)
-        return run_process(args, timeout_sec)
-
-
 @contextmanager
-def convert_to_pdf(src_fn: str,
-                   soffice_single_process_locking: bool = True,
-                   timeout_sec: int = 1800) -> Generator[str, None, None]:
+def convert_to_pdf(src_fn: str, timeout_sec: int = 1800) -> Generator[str, None, None]:
     """
     Converts the specified file to pdf file.
     Soffice converter allows specifying the output directory. The output file name is generated
@@ -69,7 +37,6 @@ def convert_to_pdf(src_fn: str,
     """
     if not os.path.isfile(src_fn) and not os.path.isfile(src_fn):
         raise InputFileDoesNotExist(src_fn)
-
     temp_dir = tempfile.mkdtemp()
     source_fn = src_fn
     src_fn, src_fn_base, src_ext = separate_filename_basename_and_extension(src_fn, temp_dir)
@@ -78,7 +45,6 @@ def convert_to_pdf(src_fn: str,
     # Bypass pdf file
     if src_ext == 'pdf':
         return src_fn
-
     try:
         if src_ext.lower() in {'.tiff', '.jpg', '.jpeg', '.png'}:
             if src_ext.lower() == '.png':
@@ -87,14 +53,16 @@ def convert_to_pdf(src_fn: str,
                 rgb_im.save(source_fn)
             completed_process = convert_image_to_pdf(src_fn, out_fn, timeout_sec)
         else:
-            completed_process = soffice_convert_to_pdf(src_fn, temp_dir,
-                                                       soffice_single_process_locking, timeout_sec)
+            java_modules_path = get_settings().java_modules_path
+            args = ['java', '-cp', f'{java_modules_path}/*', 'com.lexpredict.textextraction.ConvertToPDF',
+                    '--original-doc', src_fn,
+                    '--dst-pdf', out_fn]
+            completed_process: CompletedProcess = subprocess.run(args, check=False, timeout=timeout_sec,
+                                                                 universal_newlines=True, stderr=PIPE, stdout=PIPE)
         raise_from_process(log, completed_process, lambda: f'Converting {src_fn} to pdf.')
-
         if not os.path.isfile(out_fn):
-            raise OutputPDFDoesNotExistAfterConversion(
-                f'Unable to convert {src_fn} to pdf. Output file does not exist after conversion.\n'
-                + render_process_msg(completed_process))
+            raise OutputPDFDoesNotExistAfterConversion(f'Unable to convert {src_fn} to pdf. Output file does not exist '
+                                                       f'after conversion.\n' + render_process_msg(completed_process))
         yield out_fn
     finally:
         if os.path.isdir(temp_dir):
