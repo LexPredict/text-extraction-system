@@ -5,9 +5,8 @@ OS_VERSION=$(awk -F= '/^VERSION_ID/{print $2}' /etc/os-release)
 PYTHON3_VERSION="$(python3 -V 2>&1)"
 
 # Install python, office, maven and tesseract
-sudo apt-get install virtualenv python3-dev libreoffice maven tesseract-ocr tesseract-ocr-eng \
-                     tesseract-ocr-ita tesseract-ocr-fra tesseract-ocr-spa tesseract-ocr-deu \
-                     tesseract-ocr-rus
+sudo apt-get install virtualenv python3-dev poppler-utils libreoffice maven tesseract-ocr tesseract-ocr-eng \
+                     tesseract-ocr-ita tesseract-ocr-fra tesseract-ocr-spa tesseract-ocr-deu tesseract-ocr-rus
 
 # Prepare python virtual env
 virtualenv -p /usr/bin/python3 .venv
@@ -21,8 +20,7 @@ pip install -U --no-deps -e ../../lexpredict-contraxsuite-core/
 pip install -U -e ../text_extraction_system_api
 
 # NLTK should be installed within lexpredict-contraxsuite-core. The following downloads its models
-python3 -m nltk.downloader averaged_perceptron_tagger punkt stopwords words maxent_ne_chunker \
-                           wordnet omw-1.4
+python3 -m nltk.downloader averaged_perceptron_tagger punkt stopwords words maxent_ne_chunker wordnet omw-1.4
 
 deactivate
 
