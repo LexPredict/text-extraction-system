@@ -26,13 +26,12 @@ ENV/
 venv36/
 venv38/
 .venv/
-
+.python-version
 
 **/.idea/*
 **/.vs_code/*
 **/.vscode/*
 **/samples
-
 
 # logs, pid files
 celery_log
@@ -40,25 +39,16 @@ celery_log
 *.log_json*
 log.txt
 *.pid
-
 .cache/
 .ruff_cache/
 .pytest_cache/
-
 .DS_Store
-
 documentation/docs/build/*
 documentation/docs/source/_build/*
-
-
 sve/
-
-
 tmp/
 docker/deploy/temp
-
 java_modules/*.jar
 models/*
-
 text_extraction_system/templates/index.html
 text_extraction_system/templates/bundle.js
