@@ -85,7 +85,7 @@ elif [ "${DOLLAR}{ROLE}" == "celery-worker" ]; then
    exec celery -A text_extraction_system.tasks worker \
       -X beat \
       -l INFO \
-      --concurrency=${DOLLAR}{CPU_QUARTER_CORES} \
+      --concurrency=8 \
       --autoscale=${DOLLAR}{CPU_QUARTER_CORES},${DOLLAR}{CPU_QUARTER_CORES} \
       -Ofair \
       -n celery@%h \
